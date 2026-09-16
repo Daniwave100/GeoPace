@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Raw downloads (route files, terrain tiles). Never committed.
+pipeline/.cache/
+
+# App
+node_modules/
+app/dist/
+
+.DS_Store
