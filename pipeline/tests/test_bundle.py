@@ -42,6 +42,8 @@ def test_bundle_validates_against_the_shared_schema(synthetic_facts, tmp_path):
     assert line["km"][-1] == pytest.approx(line["length_m"] / 1000, abs=0.0001)
     assert written["measured"]["elevation_summary"]["gain_m"] == pytest.approx(50, abs=2)
     assert {s["url"] for s in written["sources"]} == {"https://example.org/synthetic.gpx", "https://example.org/dem"}
+    # Facts keep their source all the way to the app.
+    assert written["course"]["landmarks"] == [{"name": "Turnaround", "km": 2.5, "source": "https://example.org/synthetic"}]
 
 
 def test_grades_outside_the_difficulty_model_are_null_not_invented(synthetic_facts):

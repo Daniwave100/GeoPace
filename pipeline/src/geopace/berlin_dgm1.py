@@ -37,31 +37,48 @@ ATTRIBUTION = Attribution(
 _to_utm33 = Transformer.from_crs("EPSG:4326", "EPSG:25833", always_xy=True)
 
 
-def elevation_model() -> ElevationModel:
-    return ElevationModel(sample=sample, source=SOURCE, attribution=ATTRIBUTION)
+class TilesNotCached(FileNotFoundError):
+    """Downloads were turned off and some needed terrain tiles aren't in the cache."""
 
 
-def sample(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
+def elevation_model(allow_download: bool = True) -> ElevationModel:
+    return ElevationModel(
+        sample=lambda lat, lon: sample(lat, lon, allow_download),
+        source=SOURCE,
+        attribution=ATTRIBUTION,
+    )
+
+
+def sample(lat: np.ndarray, lon: np.ndarray, allow_download: bool = True) -> np.ndarray:
     """Bilinear interpolation between the four 1 m cells around each point."""
     easting, northing = _to_utm33.transform(np.asarray(lon), np.asarray(lat))
     # Cell centers sit at whole meters + 0.5, so shift by half a cell before flooring.
-    fx, fy = easting - 0.5, northing - 0.5
-    ix, iy = np.floor(fx).astype(np.int64), np.floor(fy).astype(np.int64)
-    tx, ty = fx - ix, fy - iy
+    x, y = easting - 0.5, northing - 0.5
+    # (west_cell, south_cell) is the cell to the lower left; east_share/north_share (0..1)
+    # say how far the point sits toward the next cell east/north.
+    west_cell, south_cell = np.floor(x).astype(np.int64), np.floor(y).astype(np.int64)
+    east_share, north_share = x - west_cell, y - south_cell
 
-    corners = [(ix, iy), (ix + 1, iy), (ix, iy + 1), (ix + 1, iy + 1)]
-    needed = {_tile_of(x, y) for xs, ys in corners for x, y in zip(xs, ys)}
-    grids = _load_tiles(needed)
+    corners = [
+        (west_cell, south_cell),
+        (west_cell + 1, south_cell),
+        (west_cell, south_cell + 1),
+        (west_cell + 1, south_cell + 1),
+    ]
+    needed = {_tile_of(cx, cy) for xs, ys in corners for cx, cy in zip(xs, ys)}
+    grids = _load_tiles(needed, allow_download)
 
     def height(xs, ys):
         out = np.empty(xs.shape)
-        for i, (x, y) in enumerate(zip(xs, ys)):
-            e, n = _tile_of(x, y)
-            out[i] = grids[(e, n)][y - n * 1000, x - e * 1000]
+        for i, (cx, cy) in enumerate(zip(xs, ys)):
+            east_km, north_km = _tile_of(cx, cy)
+            out[i] = grids[(east_km, north_km)][cy - north_km * 1000, cx - east_km * 1000]
         return out
 
-    h00, h10, h01, h11 = (height(xs, ys) for xs, ys in corners)
-    return (h00 * (1 - tx) + h10 * tx) * (1 - ty) + (h01 * (1 - tx) + h11 * tx) * ty
+    south_west, south_east, north_west, north_east = (height(xs, ys) for xs, ys in corners)
+    south = south_west * (1 - east_share) + south_east * east_share
+    north = north_west * (1 - east_share) + north_east * east_share
+    return south * (1 - north_share) + north * north_share
 
 
 def _tile_of(cell_x: int, cell_y: int) -> tuple[int, int]:
@@ -69,9 +86,12 @@ def _tile_of(cell_x: int, cell_y: int) -> tuple[int, int]:
     return (int(cell_x) // TILE_SIZE_M * 2, int(cell_y) // TILE_SIZE_M * 2)
 
 
-def _load_tiles(tiles: set[tuple[int, int]]) -> dict[tuple[int, int], np.ndarray]:
+def _load_tiles(tiles: set[tuple[int, int]], allow_download: bool) -> dict[tuple[int, int], np.ndarray]:
     folder = cache_dir() / "berlin" / "dgm1"
     todo = sorted(tiles)
+    missing = [t for t in todo if not (folder / f"DGM1_{t[0]}_{t[1]}.zip").exists()]
+    if missing and not allow_download:
+        raise TilesNotCached(f"{len(missing)} DGM1 tiles are not cached in {folder}")
     print(f"  DGM1: {len(todo)} tiles (downloading any not yet cached into {folder})")
     with ThreadPoolExecutor(max_workers=4) as pool:
         paths = list(pool.map(lambda t: download(TILE_URL.format(e=t[0], n=t[1]), folder / f"DGM1_{t[0]}_{t[1]}.zip"), todo))

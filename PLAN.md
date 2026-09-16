@@ -72,7 +72,8 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D16 | ✅ **Keyless map providers: OpenStreetMap standard tiles + Re:Earth Terrain** (quantized-mesh from Mapterhorn). ⛔ Esri World Imagery and CARTO raster basemaps. | Esri basemaps now need an ArcGIS key; CARTO raster tiles are watermarked without a key. OSM tiles are keyless with visible attribution and no bulk/offline fetching; Re:Earth Terrain is keyless, CORS-open, and loads natively in CesiumJS. Both are best-effort with no SLA, so the look may switch to a quieter basemap once the design is picked. | 09-16 |
 | D17 | ✅ **Difficulty = Minetti et al. 2002 running energy cost relative to flat**, only for grades within the model's measured −45%…+45% range (outside it: null, grayed out). | A published, widely cited physiological model instead of an invented score. | 09-16 |
 | D18 | ✅ **Bridge decks the ground model drops are listed as sourced course facts** (km span + OpenStreetMap way) and spanned in a straight line between the two ends. | Berlin DGM1 omits most decks: the Moltkebrücke read as the Spree 6 m below and faked a −4.7% grade. A straight span is right for low, flat city bridges. NYC's high bridges still need deck heights from surface data (#3). | 09-16 |
-| D19 | ✅ **Course Bundle = one JSON file per course**, `data/derived/<id>/course-bundle.json`, validated on both sides against `schema/course-bundle.schema.json` (`schema_version` 1). Measured data sits under `measured`; subjective data will get its own section. | One versioned contract; drift is caught when loading instead of showing wrong numbers. Berlin's bundle is ~210 KB. | 09-16 |
+| D19 | ✅ **Course Bundle = one JSON file per course**, `data/derived/<id>/course-bundle.json`, validated on both sides against `schema/course-bundle.schema.json` (`schema_version` 1). Measured data (and values computed from it by published models, like difficulty) sits under `measured`; subjective data will get its own section. Every landmark carries its source into the bundle. | One versioned contract; drift is caught when loading instead of showing wrong numbers. Berlin's bundle is ~210 KB. | 09-16 |
+| D20 | ✅ **One distance scale per course: km measured along the course file** (Berlin: 42.28 km). Landmarks and bridge spans use it too; certified positions (half, finish) are scaled onto it. *Revisit in #12:* organizer km (aid stations, km signs) sit on the certified scale and must be converted, or the line rescaled to 42.195 km. | Mixing scales put the Finish marker ~90 m before the end of the line. The 0.2% gap is real (street line vs shortest legal line) and small, but it must not be silently mixed. | 09-16 |
 
 ---
 
@@ -264,4 +265,5 @@ arrival times are approximate — state that in the UI.
 - **2026-09-16** — Plan created from the original project brief + grilling session (D1–D12).
 - **2026-09-16** — Design process decisions D13–D15; plan confirmed by owner.
 - **2026-09-16** — Berlin end-to-end slice (#2): verified Berlin route source, DGM1 access and licence, and keyless
-  map/terrain terms (§5). Added D16 (keyless providers), D17 (Minetti difficulty), D18 (bridge spans), D19 (Course Bundle format).
+  map/terrain terms (§5). Added D16 (keyless providers), D17 (Minetti difficulty), D18 (bridge spans), D19 (Course Bundle format),
+  D20 (one distance scale per course).

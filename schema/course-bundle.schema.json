@@ -34,18 +34,19 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name", "km"],
+            "required": ["name", "km", "source"],
             "additionalProperties": false,
             "properties": {
               "name": { "type": "string", "minLength": 1 },
-              "km": { "type": "number", "minimum": 0 }
+              "km": { "description": "Distance from the start along the course file, same scale as course_line.km.", "type": "number", "minimum": 0 },
+              "source": { "$ref": "#/$defs/url" }
             }
           }
         }
       }
     },
     "measured": {
-      "description": "Measured data only. Subjective data (forum reports etc.) never goes in here.",
+      "description": "Measured data, and values computed from it with published models (e.g. difficulty). Subjective data (forum reports etc.) never goes in here.",
       "type": "object",
       "required": ["course_line", "elevation_summary", "difficulty_model"],
       "additionalProperties": false,

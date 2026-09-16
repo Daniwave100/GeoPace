@@ -13,9 +13,10 @@ export interface CourseBundle {
     timezone: string;
     certified_distance_m: number;
     start: { lat: number; lon: number };
-    landmarks: { name: string; km: number }[];
+    /** km on the same scale as course_line.km; source locates the landmark */
+    landmarks: { name: string; km: number; source: string }[];
   };
-  /** Measured data only. Subjective data never lives here. */
+  /** Measured data and values computed from it with published models. Subjective data never lives here. */
   measured: {
     course_line: CourseLine;
     elevation_summary: { gain_m: number; loss_m: number; min_m: number; max_m: number };

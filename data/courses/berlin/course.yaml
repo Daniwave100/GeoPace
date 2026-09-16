@@ -3,7 +3,8 @@
 # Positions along the course are km from the start.
 
 id: berlin
-name: BMW BERLIN-MARATHON
+# Plain event name; no sponsor styling or trade dress (PLAN.md §9).
+name: Berlin Marathon
 city: Berlin
 timezone: Europe/Berlin
 source: https://www.bmw-berlin-marathon.com/en/your-race/course/
@@ -30,8 +31,12 @@ start:
   source: https://www.bmw-berlin-marathon.com/fileadmin/media/events/berlinmarathon/gpx/BM25_Marathon-Strecke.gpx
   accessed: 2026-09-16
 
-# km = distance along the official 2025 course file to the point closest to the landmark,
-# rounded to 0.1 km. `source` locates the landmark itself.
+# All km here are on ONE scale: distance measured along the official 2025 course file, the same
+# scale as the course line in the bundle. The file measures 42.28 km; the certified course is
+# 42.195 km because it is measured on the shortest legal line.
+# Places: km = distance along the course file to the point closest to the landmark, rounded to
+# 0.1 km; `source` locates the landmark. Half marathon and Finish: the certified positions
+# (21.0975 km, 42.195 km) scaled onto the course file (x 42.28 / 42.195).
 landmarks:
   - name: Victory Column (Großer Stern)
     km: 0.7
@@ -54,7 +59,7 @@ landmarks:
     source: https://en.wikipedia.org/wiki/Hermannplatz
     accessed: 2026-09-16
   - name: Half marathon
-    km: 21.0975
+    km: 21.14
     source: https://www.bmw-berlin-marathon.com/en/your-race/course/
     accessed: 2026-09-16
   - name: Rathaus Schöneberg
@@ -82,7 +87,7 @@ landmarks:
     source: https://en.wikipedia.org/wiki/Brandenburg_Gate
     accessed: 2026-09-16
   - name: Finish
-    km: 42.195
+    km: 42.28
     source: https://www.bmw-berlin-marathon.com/en/your-race/course/
     accessed: 2026-09-16
 

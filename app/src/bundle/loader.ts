@@ -14,7 +14,7 @@ export class BundleError extends Error {
 
 const validate = new Ajv2020({ allErrors: true, allowUnionTypes: true }).compile<CourseBundle>(schema);
 
-export function bundleUrl(courseId: string): string {
+function bundleUrl(courseId: string): string {
   return `/${courseId}/course-bundle.json`;
 }
 

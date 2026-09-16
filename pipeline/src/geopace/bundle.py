@@ -12,7 +12,7 @@ import jsonschema
 
 from geopace import __version__, difficulty
 from geopace.course_facts import CourseFacts
-from geopace.course_line import DEFAULT_SPACING_M, CourseLine, build_course_line
+from geopace.course_line import CourseLine, build_course_line
 from geopace.elevation import ElevationModel
 from geopace.provenance import Attribution, Source
 
@@ -46,11 +46,8 @@ def build_course_bundle(
     facts: CourseFacts,
     route: list[tuple[float, float]],
     elevation: ElevationModel,
-    *,
-    spacing_m: float = DEFAULT_SPACING_M,
-    generated_at: datetime | None = None,
 ) -> dict:
-    line = build_course_line(route, elevation, spacing_m, facts.bridges)
+    line = build_course_line(route, elevation, bridges=facts.bridges)
     check_length(line.length_m, facts.certified_distance_m)
     route_source = Source(
         id="route",
@@ -62,7 +59,7 @@ def build_course_bundle(
     bundle = {
         "schema_version": SCHEMA_VERSION,
         "course_id": facts.id,
-        "generated_at": (generated_at or datetime.now(UTC)).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "pipeline_version": __version__,
         "course": {
             "name": facts.name,
@@ -70,7 +67,7 @@ def build_course_bundle(
             "timezone": facts.timezone,
             "certified_distance_m": facts.certified_distance_m,
             "start": {"lat": facts.start_lat, "lon": facts.start_lon},
-            "landmarks": [{"name": l.name, "km": l.km} for l in facts.landmarks],
+            "landmarks": [{"name": mark.name, "km": mark.km, "source": mark.source} for mark in facts.landmarks],
         },
         "measured": {
             "course_line": _course_line_json(line),
@@ -83,7 +80,7 @@ def build_course_bundle(
             elevation.attribution.to_json(),
         ],
     }
-    if any("openstreetmap.org" in source for source in facts.bridge_sources):
+    if any("openstreetmap.org" in bridge.source for bridge in facts.bridges):
         bundle["sources"].append(OSM_SOURCE.to_json())
         bundle["attributions"].append(OSM_ATTRIBUTION.to_json())
     validate_bundle(bundle)

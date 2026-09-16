@@ -26,7 +26,12 @@ def test_committed_berlin_bundle_matches_the_schema():
 @pytest.mark.skipif(not (ROUTE.exists() and any(TILES.glob("*.zip"))), reason="real Berlin inputs not cached")
 def test_real_berlin_course_is_marathon_length_with_no_absurd_grades():
     facts = load_course_facts(REPO / "data" / "courses" / "berlin" / "course.yaml")
-    bundle = build_course_bundle(facts, parse_gpx(ROUTE.read_text()), berlin_dgm1.elevation_model())
+    try:
+        bundle = build_course_bundle(
+            facts, parse_gpx(ROUTE.read_text()), berlin_dgm1.elevation_model(allow_download=False)
+        )
+    except berlin_dgm1.TilesNotCached as missing:
+        pytest.skip(str(missing))
     line = bundle["measured"]["course_line"]
 
     assert line["length_m"] == pytest.approx(42195, rel=0.01)

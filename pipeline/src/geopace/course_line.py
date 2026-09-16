@@ -75,17 +75,19 @@ def resample(route: list[tuple[float, float]], spacing_m: float):
     """Evenly spaced points along the route. The last point is always the route's end."""
     if len(route) < 2:
         raise ValueError("A route needs at least two points")
-    vlat = np.array([p[0] for p in route], dtype=float)
-    vlon = np.array([p[1] for p in route], dtype=float)
-    _, _, seg = WGS84.inv(vlon[:-1], vlat[:-1], vlon[1:], vlat[1:])
-    cumulative = np.concatenate([[0.0], np.cumsum(seg)])
-    total = cumulative[-1]
-    distance_m = np.arange(0.0, total, spacing_m)
-    if total - distance_m[-1] > 1e-6:
-        distance_m = np.append(distance_m, total)
+    vertex_lat = np.array([point[0] for point in route], dtype=float)
+    vertex_lon = np.array([point[1] for point in route], dtype=float)
+    _, _, segment_m = WGS84.inv(vertex_lon[:-1], vertex_lat[:-1], vertex_lon[1:], vertex_lat[1:])
+    vertex_distance_m = np.concatenate([[0.0], np.cumsum(segment_m)])
+    total_m = vertex_distance_m[-1]
+    distance_m = np.arange(0.0, total_m, spacing_m)
+    if total_m - distance_m[-1] > 1e-6:
+        distance_m = np.append(distance_m, total_m)
     # Linear interpolation in lat/lon inside one route segment; segments are short enough
     # (well under a km) that this is centimeter-accurate.
-    return np.interp(distance_m, cumulative, vlat), np.interp(distance_m, cumulative, vlon), distance_m
+    lat = np.interp(distance_m, vertex_distance_m, vertex_lat)
+    lon = np.interp(distance_m, vertex_distance_m, vertex_lon)
+    return lat, lon, distance_m
 
 
 def span_bridges(distance_m: np.ndarray, elevation_m: np.ndarray, bridges: list[Bridge]) -> np.ndarray:

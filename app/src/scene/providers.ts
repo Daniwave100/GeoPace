@@ -10,7 +10,7 @@ export const BASEMAP = {
 
 export const TERRAIN = {
   // Re:Earth Terrain: quantized-mesh built from Mapterhorn (CC BY 4.0) + EGM2008 geoid, no key.
-  // "Best-effort uptime, no SLA, no signup, no API key." https://terrain.reearth.land/
+  // Free with no signup or key; best effort with no uptime guarantee. https://terrain.reearth.land/
   // Its layer.json carries the full attribution, which Cesium shows on the map automatically.
   url: "https://terrain.reearth.land/cesium-mesh/ellipsoid",
 };

@@ -71,9 +71,15 @@ function chart(bundle: CourseBundle, width: number): SVGSVGElement {
   for (const landmark of bundle.course.landmarks) {
     if (landmark.km > lastKm + 0.5) continue;
     const lx = x(Math.min(landmark.km, lastKm));
+    const label = document.createElementNS(SVG_NS, "a");
+    label.setAttribute("href", landmark.source);
+    label.setAttribute("target", "_blank");
+    label.append(
+      el("text", { x: lx, y: MARGIN.top - 8, "font-size": 11, transform: `rotate(-50 ${lx} ${MARGIN.top - 8})` }, landmark.name),
+    );
     svg.append(
       el("line", { x1: lx, x2: lx, y1: MARGIN.top - 4, y2: bandTop + BAND_HEIGHT, stroke: "#0004", "stroke-dasharray": "2 3" }),
-      el("text", { x: lx, y: MARGIN.top - 8, "font-size": 11, transform: `rotate(-50 ${lx} ${MARGIN.top - 8})` }, landmark.name),
+      label,
     );
   }
 

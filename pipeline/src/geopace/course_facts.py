@@ -22,6 +22,7 @@ class CourseFactsInvalid(ValueError):
 class Landmark:
     name: str
     km: float
+    source: str
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class Bridge:
     name: str
     km_start: float
     km_end: float
+    source: str
 
 
 @dataclass(frozen=True)
@@ -47,7 +49,6 @@ class CourseFacts:
     start_lon: float
     landmarks: list[Landmark]
     bridges: list[Bridge]
-    bridge_sources: list[str]
 
 
 def load_course_facts(path: Path) -> CourseFacts:
@@ -86,12 +87,19 @@ def parse_course_facts(raw: dict) -> CourseFacts:
         route_edition=int(raw["route"]["edition"]),
         start_lat=float(raw["start"]["lat"]),
         start_lon=float(raw["start"]["lon"]),
-        landmarks=[Landmark(name=l["name"], km=float(l["km"])) for l in raw.get("landmarks", [])],
-        bridges=[
-            Bridge(name=b["name"], km_start=float(b["km_start"]), km_end=float(b["km_end"]))
-            for b in raw.get("bridges", [])
+        landmarks=[
+            Landmark(name=landmark["name"], km=float(landmark["km"]), source=landmark["source"])
+            for landmark in raw.get("landmarks", [])
         ],
-        bridge_sources=[b["source"] for b in raw.get("bridges", [])],
+        bridges=[
+            Bridge(
+                name=bridge["name"],
+                km_start=float(bridge["km_start"]),
+                km_end=float(bridge["km_end"]),
+                source=bridge["source"],
+            )
+            for bridge in raw.get("bridges", [])
+        ],
     )
 
 
