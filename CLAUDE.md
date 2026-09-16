@@ -40,9 +40,12 @@ ask before anything that changes scope or look.
 - Course length stays within tolerance of the certified 42.195 km.
 
 ## Commands
-*(Filled in as each part is scaffolded.)*
-- Pipeline: `cd pipeline && uv run pytest`
-- App: `cd app && npm install && npm run dev`
+- Run the app: `cd app && npm install && npm run dev` → http://localhost:5173
+- App tests / types: `cd app && npm test` · `cd app && npm run typecheck`
+- Rebuild a Course Bundle: `cd pipeline && uv run geopace build berlin` (downloads into `pipeline/.cache/`)
+- Pipeline tests: `cd pipeline && uv run pytest` (real-data checks skip until the cache exists)
+- The Course Bundle contract is `schema/course-bundle.schema.json`; both halves validate against it.
+  Bump `schema_version` on breaking changes.
 
 ## Git
 Work on a branch, commit in small steps, don't push unless the owner asks.

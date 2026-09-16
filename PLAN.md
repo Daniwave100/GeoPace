@@ -69,6 +69,10 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D13 | ✅ **Design is chosen from 3 contrasting clickable mockups**: (a) Roadbook — editorial/print, (b) Race poster — bold graphic, (c) Field instrument — light scientific. Owner picks or mixes. | "Unique" is easier to recognize than to specify. Runs in parallel with step 1. | 09-16 |
 | D14 | ✅ **The km strip is the spine of the UI.** Every layer aligns by km; scrubbing moves runner, clock, sun, and camera together. | A recognizable interaction no 3D map app has. | 09-16 |
 | D15 | ✅ **Analysis mode looks like an architectural model**: matte untextured buildings on a quiet ground, real shadows as the hero. *(Accepted by default; owner can revisit on seeing mockups.)* | Distinct from Google Earth / game looks; contrasts with photoreal mode. | 09-16 |
+| D16 | ✅ **Keyless map providers: OpenStreetMap standard tiles + Re:Earth Terrain** (quantized-mesh from Mapterhorn). ⛔ Esri World Imagery and CARTO raster basemaps. | Esri basemaps now need an ArcGIS key; CARTO raster tiles are watermarked without a key. OSM tiles are keyless with visible attribution and no bulk/offline fetching; Re:Earth Terrain is keyless, CORS-open, and loads natively in CesiumJS. Both are best-effort with no SLA, so the look may switch to a quieter basemap once the design is picked. | 09-16 |
+| D17 | ✅ **Difficulty = Minetti et al. 2002 running energy cost relative to flat**, only for grades within the model's measured −45%…+45% range (outside it: null, grayed out). | A published, widely cited physiological model instead of an invented score. | 09-16 |
+| D18 | ✅ **Bridge decks the ground model drops are listed as sourced course facts** (km span + OpenStreetMap way) and spanned in a straight line between the two ends. | Berlin DGM1 omits most decks: the Moltkebrücke read as the Spree 6 m below and faked a −4.7% grade. A straight span is right for low, flat city bridges. NYC's high bridges still need deck heights from surface data (#3). | 09-16 |
+| D19 | ✅ **Course Bundle = one JSON file per course**, `data/derived/<id>/course-bundle.json`, validated on both sides against `schema/course-bundle.schema.json` (`schema_version` 1). Measured data sits under `measured`; subjective data will get its own section. | One versioned contract; drift is caught when loading instead of showing wrong numbers. Berlin's bundle is ~210 KB. | 09-16 |
 
 ---
 
@@ -80,7 +84,7 @@ Success for v1 = a few hundred stars within a few months of launch.
 | 3D engine | **CesiumJS** — built-in sun position from a clock, shadow maps, timeline, terrain, 3D Tiles (incl. Google photoreal) | ✅ |
 | Frontend language | **TypeScript** | ✅ |
 | Build/dev server | **Vite** | ✅ |
-| UI framework | **Svelte 5** (proposed): small bundles, built-in transitions for a polished custom UI, less boilerplate than React | 🟡 confirm with design direction |
+| UI framework | **Svelte 5** (proposed): small bundles, built-in transitions for a polished custom UI, less boilerplate than React. *The first slice uses plain TypeScript DOM code so nothing depends on the pick yet.* | 🟡 confirm with design direction |
 | Charts | Hand-built SVG/D3 for the km-strip (custom look matters more than a chart library's defaults) | 🟡 |
 | Data pipeline | **Python**, managed with **uv**; tests with pytest | ✅ |
 | Hosting | None for v1 (local). Static build → free host later if wanted | ✅ |
@@ -119,13 +123,14 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 
 | Need | Berlin | NYC | License | Status |
 |------|--------|-----|---------|--------|
-| Course route | 🔍 official GPX/KML or certified course map | 🔍 official GPX/KML or certified course map | Road geometry is factual | 🔍 |
-| Bare-earth elevation | 🔍 Berlin DGM1 | NYC 1-ft DEM (2024) — bridges removed, patch from LiDAR | 🔍 dl-de/zero-2.0 / NYC Open Data terms | 🔍 |
+| Course route | ✅ Organizer's own GPX: [BM25_Marathon-Strecke.gpx](https://www.bmw-berlin-marathon.com/fileadmin/media/events/berlinmarathon/gpx/BM25_Marathon-Strecke.gpx), linked from the [course page](https://www.bmw-berlin-marathon.com/en/your-race/course/). 508 points, no elevation; 42.285 km measured on the WGS84 ellipsoid (+0.2% vs certified). No 2026 file yet (BM26 → 404, 2026-09-16). | 🔍 official GPX/KML or certified course map | Road geometry is factual; the file is downloaded to the cache, never committed | Berlin ✅ |
+| Bare-earth elevation | ✅ [ATKIS® DGM1](https://gdi.berlin.de/data/dgm1/atom/) via ATOM feed: 2×2 km zips of "E N H" text, EPSG:25833, 1 m cells, DHHN2016 heights, ~17 MB each; the course needs 18 tiles. Feed updated 2025-12-18. **Most bridge decks are missing** (D18). | NYC 1-ft DEM (2024) — bridges removed, patch from LiDAR | Berlin ✅ [dl-de/zero-2.0](https://www.govdata.de/dl-de/zero-2-0) (no attribution required; we credit anyway) / NYC Open Data terms 🔍 | Berlin ✅ |
 | Surface model (buildings + trees) | DOM / bDOM, ALS LiDAR, Vegetation heights 2020 | 2017 topobathy LiDAR (8 pts/m², May 3–17 2017, 50% leaf-off; 180 GB citywide, per-tile download) | Berlin: dl-de/zero-2.0 · NYC: 🔍 NYC Open Data terms | ✅ found |
 | Buildings | 3D building models LoD2 | Building Footprints w/ roof heights (updated 2026; preferred over 2017 LiDAR for new towers) | as above | ✅ found |
 | Tree canopy | Vegetation heights 2020 | 6-inch Land Cover 2017 | as above | ✅ found |
 | Historical weather | Open-Meteo historical archive (ERA5), keyless | same | CC BY 4.0, attribution required | 🔍 rate limits, window |
-| Keyless basemap / terrain | 🔍 Esri World Imagery (keyless endpoint) or open vector tiles; Mapterhorn terrain (CC BY 4.0) | same | 🔍 | 🔍 |
+| Keyless basemap / terrain | ✅ [OpenStreetMap standard tiles](https://operations.osmfoundation.org/policies/tiles/) (attribution visible, no bulk/offline pre-fetching, Referer sent) + [Re:Earth Terrain](https://terrain.reearth.land/) quantized-mesh `cesium-mesh/ellipsoid` ("no signup, no API key", best-effort, may rate-limit heavy clients; attribution "Re:Earth Terrain · Mapterhorn (CC BY 4.0)"). ⛔ Esri (needs key) · ⛔ CARTO raster (watermarked without key). Candidate quieter basemap for Berlin: [basemap.de Web Raster](https://basemap.de/produkte-und-dienste/web-raster/) grayscale (CC BY 4.0, Germany only). | same | OSM: ODbL · Mapterhorn: CC BY 4.0 | ✅ (D16) |
+| Bridge locations | ✅ OpenStreetMap ways, listed per bridge in `data/courses/berlin/course.yaml` | 🔍 | ODbL, attribution in bundle | Berlin ✅ |
 | Photoreal 3D | Google Photorealistic 3D Tiles via user's key or Cesium ion token | same | Google ToS: no caching, attribution required · ion Community = personal/non-commercial | ✅ |
 | Aid stations | 🔍 organizer site (paraphrase + source link) | 🔍 NYRR (2026 may publish late) | Facts, not copied layouts | 🔍 |
 | Race date / start waves | Sept 27, 2026 (✅ official site) | 🔍 believed Nov 1, 2026; wave times TBD | — | 🔍 |
@@ -246,12 +251,11 @@ arrival times are approximate — state that in the UI.
 ## 10. Open items
 
 - 🟡 **Design direction (§6)** — mockups in progress; owner picks.
-- 🟡 UI framework confirmation (Svelte 5 proposed).
+- 🟡 UI framework confirmation (Svelte 5 proposed; the first slice is plain TypeScript).
 - ⚠️ **GitHub repo `Daniwave100/GeoPace` is currently public**, but D10 says private until the demo.
   Owner to decide whether to flip it to private (GitHub → Settings → Danger Zone).
-- 🔍 Verify: NYC 2026 date + wave times · official course GPX sources for both races · Berlin DGM1
-  licence · NYC Open Data terms · Esri keyless basemap terms vs. open vector-tile alternative ·
-  Mapterhorn terrain · Open-Meteo archive limits · Cesium ion Community terms for end users.
+- 🔍 Verify: NYC 2026 date + wave times · official NYC course GPX source · NYC Open Data terms ·
+  Open-Meteo archive limits · Cesium ion Community terms for end users.
 - ✅ Plan confirmed 2026-09-16; CLAUDE.md created; step 1 + mockups started.
 
 ---
@@ -259,3 +263,5 @@ arrival times are approximate — state that in the UI.
 ## Changelog
 - **2026-09-16** — Plan created from the original project brief + grilling session (D1–D12).
 - **2026-09-16** — Design process decisions D13–D15; plan confirmed by owner.
+- **2026-09-16** — Berlin end-to-end slice (#2): verified Berlin route source, DGM1 access and licence, and keyless
+  map/terrain terms (§5). Added D16 (keyless providers), D17 (Minetti difficulty), D18 (bridge spans), D19 (Course Bundle format).
