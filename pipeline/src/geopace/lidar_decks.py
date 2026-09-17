@@ -99,20 +99,45 @@ def lidar_deck_model(
     return BridgeDeckModel(returns=returns, source=source, attribution=attribution)
 
 
-def deck_height(returns: np.ndarray, deck: str | None, where: str) -> float:
-    """Height of one deck from the returns near a point: the median of that deck's returns.
-    NaN when there aren't enough returns to call it a deck."""
+def deck_heights(returns: list[np.ndarray], deck: str | None, where: str) -> np.ndarray:
+    """The height of the deck under the runners at each point along a bridge, NaN where the scan
+    has nothing to say.
+
+    The returns near a point can fall in more than one layer: the bridge's own deck, and whatever
+    passes over or under it there (a ramp, a walkway, the other level of a double-deck bridge).
+    Layers with far fewer returns than the busiest are discarded, then:
+
+    - one layer left: that is the deck.
+    - several, and the course facts name a deck ("upper"/"lower"): take that one. A bridge that is
+      double-decked the whole way (NYC's Queensboro) can only be resolved this way.
+    - several, and no deck named: a deck runs on unbroken, so take the layer nearest the height of
+      the closest point that was not ambiguous. That is how a bridge passing under something else
+      for a few meters resolves itself.
+    """
+    layers = [_layers(z) for z in returns]
+    heights = np.array([layer[0] if len(layer) == 1 else np.nan for layer in layers])
+    if deck is not None:
+        return np.array([np.nan if not len(l) else (l[0] if deck == "lower" else l[-1]) for l in layers])
+    ambiguous = [i for i, layer in enumerate(layers) if len(layer) > 1]
+    if ambiguous and not np.any(np.isfinite(heights)):
+        found = ", ".join(f"{h:.1f} m" for h in layers[ambiguous[0]])
+        raise ValueError(
+            f"{where} has more than one deck in the surface data ({found}) all the way along. "
+            "Say which one the course uses in the course facts with `deck: upper` or `deck: lower`."
+        )
+    known = np.flatnonzero(np.isfinite(heights))
+    for i in ambiguous:
+        nearest = known[np.argmin(np.abs(known - i))]
+        heights[i] = min(layers[i], key=lambda h: abs(h - heights[nearest]))
+    return heights
+
+
+def _layers(returns: np.ndarray) -> list[float]:
+    """The heights the returns near one point fall into, lowest first: a deck, plus anything
+    passing over or under it. Empty when there aren't enough returns to call anything a deck."""
     heights = np.sort(np.asarray(returns, dtype=float))
     layers = [layer for layer in np.split(heights, np.flatnonzero(np.diff(heights) > DECK_GAP_M) + 1) if len(layer) >= MIN_DECK_RETURNS]
     if not layers:
-        return float("nan")
+        return []
     busiest = max(len(layer) for layer in layers)
-    layers = [layer for layer in layers if len(layer) >= MIN_DECK_SHARE * busiest]
-    if len(layers) > 1 and deck is None:
-        found = ", ".join(f"{np.median(layer):.1f} m" for layer in layers)
-        raise ValueError(
-            f"{where} has more than one deck in the surface data ({found}). "
-            "Say which one the course uses in the course facts with `deck: upper` or `deck: lower`."
-        )
-    layer = layers[0] if deck == "lower" else layers[-1]
-    return float(np.median(layer))
+    return [float(np.median(layer)) for layer in layers if len(layer) >= MIN_DECK_SHARE * busiest]

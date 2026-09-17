@@ -208,6 +208,39 @@ def test_a_structure_passing_overhead_is_not_mistaken_for_a_second_deck(syntheti
     assert np.max(np.abs(line["grade"])) < 0.05
 
 
+def test_a_bridge_passing_under_another_structure_keeps_its_own_deck(synthetic_facts):
+    """A ramp crossing above the bridge leaves as many returns as the deck itself, but only for a
+    moment: the deck is the layer that carries on from the samples either side."""
+
+    def returns(lat, lon):
+        out = []
+        for di in meters_north_of(lat, START_LAT):
+            if not 1200 <= di <= 3800:
+                out.append(np.empty(0))
+                continue
+            deck = high_arched_deck(di) + np.linspace(-0.1, 0.1, 400)
+            crossing = high_arched_deck(di) + 7 + np.linspace(-0.1, 0.1, 400) if 2000 <= di <= 2100 else np.empty(0)
+            out.append(np.concatenate([deck, crossing]))
+        return out
+
+    with_test_bridge(synthetic_facts)
+    line = course_line(
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=synthetic_elevation(bay_without_bridge_deck),
+            decks=synthetic_decks(returns),
+        )
+    )
+    km = np.array(line["km"])
+    elevation = np.array(line["elevation_m"])
+
+    # The course stays on its own deck under the crossing, instead of jumping 7 m up and back.
+    under = elevation[(km > 2.0) & (km < 2.1)]
+    assert np.max(under) < high_arched_deck(2100) + 2
+    assert np.max(np.abs(line["grade"])) < 0.05
+
+
 def test_a_double_deck_bridge_must_say_which_deck(synthetic_facts):
     two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
 

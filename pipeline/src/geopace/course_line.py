@@ -24,7 +24,7 @@ from pyproj import Geod
 from geopace import difficulty
 from geopace.course_facts import Bridge
 from geopace.elevation import BridgeDeckModel, ElevationModel
-from geopace.lidar_decks import deck_height
+from geopace.lidar_decks import deck_heights
 
 WGS84 = Geod(ellps="WGS84")
 
@@ -143,7 +143,7 @@ def raise_bridge_decks(
     for bridge in bridges:
         span = _bridge_span(distance_m, bridge)
         where = f"{bridge.name} (km {bridge.km_start}-{bridge.km_end})"
-        heights = np.array([deck_height(z, bridge.deck, where) for z in decks.returns(lat[span], lon[span])])
+        heights = deck_heights(decks.returns(lat[span], lon[span]), bridge.deck, where)
         measured = np.isfinite(heights)
         if not measured.any():
             raise ValueError(f"{where}: the surface data has no bridge deck there. Is the km range right?")

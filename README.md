@@ -56,7 +56,9 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
 
 - **The route** is the organizer's own course file where there is one (Berlin). New York publishes
   none you can download, so its course facts list the turn points — taken from the city's official
-  list of closed course streets — and the pipeline traces them along OpenStreetMap streets.
+  list of closed course streets — and the pipeline traces them along OpenStreetMap streets. That
+  line is checked street by street against the city's list, and its start line comes from the
+  course's USATF certification, which records how far apart the start and finish are.
 - **Elevation** comes from each city's official ground model, never GPS. It is smoothed before
   grade is computed.
 - **Bridges** are missing from those models: they are bare-earth, so a bridge reads as the water
@@ -75,6 +77,7 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
 | Berlin course route | [BMW BERLIN-MARATHON course file (2025)](https://www.bmw-berlin-marathon.com/en/your-race/course/) | Course geometry only; file not redistributed |
 | Berlin elevation | [Geoportal Berlin, ATKIS® DGM1](https://gdi.berlin.de/data/dgm1/atom/) | [dl-de/zero-2.0](https://www.govdata.de/dl-de/zero-2-0) |
 | NYC course streets | [City of New York course street closures (2025)](https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf) · [NYRR](https://www.nyrr.org/tcsnycmarathon/race-day/the-course) | Facts about which streets the course uses |
+| NYC start line | [USATF course certification NY22001JHP](https://certifiedroadraces.com/certificate/?type=l&id=NY22001JHP) | Published measurement of the certified course |
 | NYC elevation | [2017 NYC 1-ft bare-earth DEM](https://www.fisheries.noaa.gov/inport/item/64732) (City of New York, via NOAA Digital Coast) | [NYC Open Data: no usage restrictions](https://opendata.cityofnewyork.us/faq/) |
 | NYC bridge decks | [2017 NYC Topobathymetric LiDAR](https://www.fisheries.noaa.gov/inport/item/64728) (City of New York, via NOAA Digital Coast) | as above |
 | Street geometry, bridge locations | [OpenStreetMap](https://www.openstreetmap.org/copyright) | ODbL |

@@ -24,6 +24,8 @@ certified_distance:
 # describes. `way` pins a waypoint to one OpenStreetMap way where roadways are stacked or
 # side by side: the Verrazzano's upper deck, the Queensboro's lower level.
 route:
+  # The 2026 course street list is not published yet; the streets have been the same for years,
+  # and the 2025 list is used until NYRR and the city publish the 2026 one.
   edition: 2025
   source: https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf
   accessed: 2026-09-17
@@ -32,9 +34,9 @@ route:
     - https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_Map_Course_102925_M3.pdf
   waypoints:
     # Staten Island
-    - at: Start, Verrazzano-Narrows Bridge upper level (Brooklyn-bound), Staten Island approach
-      lat: 40.602740
-      lon: -74.056400
+    - at: Start, Verrazzano-Narrows Bridge upper level (Brooklyn-bound), Staten Island end
+      lat: 40.603044
+      lon: -74.055468
       way: 46858873
     - at: Verrazzano-Narrows Bridge upper level, main span
       lat: 40.606300
@@ -237,77 +239,83 @@ route:
       lon: -73.976856
       way: 330748465
 
+# NYRR publishes no coordinates for the start line. This position is derived from the course's
+# USATF certification (NY22001JHP, measured 2022, valid to 2032), which records the straight-line
+# separation between start and finish as 47.22% of 42.195 km = 19,924 m: it is the point on the
+# bridge's upper Brooklyn-bound roadway exactly that far from the finish line by Tavern on the
+# Green. Moving 1 m along the bridge changes the separation by 0.68 m, so the certificate's
+# rounding puts this within ~3 m; the remaining uncertainty is the finish line's own position.
 start:
-  lat: 40.602740
-  lon: -74.056400
-  source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_Map_Course_102925_M3.pdf
+  lat: 40.603044
+  lon: -74.055468
+  source: https://certifiedroadraces.com/certificate/?type=l&id=NY22001JHP
   accessed: 2026-09-17
 
 # All km here are on ONE scale: distance measured along the traced course line in the bundle.
-# The line measures 42.77 km; the certified course is 42.195 km because it is measured along the
-# shortest legal line (and this line follows street centres). Places: km = distance along the
-# course line to the point closest to the landmark, rounded to 0.1 km; `source` locates the
-# landmark. Half marathon and Finish: the certified positions (21.0975 km, 42.195 km) scaled onto
-# the course line (x 42.774 / 42.195).
+# The line measures 42.69 km; the certified course is 42.195 km because it is measured along the
+# shortest legal line (and this line follows street centres). Each landmark's km is the point on
+# the course line closest to the coordinate its `source` gives, rounded to 0.1 km. Half marathon
+# and Finish: the certified positions (21.0975 km, 42.195 km) scaled onto the course line
+# (x 42.688 / 42.195).
 landmarks:
   - name: Verrazzano-Narrows Bridge
-    km: 0.0
-    source: https://en.wikipedia.org/wiki/Verrazzano-Narrows_Bridge
-    accessed: 2026-09-17
-  - name: Bay Ridge (Fourth Avenue)
-    km: 4.9
-    source: https://en.wikipedia.org/wiki/Bay_Ridge,_Brooklyn
+    km: 0.9
+    source: https://www.openstreetmap.org/way/46858873
     accessed: 2026-09-17
   - name: Barclays Center (Atlantic Avenue)
-    km: 12.2
-    source: https://en.wikipedia.org/wiki/Barclays_Center
+    km: 12.1
+    source: https://www.openstreetmap.org/relation/8610205
     accessed: 2026-09-17
-  - name: Fort Greene (Lafayette Avenue)
-    km: 13.0
-    source: https://en.wikipedia.org/wiki/Fort_Greene,_Brooklyn
-    accessed: 2026-09-17
-  - name: Williamsburg (Bedford Avenue)
-    km: 17.4
-    source: https://en.wikipedia.org/wiki/Williamsburg,_Brooklyn
+  - name: Bedford Avenue (Williamsburg)
+    km: 14.5
+    source: https://www.openstreetmap.org/way/221696386
     accessed: 2026-09-17
   - name: Pulaski Bridge (into Queens)
-    km: 21.0
-    source: https://en.wikipedia.org/wiki/Pulaski_Bridge
+    km: 21.1
+    source: https://www.openstreetmap.org/way/25355824
     accessed: 2026-09-17
   - name: Half marathon
-    km: 21.39
+    km: 21.34
     source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
     accessed: 2026-09-17
-  - name: Queensboro Bridge (into Manhattan)
-    km: 23.9
-    source: https://en.wikipedia.org/wiki/Queensboro_Bridge
+    note: >-
+      The certified halfway point is the timing mat on the Pulaski Bridge. Scaled onto this line
+      it lands about 70 m past the bridge's Queens end, because the line's extra length over the
+      certified course is not spread evenly along it.
+  - name: Ed Koch Queensboro Bridge (into Manhattan)
+    km: 25.1
+    source: https://www.openstreetmap.org/way/198924625
     accessed: 2026-09-17
-  - name: First Avenue
-    km: 26.9
-    source: https://en.wikipedia.org/wiki/First_Avenue_(Manhattan)
+  - name: First Avenue (north from 60th Street)
+    km: 26.0
+    source: https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf
     accessed: 2026-09-17
   - name: Willis Avenue Bridge (into the Bronx)
     km: 31.4
-    source: https://en.wikipedia.org/wiki/Willis_Avenue_Bridge
+    source: https://www.openstreetmap.org/way/32965216
     accessed: 2026-09-17
   - name: Madison Avenue Bridge (back to Manhattan)
-    km: 34.1
-    source: https://en.wikipedia.org/wiki/Madison_Avenue_Bridge
+    km: 33.8
+    source: https://www.openstreetmap.org/way/46625537
     accessed: 2026-09-17
   - name: Marcus Garvey Park (Mount Morris Park West)
-    km: 35.6
-    source: https://en.wikipedia.org/wiki/Marcus_Garvey_Park
+    km: 35.4
+    source: https://www.openstreetmap.org/way/199925533
     accessed: 2026-09-17
-  - name: Central Park (East Drive)
-    km: 38.5
-    source: https://en.wikipedia.org/wiki/Central_Park
+  - name: Central Park (enters at East 90th Street)
+    km: 38.4
+    source: https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf
+    accessed: 2026-09-17
+  - name: Leaves the park at Grand Army Plaza
+    km: 41.2
+    source: https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf
     accessed: 2026-09-17
   - name: Columbus Circle
     km: 42.0
-    source: https://en.wikipedia.org/wiki/Columbus_Circle
+    source: https://www.openstreetmap.org/node/5706568329
     accessed: 2026-09-17
-  - name: Finish
-    km: 42.77
+  - name: Finish (Tavern on the Green)
+    km: 42.69
     source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
     accessed: 2026-09-17
 
@@ -321,7 +329,7 @@ landmarks:
 bridges:
   - name: Verrazzano-Narrows Bridge (upper level)
     km_start: 0.00
-    km_end: 2.03
+    km_end: 1.94
     deck: upper
     source: https://www.openstreetmap.org/way/46858873
     accessed: 2026-09-17
@@ -330,28 +338,28 @@ bridges:
       so the height there is a straight line between the last measured deck heights on either
       side. The real deck crests a few meters higher.
   - name: Gowanus Expressway viaduct (Brooklyn approach) and the ramp to 92nd Street
-    km_start: 2.03
-    km_end: 2.86
+    km_start: 1.94
+    km_end: 2.77
     source: https://www.openstreetmap.org/way/38180795
     accessed: 2026-09-17
   - name: 92nd Street bridge at the Belt Parkway interchange
-    km_start: 3.05
-    km_end: 3.18
+    km_start: 2.96
+    km_end: 3.09
     source: https://www.openstreetmap.org/way/420540321
     accessed: 2026-09-17
   - name: 4th Avenue bridge over the Gowanus Expressway
-    km_start: 5.75
-    km_end: 5.92
+    km_start: 5.66
+    km_end: 5.83
     source: https://www.openstreetmap.org/way/46640100
     accessed: 2026-09-17
   - name: Pulaski Bridge
-    km_start: 20.66
-    km_end: 21.36
+    km_start: 20.57
+    km_end: 21.27
     source: https://www.openstreetmap.org/way/46717584
     accessed: 2026-09-17
   - name: Ed Koch Queensboro Bridge (lower level) and the ramp down to First Avenue
-    km_start: 23.88
-    km_end: 26.30
+    km_start: 23.79
+    km_end: 26.21
     deck: lower
     source: https://www.openstreetmap.org/way/198924625
     accessed: 2026-09-17
@@ -361,17 +369,17 @@ bridges:
       ramp is a straight line down to the street; ending the span at the bridge instead would
       drop the course 10 m onto the ground under the ramp.
   - name: Willis Avenue Bridge
-    km_start: 31.36
-    km_end: 32.26
+    km_start: 31.24
+    km_end: 32.17
     source: https://www.openstreetmap.org/way/32965216
     accessed: 2026-09-17
   - name: Madison Avenue Bridge
-    km_start: 33.88
-    km_end: 34.20
+    km_start: 33.79
+    km_end: 34.12
     source: https://www.openstreetmap.org/way/46625537
     accessed: 2026-09-17
   - name: East Drive bridge over the 79th Street Transverse, Central Park
-    km_start: 39.94
-    km_end: 40.02
+    km_start: 39.85
+    km_end: 39.93
     source: https://www.openstreetmap.org/way/959011551
     accessed: 2026-09-17
