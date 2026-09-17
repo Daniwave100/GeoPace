@@ -6,7 +6,7 @@ import pytest
 from geopace.bundle import build_course_bundle
 from geopace.course_facts import CourseFactsInvalid, parse_course_facts
 
-from conftest import meters_north_of, straight_north_route, synthetic_elevation
+from conftest import meters_north_of, straight_north_route, synthetic_decks, synthetic_elevation
 
 START_LAT = 52.5
 
@@ -70,6 +70,195 @@ def test_listed_bridges_carry_the_course_over_the_water_not_down_to_it(synthetic
 
     assert np.min(elevation[(km > 1.9) & (km < 2.2)]) > 35.5
     assert np.max(np.abs(line["grade"])) < 0.005
+
+
+def bay_without_bridge_deck(lat, lon):
+    """Streets 5 m above sea level with a bay (0 m) between 1.5 and 3.5 km. A bare-earth
+    model has no bridge in it at all: across the bay it reports the water."""
+    d = meters_north_of(lat, START_LAT)
+    return np.where((d > 1500) & (d < 3500), 0.0, 5.0)
+
+
+def high_arched_deck(d):
+    """A tall bridge: its deck leaves the street at 1.2 km, peaks 60 m up at 2.5 km, lands at 3.8 km."""
+    return 5.0 + 55.0 * (1 - np.abs(d - 2500) / 1300)
+
+
+def deck_returns(decks_at):
+    """LiDAR-like bridge-deck returns: a few heights per deck, near every point on the bridge."""
+
+    def returns(lat, lon):
+        d = meters_north_of(lat, START_LAT)
+        out = []
+        for di in d:
+            heights = decks_at(di) if 1200 <= di <= 3800 else []
+            out.append(np.concatenate([h + np.array([-0.1, 0.0, 0.05, 0.1]) for h in heights]) if heights else np.empty(0))
+        return out
+
+    return returns
+
+
+def with_test_bridge(synthetic_facts, **bridge):
+    """The synthetic course facts, with one sourced bridge from km 1.2 to km 3.8."""
+    synthetic_facts["bridges"] = [
+        {
+            "name": "Test Narrows Bridge",
+            "km_start": 1.2,
+            "km_end": 3.8,
+            "source": "https://example.org/bridge",
+            "accessed": "2026-09-17",
+            **bridge,
+        }
+    ]
+    return synthetic_facts
+
+
+def build_with_decks(synthetic_facts, bridge, decks_at):
+    with_test_bridge(synthetic_facts, **bridge)
+    return build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=synthetic_elevation(bay_without_bridge_deck),
+        decks=synthetic_decks(deck_returns(decks_at)),
+    )
+
+
+def test_a_high_bridge_the_ground_model_drops_is_measured_at_deck_height(synthetic_facts):
+    bundle = build_with_decks(synthetic_facts, {}, lambda d: [high_arched_deck(d)])
+    line = course_line(bundle)
+    km = np.array(line["km"])
+    elevation = np.array(line["elevation_m"])
+
+    # The top of the bridge, not the water 60 m below it.
+    assert np.max(elevation) == pytest.approx(60, abs=2)
+    assert elevation[np.argmin(np.abs(km - 2.5))] == pytest.approx(60, abs=2)
+    over_water = elevation[(km > 1.5) & (km < 3.5)]
+    assert np.min(over_water) > 10
+    # A steady ~4% ramp up and down, not a plunge to sea level.
+    assert np.max(np.abs(line["grade"])) < 0.05
+    assert {s["url"] for s in bundle["sources"]} >= {"https://example.org/lidar"}
+    assert "Synthetic LiDAR" in {a["text"] for a in bundle["attributions"]}
+
+
+def test_on_a_double_deck_bridge_the_course_is_on_the_deck_runners_use(synthetic_facts):
+    two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+
+    lower = course_line(build_with_decks(synthetic_facts, {"deck": "lower"}, two_decks))
+    upper = course_line(build_with_decks(synthetic_facts, {"deck": "upper"}, two_decks))
+
+    assert np.max(lower["elevation_m"]) == pytest.approx(60, abs=2)
+    assert np.max(upper["elevation_m"]) == pytest.approx(66.4, abs=2)
+
+
+def bay_with_no_ground_at_all(lat, lon):
+    """Like a real bare-earth model over open water: no data, not even the water surface."""
+    d = meters_north_of(lat, START_LAT)
+    return np.where((d > 1500) & (d < 3500), np.nan, 5.0)
+
+
+def test_water_with_no_ground_data_is_fine_where_a_bridge_carries_the_course(synthetic_facts):
+    with_test_bridge(synthetic_facts)
+
+    line = course_line(
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=synthetic_elevation(bay_with_no_ground_at_all),
+            decks=synthetic_decks(deck_returns(lambda d: [high_arched_deck(d)])),
+        )
+    )
+
+    assert np.max(line["elevation_m"]) == pytest.approx(60, abs=2)
+    assert all(np.isfinite(line["elevation_m"]))
+
+
+def test_missing_ground_where_no_bridge_carries_the_course_is_refused(synthetic_facts):
+    with pytest.raises(ValueError, match=r"No elevation at km 1\.5"):
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=synthetic_elevation(bay_with_no_ground_at_all),
+        )
+
+
+def test_a_structure_passing_overhead_is_not_mistaken_for_a_second_deck(synthetic_facts):
+    # A few returns off a ramp crossing above the bridge, against a deck's worth underneath.
+    def returns(lat, lon):
+        out = []
+        for di in meters_north_of(lat, START_LAT):
+            if not 1200 <= di <= 3800:
+                out.append(np.empty(0))
+                continue
+            deck = high_arched_deck(di) + np.linspace(-0.1, 0.1, 400)
+            overhead = high_arched_deck(di) + 8 + np.linspace(-0.1, 0.1, 5) if 2000 <= di <= 2100 else np.empty(0)
+            out.append(np.concatenate([deck, overhead]))
+        return out
+
+    with_test_bridge(synthetic_facts)
+    line = course_line(
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=synthetic_elevation(bay_without_bridge_deck),
+            decks=synthetic_decks(returns),
+        )
+    )
+
+    assert np.max(line["elevation_m"]) == pytest.approx(60, abs=2)
+    assert np.max(np.abs(line["grade"])) < 0.05
+
+
+def test_a_bridge_passing_under_another_structure_keeps_its_own_deck(synthetic_facts):
+    """A ramp crossing above the bridge leaves as many returns as the deck itself, but only for a
+    moment: the deck is the layer that carries on from the samples either side."""
+
+    def returns(lat, lon):
+        out = []
+        for di in meters_north_of(lat, START_LAT):
+            if not 1200 <= di <= 3800:
+                out.append(np.empty(0))
+                continue
+            deck = high_arched_deck(di) + np.linspace(-0.1, 0.1, 400)
+            crossing = high_arched_deck(di) + 7 + np.linspace(-0.1, 0.1, 400) if 2000 <= di <= 2100 else np.empty(0)
+            out.append(np.concatenate([deck, crossing]))
+        return out
+
+    with_test_bridge(synthetic_facts)
+    line = course_line(
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=synthetic_elevation(bay_without_bridge_deck),
+            decks=synthetic_decks(returns),
+        )
+    )
+    km = np.array(line["km"])
+    elevation = np.array(line["elevation_m"])
+
+    # The course stays on its own deck under the crossing, instead of jumping 7 m up and back.
+    under = elevation[(km > 2.0) & (km < 2.1)]
+    assert np.max(under) < high_arched_deck(2100) + 2
+    assert np.max(np.abs(line["grade"])) < 0.05
+
+
+def test_a_double_deck_bridge_must_say_which_deck(synthetic_facts):
+    two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+
+    with pytest.raises(ValueError, match=r"Test Narrows Bridge.*deck: upper.*lower"):
+        build_with_decks(synthetic_facts, {}, two_decks)
+
+
+def test_a_listed_bridge_with_no_deck_in_the_surface_data_is_refused(synthetic_facts):
+    with pytest.raises(ValueError, match=r"Test Narrows Bridge.*no bridge deck"):
+        build_with_decks(synthetic_facts, {}, lambda d: [])
+
+
+def test_a_bridge_deck_must_be_upper_or_lower(synthetic_facts):
+    source = {"source": "https://example.org/bridge", "accessed": "2026-09-17"}
+    synthetic_facts["bridges"] = [{"name": "Test bridge", "km_start": 2.0, "km_end": 2.08, "deck": "middle", **source}]
+
+    with pytest.raises(CourseFactsInvalid, match=r"bridges\[0\] \(Test bridge\).*deck"):
+        parse_course_facts(synthetic_facts)
 
 
 def test_a_bridge_without_a_source_is_rejected(synthetic_facts):

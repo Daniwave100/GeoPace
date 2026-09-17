@@ -19,7 +19,8 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { CourseBundle } from "../bundle/types";
 import { BASEMAP, TERRAIN } from "./providers";
 
-export function createGlobe(container: HTMLElement, bundle: CourseBundle): Viewer {
+/** The viewer is made once; switching course only swaps what is drawn on it. */
+export function createGlobe(container: HTMLElement): Viewer {
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
       new OpenStreetMapImageryProvider({
@@ -42,7 +43,13 @@ export function createGlobe(container: HTMLElement, bundle: CourseBundle): Viewe
     selectionIndicator: false,
   });
 
+  return viewer;
+}
+
+/** Draw one course: the route on the ground, its start and finish, and fly to it. */
+export function showCourse(viewer: Viewer, bundle: CourseBundle): void {
   const line = bundle.measured.course_line;
+  viewer.entities.removeAll();
   const positions = Cartesian3.fromDegreesArray(line.lon.flatMap((lon, i) => [lon, line.lat[i]]));
   viewer.entities.add({
     name: `${bundle.course.name} course`,
@@ -54,7 +61,6 @@ export function createGlobe(container: HTMLElement, bundle: CourseBundle): Viewe
   addMarker(viewer, "Finish", line.lat[last], line.lon[last]);
 
   frameCourse(viewer, line.lat, line.lon);
-  return viewer;
 }
 
 function addMarker(viewer: Viewer, text: string, lat: number, lon: number): void {

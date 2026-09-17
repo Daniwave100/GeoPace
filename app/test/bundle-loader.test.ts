@@ -3,8 +3,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BundleError, loadCourseBundle, parseCourseBundle } from "../src/bundle/loader";
 
-// The committed Berlin bundle, produced by `uv run geopace build berlin`.
-const berlinJson = readFileSync(new URL("../../data/derived/berlin/course-bundle.json", import.meta.url), "utf8");
+// The committed bundles, produced by `uv run geopace build <course>`.
+const committed = (course: string) => readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8");
+const berlinJson = committed("berlin");
 const pipelineBundle = (): any => JSON.parse(berlinJson);
 
 function rejectionOf(data: unknown): string {
@@ -26,6 +27,16 @@ describe("Course Bundle loader", () => {
     expect(line.km.length).toBeGreaterThan(4000);
     expect(line.elevation_m.length).toBe(line.km.length);
     expect(bundle.attributions.length).toBeGreaterThan(0);
+  });
+
+  it("loads every committed course, so the picker can switch between them", () => {
+    for (const course of ["berlin", "nyc"]) {
+      const bundle = parseCourseBundle(JSON.parse(committed(course)), course);
+
+      expect(bundle.course_id).toBe(course);
+      expect(bundle.course.landmarks.length).toBeGreaterThan(0);
+      expect(bundle.measured.course_line.km.length).toBeGreaterThan(4000);
+    }
   });
 
   it("rejects a malformed bundle and names each problem", () => {

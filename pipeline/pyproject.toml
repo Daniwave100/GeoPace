@@ -8,9 +8,12 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "jsonschema>=4.26.0",
+    "laspy[lazrs]>=2.7.0",
     "numpy>=2.5.3",
     "pyproj>=3.8.0",
     "pyyaml>=6.0.3",
+    "rasterio>=1.5.1",
+    "requests>=2.34.2",  # laspy reads COPC tiles over HTTP through it
 ]
 
 [project.scripts]

@@ -1,30 +1,61 @@
-"""Command line: `uv run geopace build berlin` rebuilds data/derived/berlin/ from raw inputs."""
+"""Command line: `uv run geopace build <course>` rebuilds data/derived/<course>/ from raw inputs."""
 
 import argparse
+import hashlib
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
-from geopace import berlin_dgm1
+from geopace import berlin_dgm1, nyc_dem, nyc_lidar
 from geopace.bundle import build_course_bundle, write_bundle
 from geopace.cache import cache_dir, download
-from geopace.course_facts import load_course_facts
+from geopace.course_facts import CourseFacts, load_course_facts
+from geopace.elevation import BridgeDeckModel, ElevationModel
 from geopace.route import parse_gpx
+from geopace.street_route import fetch_streets, trace_route
 
 REPO = Path(__file__).resolve().parents[3]
 COURSES = REPO / "data" / "courses"
 DERIVED = REPO / "data" / "derived"
 
-# Which official ground model each course uses.
-ELEVATION_MODELS = {"berlin": berlin_dgm1.elevation_model}
+
+@dataclass(frozen=True)
+class CourseData:
+    """Which official data each course is built from."""
+
+    elevation: Callable[..., ElevationModel]  # bare-earth ground model
+    decks: Callable[..., BridgeDeckModel] | None = None  # surface data for bridge decks, if any
+
+
+COURSE_DATA = {
+    "berlin": CourseData(elevation=berlin_dgm1.elevation_model),
+    "nyc": CourseData(elevation=nyc_dem.elevation_model, decks=nyc_lidar.deck_model),
+}
+
+
+def load_route(facts: CourseFacts, allow_download: bool = True) -> list[tuple[float, float]]:
+    """The course as (lat, lon) vertices: the organizer's file, or waypoints traced on streets."""
+    folder = cache_dir() / facts.id
+    if facts.route_url:
+        print(f"  route: {facts.route_url}")
+        path = folder / "route.gpx"
+        if not path.exists() and not allow_download:
+            raise FileNotFoundError(f"The course file is not cached at {path}")
+        return parse_gpx(download(facts.route_url, path).read_text(encoding="utf-8"))
+    print(f"  route: {len(facts.route_waypoints)} waypoints from {facts.route_source}, traced on OpenStreetMap")
+    # Name the cached streets after the waypoints, so moving a waypoint fetches a fresh corridor.
+    key = hashlib.sha1(repr(facts.route_waypoints).encode()).hexdigest()[:12]
+    streets = fetch_streets(facts.route_waypoints, folder / f"osm-streets-{key}.json", allow_download)
+    return trace_route(streets, facts.route_waypoints)
 
 
 def build(course_id: str) -> Path:
     print(f"Building the {course_id} Course Bundle")
     facts = load_course_facts(COURSES / course_id / "course.yaml")
-    print(f"  route: {facts.route_url}")
-    gpx = download(facts.route_url, cache_dir() / course_id / "route.gpx")
-    route = parse_gpx(gpx.read_text(encoding="utf-8"))
-    bundle = build_course_bundle(facts, route, ELEVATION_MODELS[course_id]())
+    route = load_route(facts)
+    data = COURSE_DATA[course_id]
+    bundle = build_course_bundle(facts, route, data.elevation(), decks=data.decks() if data.decks else None)
 
     out = DERIVED / course_id / "course-bundle.json"
     write_bundle(bundle, out)
@@ -42,9 +73,9 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="geopace", description="GeoPace data pipeline")
     commands = parser.add_subparsers(dest="command", required=True)
     build_cmd = commands.add_parser("build", help="rebuild a course's Course Bundle from raw inputs")
-    build_cmd.add_argument("course", choices=sorted(ELEVATION_MODELS))
+    build_cmd.add_argument("course", choices=sorted(COURSE_DATA))
     args = parser.parse_args(argv)
     try:
         build(args.course)
-    except ValueError as err:  # invalid facts, wrong route length, invalid bundle
+    except ValueError as err:  # invalid facts, untraceable route, wrong route length, invalid bundle
         sys.exit(f"error: {err}")

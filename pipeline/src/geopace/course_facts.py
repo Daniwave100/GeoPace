@@ -19,6 +19,16 @@ class CourseFactsInvalid(ValueError):
 
 
 @dataclass(frozen=True)
+class Waypoint:
+    """A turn point of a course whose route is traced along streets, in words and coordinates."""
+
+    lat: float
+    lon: float
+    label: str  # where this is, in words ("Fourth Avenue at 92nd Street")
+    way: int | None = None  # put it on this OpenStreetMap way only (stacked roadways, bridge decks)
+
+
+@dataclass(frozen=True)
 class Landmark:
     name: str
     km: float
@@ -33,6 +43,8 @@ class Bridge:
     km_start: float
     km_end: float
     source: str
+    # On a double-deck bridge, which deck the course uses: "upper" or "lower".
+    deck: str | None = None
 
 
 @dataclass(frozen=True)
@@ -42,7 +54,11 @@ class CourseFacts:
     city: str
     timezone: str  # IANA name, e.g. Europe/Berlin
     certified_distance_m: float
-    route_url: str
+    # The route is either the organizer's course file (route_url) or turn points traced along
+    # OpenStreetMap streets (route_waypoints). route_source is the page that documents it.
+    route_url: str | None
+    route_waypoints: list[Waypoint]
+    route_source: str
     route_accessed: str
     route_edition: int
     start_lat: float
@@ -64,6 +80,12 @@ def parse_course_facts(raw: dict) -> CourseFacts:
             problems.append(f"{key} is missing")
         else:
             _check_sourced(key, raw[key], problems)
+    route = raw.get("route", {})
+    if ("url" in route) == ("waypoints" in route):
+        problems.append("route needs either a course file `url` or `waypoints` (not both)")
+    for i, waypoint in enumerate(route.get("waypoints", [])):
+        if not {"at", "lat", "lon"} <= set(waypoint):
+            problems.append(f"route.waypoints[{i}] needs `at` (where it is, in words), `lat` and `lon`")
     for i, landmark in enumerate(raw.get("landmarks", [])):
         _check_sourced(f"landmarks[{i}] ({landmark.get('name', '?')})", landmark, problems)
     for i, bridge in enumerate(raw.get("bridges", [])):
@@ -71,6 +93,8 @@ def parse_course_facts(raw: dict) -> CourseFacts:
         _check_sourced(label, bridge, problems)
         if not bridge.get("km_start", 0) < bridge.get("km_end", 0):
             problems.append(f"{label} km_start must be before km_end")
+        if bridge.get("deck") not in (None, "upper", "lower"):
+            problems.append(f"{label} deck must be upper or lower, not {bridge['deck']!r}")
     if not _is_iana_timezone(raw.get("timezone")):
         problems.append(f"timezone {raw.get('timezone')!r} is not an IANA time zone name like Europe/Berlin")
     if problems:
@@ -82,7 +106,12 @@ def parse_course_facts(raw: dict) -> CourseFacts:
         city=raw["city"],
         timezone=raw["timezone"],
         certified_distance_m=float(raw["certified_distance"]["meters"]),
-        route_url=raw["route"]["url"],
+        route_url=route.get("url"),
+        route_waypoints=[
+            Waypoint(lat=float(w["lat"]), lon=float(w["lon"]), label=w["at"], way=w.get("way"))
+            for w in route.get("waypoints", [])
+        ],
+        route_source=route["source"],
         route_accessed=str(raw["route"]["accessed"]),
         route_edition=int(raw["route"]["edition"]),
         start_lat=float(raw["start"]["lat"]),
@@ -97,6 +126,7 @@ def parse_course_facts(raw: dict) -> CourseFacts:
                 km_start=float(bridge["km_start"]),
                 km_end=float(bridge["km_end"]),
                 source=bridge["source"],
+                deck=bridge.get("deck"),
             )
             for bridge in raw.get("bridges", [])
         ],
