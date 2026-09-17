@@ -5,9 +5,12 @@ Steps, in order:
 2. Sample bare-earth elevation from an official terrain model at each sample
    (never GPS elevation, which is far too noisy).
 2b. Bare-earth models leave out bridge decks, so on a bridge they report the water or road
-   underneath. Across each listed bridge we replace the height with a straight line between
-   the heights at the bridge's two ends. That suits low, flat city bridges (Berlin). High
-   bridges with long ramps (NYC's Verrazzano) need deck heights from surface data instead.
+   underneath. Each listed bridge is patched in one of two ways:
+   - With surface data (LiDAR returns classified as bridge deck), the height is the deck's
+     own measured height. High bridges need this (NYC's Verrazzano crests ~78 m over the water).
+     On a double-deck bridge the course facts say which deck the runners use.
+   - Without it, a straight line between the heights at the bridge's two ends. That suits
+     low, flat city bridges (Berlin).
 3. Smooth the elevation, THEN compute grade. Grade from unsmoothed data is dominated by
    noise: 0.5 m of error across 10 m looks like a 5% hill.
 4. Turn grade into a difficulty factor with a published energy-cost model.
@@ -20,7 +23,8 @@ from pyproj import Geod
 
 from geopace import difficulty
 from geopace.course_facts import Bridge
-from geopace.elevation import ElevationModel
+from geopace.elevation import BridgeDeckModel, ElevationModel
+from geopace.lidar_decks import deck_height
 
 WGS84 = Geod(ellps="WGS84")
 
@@ -49,13 +53,22 @@ def build_course_line(
     elevation: ElevationModel,
     spacing_m: float = DEFAULT_SPACING_M,
     bridges: list[Bridge] = (),
+    decks: BridgeDeckModel | None = None,
 ) -> CourseLine:
     lat, lon, distance_m = resample(route, spacing_m)
     raw_elevation = np.asarray(elevation.sample(lat, lon), dtype=float)
-    if not np.all(np.isfinite(raw_elevation)):
-        bad = int(np.flatnonzero(~np.isfinite(raw_elevation))[0])
-        raise ValueError(f"No elevation at km {distance_m[bad] / 1000:.3f} ({lat[bad]:.6f}, {lon[bad]:.6f})")
-    ground = span_bridges(distance_m, raw_elevation, bridges)
+    if decks is None:
+        ground = span_bridges(distance_m, raw_elevation, bridges)
+    else:
+        ground = raise_bridge_decks(distance_m, lat, lon, raw_elevation, bridges, decks)
+    # Checked after the bridges are in: a bare-earth model has no ground over open water, which
+    # is fine exactly where a bridge carries the course over it.
+    if not np.all(np.isfinite(ground)):
+        bad = int(np.flatnonzero(~np.isfinite(ground))[0])
+        raise ValueError(
+            f"No elevation at km {distance_m[bad] / 1000:.3f} ({lat[bad]:.6f}, {lon[bad]:.6f}). "
+            "If the course is on a bridge there, list the bridge in the course facts."
+        )
     smoothed = smooth_elevation(ground, spacing_m)
     grade = np.gradient(smoothed, distance_m)
     return CourseLine(
@@ -90,19 +103,57 @@ def resample(route: list[tuple[float, float]], spacing_m: float):
     return lat, lon, distance_m
 
 
+def _bridge_span(distance_m: np.ndarray, bridge: Bridge) -> slice:
+    """Samples from the last one at or before the bridge's start to the first at or after its
+    end, so the two outer samples are on land."""
+    first = max(np.searchsorted(distance_m, bridge.km_start * 1000, side="right") - 1, 0)
+    last = min(np.searchsorted(distance_m, bridge.km_end * 1000, side="left"), len(distance_m) - 1)
+    return slice(first, last + 1)
+
+
 def span_bridges(distance_m: np.ndarray, elevation_m: np.ndarray, bridges: list[Bridge]) -> np.ndarray:
     """Replace heights on each bridge with a straight line between the bridge's two ends."""
     patched = elevation_m.copy()
     for bridge in bridges:
-        # The last sample at or before the start and the first at or after the end are on land.
-        first = max(np.searchsorted(distance_m, bridge.km_start * 1000, side="right") - 1, 0)
-        last = min(np.searchsorted(distance_m, bridge.km_end * 1000, side="left"), len(distance_m) - 1)
-        span = slice(first, last + 1)
+        span = _bridge_span(distance_m, bridge)
+        first, last = span.start, span.stop - 1
         patched[span] = np.interp(
             distance_m[span],
             [distance_m[first], distance_m[last]],
             [elevation_m[first], elevation_m[last]],
         )
+    return patched
+
+
+def raise_bridge_decks(
+    distance_m: np.ndarray,
+    lat: np.ndarray,
+    lon: np.ndarray,
+    elevation_m: np.ndarray,
+    bridges: list[Bridge],
+    decks: BridgeDeckModel,
+) -> np.ndarray:
+    """Replace heights on each bridge with the measured height of the deck the course uses.
+
+    Where a point on the bridge has no deck returns (a gap in the scan, or the ramp where the
+    bridge meets the ground), the height is filled in along a straight line between the
+    nearest measured points, and tied to the ground at the bridge's two ends.
+    """
+    patched = elevation_m.copy()
+    for bridge in bridges:
+        span = _bridge_span(distance_m, bridge)
+        where = f"{bridge.name} (km {bridge.km_start}-{bridge.km_end})"
+        heights = np.array([deck_height(z, bridge.deck, where) for z in decks.returns(lat[span], lon[span])])
+        measured = np.isfinite(heights)
+        if not measured.any():
+            raise ValueError(f"{where}: the surface data has no bridge deck there. Is the km range right?")
+        along = distance_m[span]
+        known_m, known_h = along[measured], heights[measured]
+        if not measured[0]:
+            known_m, known_h = np.insert(known_m, 0, along[0]), np.insert(known_h, 0, elevation_m[span][0])
+        if not measured[-1]:
+            known_m, known_h = np.append(known_m, along[-1]), np.append(known_h, elevation_m[span][-1])
+        patched[span] = np.interp(along, known_m, known_h)
     return patched
 
 

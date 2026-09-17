@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from geopace.provenance import Attribution, Source
-from geopace.elevation import ElevationModel
+from geopace.elevation import BridgeDeckModel, ElevationModel
 
 EARTH_RADIUS_M = 6_371_008.8
 
@@ -35,6 +35,21 @@ def synthetic_elevation(sample):
             accessed="2026-09-16",
         ),
         attribution=Attribution(text="Synthetic DEM", url="https://example.org/dem"),
+    )
+
+
+def synthetic_decks(returns):
+    """Wrap a (lat, lon) -> [deck heights near each point] function as a bridge deck model."""
+    return BridgeDeckModel(
+        returns=returns,
+        source=Source(
+            id="synthetic-lidar",
+            title="Synthetic bridge-deck returns",
+            url="https://example.org/lidar",
+            licence="test data",
+            accessed="2026-09-17",
+        ),
+        attribution=Attribution(text="Synthetic LiDAR", url="https://example.org/lidar"),
     )
 
 

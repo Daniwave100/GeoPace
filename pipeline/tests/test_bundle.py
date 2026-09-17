@@ -73,3 +73,36 @@ def test_a_route_far_from_the_certified_distance_is_refused(synthetic_facts):
 
     with pytest.raises(ValueError, match=r"certified"):
         build(synthetic_facts, gentle_hill)
+
+
+def trace(facts):
+    """Same route, but described as waypoints traced on streets rather than a course file."""
+    del facts["route"]["url"]
+    facts["route"]["waypoints"] = [{"at": "Start", "lat": 52.5, "lon": 13.4}, {"at": "Finish", "lat": 52.545, "lon": 13.4}]
+    return facts
+
+
+def test_a_traced_route_may_run_longer_than_the_line_the_course_was_certified_on(synthetic_facts):
+    # Street centre lines run longer than the shortest legal line a course is measured along.
+    synthetic_facts["certified_distance"]["meters"] = 4920  # route is ~5000 m: 1.6% long
+
+    with pytest.raises(ValueError, match=r"certified"):
+        build(synthetic_facts, gentle_hill)
+    assert build(trace(synthetic_facts), gentle_hill)["measured"]["course_line"]["length_m"] > 4900
+
+
+def test_a_traced_route_that_is_wildly_off_is_still_refused(synthetic_facts):
+    synthetic_facts["certified_distance"]["meters"] = 4700  # route is ~5000 m: 6% long
+
+    with pytest.raises(ValueError, match=r"certified"):
+        build(trace(synthetic_facts), gentle_hill)
+
+
+def test_a_route_traced_on_streets_credits_the_organizer_page_and_openstreetmap(synthetic_facts):
+    bundle = build(trace(synthetic_facts), gentle_hill)
+
+    route = next(s for s in bundle["sources"] if s["id"] == "route")
+    assert route["url"] == "https://example.org/synthetic"
+    assert "OpenStreetMap" in route["title"]
+    assert "openstreetmap" in {s["id"] for s in bundle["sources"]}
+    assert any("OpenStreetMap" in a["text"] for a in bundle["attributions"])

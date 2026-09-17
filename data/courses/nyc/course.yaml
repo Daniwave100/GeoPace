@@ -1,0 +1,377 @@
+# Hand-maintained facts about the New York City Marathon course.
+# Rule: every fact about the world has a `source` URL and the date we `accessed` it.
+# Positions along the course are km from the start.
+
+id: nyc
+# Plain event name; no sponsor styling or trade dress (PLAN.md §9).
+name: New York City Marathon
+city: New York City
+timezone: America/New_York
+source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+accessed: 2026-09-17
+
+certified_distance:
+  meters: 42195
+  source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+  accessed: 2026-09-17
+
+# The organizer publishes no course file anyone can download (the course map is a PDF; the
+# route on Strava needs a login). So the route is the "Blue" course (the main start, upper deck
+# of the Verrazzano) described as turn points, and the pipeline traces it along OpenStreetMap
+# streets. Which streets, in which order, comes from the City of New York's 2025 list of closed
+# course streets (each segment "street, from - to") and NYRR's 2025 street closures and course
+# map. Each waypoint's lat/lon is the OpenStreetMap intersection (or point on the named way) it
+# describes. `way` pins a waypoint to one OpenStreetMap way where roadways are stacked or
+# side by side: the Verrazzano's upper deck, the Queensboro's lower level.
+route:
+  edition: 2025
+  source: https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf
+  accessed: 2026-09-17
+  also_see:
+    - https://www.nyrr.org/info/2025tcsnewyorkcitymarathon/2025-street-closures
+    - https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_Map_Course_102925_M3.pdf
+  waypoints:
+    # Staten Island
+    - at: Start, Verrazzano-Narrows Bridge upper level (Brooklyn-bound), Staten Island approach
+      lat: 40.602740
+      lon: -74.056400
+      way: 46858873
+    - at: Verrazzano-Narrows Bridge upper level, main span
+      lat: 40.606300
+      lon: -74.045300
+      way: 46858873
+    # Brooklyn
+    - at: Upper-level exit ramp to 92nd Street
+      lat: 40.613250
+      lon: -74.028210
+      way: 38100096
+    - at: Dahlgren Place at 92nd Street
+      lat: 40.616061
+      lon: -74.025741
+    - at: 92nd Street at 4th Avenue
+      lat: 40.618338
+      lon: -74.030173
+    - at: 4th Avenue at 86th Street
+      lat: 40.622778
+      lon: -74.028359
+    - at: 4th Avenue at 63rd Street
+      lat: 40.639110
+      lon: -74.020132
+    - at: 4th Avenue at 43rd Street
+      lat: 40.650353
+      lon: -74.008440
+    - at: 4th Avenue at 22nd Street
+      lat: 40.662116
+      lon: -73.996204
+    - at: 4th Avenue at 3rd Street
+      lat: 40.673944
+      lon: -73.985651
+    - at: 4th Avenue at Flatbush Avenue
+      lat: 40.684885
+      lon: -73.978061
+    - at: Flatbush Avenue at Lafayette Avenue
+      lat: 40.686691
+      lon: -73.979360
+    - at: Lafayette Avenue at Classon Avenue
+      lat: 40.688878
+      lon: -73.960016
+    - at: Lafayette Avenue at Bedford Avenue
+      lat: 40.689452
+      lon: -73.955127
+    - at: Bedford Avenue at Lynch Street
+      lat: 40.699999
+      lon: -73.957229
+    - at: Bedford Avenue at South 3rd Street
+      lat: 40.712526
+      lon: -73.962552
+    - at: Bedford Avenue at North 10th Street
+      lat: 40.719493
+      lon: -73.955942
+    - at: Nassau Avenue at Bedford Avenue and Lorimer Street
+      lat: 40.723488
+      lon: -73.951643
+    - at: Nassau Avenue at Manhattan Avenue
+      lat: 40.723772
+      lon: -73.950788
+    - at: Manhattan Avenue at Greenpoint Avenue
+      lat: 40.730206
+      lon: -73.954253
+    - at: Greenpoint Avenue at McGuinness Boulevard
+      lat: 40.730459
+      lon: -73.951569
+    # Queens
+    - at: Pulaski Bridge (Queens-bound roadway)
+      lat: 40.740800
+      lon: -73.952010
+      way: 25355824
+    - at: 11th Street at 48th Avenue
+      lat: 40.743659
+      lon: -73.951292
+    - at: 48th Avenue at Vernon Boulevard
+      lat: 40.744113
+      lon: -73.953641
+    - at: Vernon Boulevard at 10th Street
+      lat: 40.748268
+      lon: -73.952248
+    - at: 10th Street at 44th Drive
+      lat: 40.748944
+      lon: -73.951644
+    - at: 44th Drive at Hunter Street
+      lat: 40.747411
+      lon: -73.943724
+    - at: Hunter Street at Crescent Street
+      lat: 40.747708
+      lon: -73.943247
+    - at: Crescent Street at Queens Plaza South
+      lat: 40.750531
+      lon: -73.940648
+    - at: Queens Plaza South at 23rd Street
+      lat: 40.751257
+      lon: -73.942277
+    - at: 23rd Street at Queens Plaza North
+      lat: 40.751691
+      lon: -73.941863
+    - at: Queensboro Bridge lower level (Manhattan-bound), main span
+      lat: 40.757035
+      lon: -73.954715
+      way: 198924625
+    # Manhattan. The bridge's exit ramp comes down beside 60th Street, where the course turns
+    # north onto 1st Avenue.
+    - at: 1st Avenue at East 60th Street
+      lat: 40.760251
+      lon: -73.961502
+    - at: 1st Avenue at East 77th Street
+      lat: 40.771031
+      lon: -73.953634
+    - at: 1st Avenue at East 96th Street
+      lat: 40.783251
+      lon: -73.944720
+    - at: 1st Avenue at East 117th Street
+      lat: 40.796681
+      lon: -73.934912
+    - at: Willis Avenue Bridge (Bronx-bound)
+      lat: 40.802815
+      lon: -73.930005
+      way: 949990384
+    # The Bronx
+    - at: East 135th Street at Willis Avenue
+      lat: 40.807176
+      lon: -73.924244
+    - at: East 135th Street at Alexander Avenue
+      lat: 40.808158
+      lon: -73.926538
+    - at: Alexander Avenue at East 138th Street
+      lat: 40.810066
+      lon: -73.925143
+    - at: East 138th Street at Morris Avenue
+      lat: 40.811092
+      lon: -73.927289
+    - at: Morris Avenue at East 140th Street
+      lat: 40.812972
+      lon: -73.925803
+    - at: East 140th Street at Rider Avenue
+      lat: 40.813344
+      lon: -73.926722
+    - at: Rider Avenue at East 138th Street
+      lat: 40.811730
+      lon: -73.928134
+    - at: Madison Avenue Bridge (Manhattan-bound)
+      lat: 40.814175
+      lon: -73.933150
+      way: 799505599
+    # Manhattan
+    - at: 138th Street at 5th Avenue
+      lat: 40.814772
+      lon: -73.936105
+    - at: 5th Avenue at 124th Street
+      lat: 40.805738
+      lon: -73.942758
+    - at: 124th Street at Mount Morris Park West
+      lat: 40.806404
+      lon: -73.944341
+    - at: Mount Morris Park West at 120th Street
+      lat: 40.803890
+      lon: -73.946182
+    - at: 120th Street at 5th Avenue
+      lat: 40.803230
+      lon: -73.944622
+    - at: 5th Avenue at East 90th Street
+      lat: 40.784087
+      lon: -73.958557
+    - at: East 90th Street at East Drive, Central Park
+      lat: 40.784213
+      lon: -73.958873
+    - at: East Drive near 84th Street
+      lat: 40.780022
+      lon: -73.964740
+      way: 46613691
+    - at: East Drive near 76th Street
+      lat: 40.776350
+      lon: -73.967610
+      way: 1081019373
+    - at: East Drive near 70th Street
+      lat: 40.771320
+      lon: -73.970080
+      way: 1080868599
+    - at: East Drive near 65th Street
+      lat: 40.768100
+      lon: -73.973130
+      way: 648888139
+    - at: Grand Army Plaza at Central Park South
+      lat: 40.764569
+      lon: -73.973659
+    - at: Central Park South at Columbus Circle
+      lat: 40.767684
+      lon: -73.981756
+    # Merchants' Gate: the park entrance at Columbus Circle, where the course rejoins West Drive.
+    - at: Merchants' Gate, entering Central Park at Columbus Circle
+      lat: 40.768800
+      lon: -73.980700
+      way: 153232764
+    - at: West Drive near 63rd Street
+      lat: 40.770000
+      lon: -73.979280
+      way: 385446617
+    - at: Finish, West Drive near 67th Street
+      lat: 40.772198
+      lon: -73.976856
+      way: 330748465
+
+start:
+  lat: 40.602740
+  lon: -74.056400
+  source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_Map_Course_102925_M3.pdf
+  accessed: 2026-09-17
+
+# All km here are on ONE scale: distance measured along the traced course line in the bundle.
+# The line measures 42.77 km; the certified course is 42.195 km because it is measured along the
+# shortest legal line (and this line follows street centres). Places: km = distance along the
+# course line to the point closest to the landmark, rounded to 0.1 km; `source` locates the
+# landmark. Half marathon and Finish: the certified positions (21.0975 km, 42.195 km) scaled onto
+# the course line (x 42.774 / 42.195).
+landmarks:
+  - name: Verrazzano-Narrows Bridge
+    km: 0.0
+    source: https://en.wikipedia.org/wiki/Verrazzano-Narrows_Bridge
+    accessed: 2026-09-17
+  - name: Bay Ridge (Fourth Avenue)
+    km: 4.9
+    source: https://en.wikipedia.org/wiki/Bay_Ridge,_Brooklyn
+    accessed: 2026-09-17
+  - name: Barclays Center (Atlantic Avenue)
+    km: 12.2
+    source: https://en.wikipedia.org/wiki/Barclays_Center
+    accessed: 2026-09-17
+  - name: Fort Greene (Lafayette Avenue)
+    km: 13.0
+    source: https://en.wikipedia.org/wiki/Fort_Greene,_Brooklyn
+    accessed: 2026-09-17
+  - name: Williamsburg (Bedford Avenue)
+    km: 17.4
+    source: https://en.wikipedia.org/wiki/Williamsburg,_Brooklyn
+    accessed: 2026-09-17
+  - name: Pulaski Bridge (into Queens)
+    km: 21.0
+    source: https://en.wikipedia.org/wiki/Pulaski_Bridge
+    accessed: 2026-09-17
+  - name: Half marathon
+    km: 21.39
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    accessed: 2026-09-17
+  - name: Queensboro Bridge (into Manhattan)
+    km: 23.9
+    source: https://en.wikipedia.org/wiki/Queensboro_Bridge
+    accessed: 2026-09-17
+  - name: First Avenue
+    km: 26.9
+    source: https://en.wikipedia.org/wiki/First_Avenue_(Manhattan)
+    accessed: 2026-09-17
+  - name: Willis Avenue Bridge (into the Bronx)
+    km: 31.4
+    source: https://en.wikipedia.org/wiki/Willis_Avenue_Bridge
+    accessed: 2026-09-17
+  - name: Madison Avenue Bridge (back to Manhattan)
+    km: 34.1
+    source: https://en.wikipedia.org/wiki/Madison_Avenue_Bridge
+    accessed: 2026-09-17
+  - name: Marcus Garvey Park (Mount Morris Park West)
+    km: 35.6
+    source: https://en.wikipedia.org/wiki/Marcus_Garvey_Park
+    accessed: 2026-09-17
+  - name: Central Park (East Drive)
+    km: 38.5
+    source: https://en.wikipedia.org/wiki/Central_Park
+    accessed: 2026-09-17
+  - name: Columbus Circle
+    km: 42.0
+    source: https://en.wikipedia.org/wiki/Columbus_Circle
+    accessed: 2026-09-17
+  - name: Finish
+    km: 42.77
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    accessed: 2026-09-17
+
+# Stretches where the course runs on a bridge deck or an elevated roadway. NYC's bare-earth DEM
+# has all of them removed, so on a bridge it reports the water or the ground underneath (the
+# Narrows read as sea level). The pipeline replaces these stretches with the deck's own measured
+# height, from the 2017 LiDAR returns classified as bridge deck.
+# `deck` says which roadway the runners are on where two are stacked: the Verrazzano's upper
+# level (Blue start), the Queensboro's lower level.
+# km ranges = where the traced course line overlaps the bridge's OpenStreetMap way.
+bridges:
+  - name: Verrazzano-Narrows Bridge (upper level)
+    km_start: 0.00
+    km_end: 2.03
+    deck: upper
+    source: https://www.openstreetmap.org/way/46858873
+    accessed: 2026-09-17
+    note: >-
+      The 2017 LiDAR has no returns at all over the middle of the main span (about km 0.85-1.45),
+      so the height there is a straight line between the last measured deck heights on either
+      side. The real deck crests a few meters higher.
+  - name: Gowanus Expressway viaduct (Brooklyn approach) and the ramp to 92nd Street
+    km_start: 2.03
+    km_end: 2.86
+    source: https://www.openstreetmap.org/way/38180795
+    accessed: 2026-09-17
+  - name: 92nd Street bridge at the Belt Parkway interchange
+    km_start: 3.05
+    km_end: 3.18
+    source: https://www.openstreetmap.org/way/420540321
+    accessed: 2026-09-17
+  - name: 4th Avenue bridge over the Gowanus Expressway
+    km_start: 5.75
+    km_end: 5.92
+    source: https://www.openstreetmap.org/way/46640100
+    accessed: 2026-09-17
+  - name: Pulaski Bridge
+    km_start: 20.66
+    km_end: 21.36
+    source: https://www.openstreetmap.org/way/46717584
+    accessed: 2026-09-17
+  - name: Ed Koch Queensboro Bridge (lower level) and the ramp down to First Avenue
+    km_start: 23.88
+    km_end: 26.30
+    deck: lower
+    source: https://www.openstreetmap.org/way/198924625
+    accessed: 2026-09-17
+    note: >-
+      The span runs past the bridge itself to where the exit ramp reaches street level near
+      First Avenue. The LiDAR classifies only the bridge proper as deck, so the last stretch of
+      ramp is a straight line down to the street; ending the span at the bridge instead would
+      drop the course 10 m onto the ground under the ramp.
+  - name: Willis Avenue Bridge
+    km_start: 31.36
+    km_end: 32.26
+    source: https://www.openstreetmap.org/way/32965216
+    accessed: 2026-09-17
+  - name: Madison Avenue Bridge
+    km_start: 33.88
+    km_end: 34.20
+    source: https://www.openstreetmap.org/way/46625537
+    accessed: 2026-09-17
+  - name: East Drive bridge over the 79th Street Transverse, Central Park
+    km_start: 39.94
+    km_end: 40.02
+    source: https://www.openstreetmap.org/way/959011551
+    accessed: 2026-09-17

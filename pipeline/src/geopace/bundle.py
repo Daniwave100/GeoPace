@@ -13,25 +13,22 @@ import jsonschema
 from geopace import __version__, difficulty
 from geopace.course_facts import CourseFacts
 from geopace.course_line import CourseLine, build_course_line
-from geopace.elevation import ElevationModel
+from geopace.elevation import BridgeDeckModel, ElevationModel
 from geopace.provenance import Attribution, Source
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schema" / "course-bundle.schema.json"
 SCHEMA_VERSION = 1
 
-# Certified courses are measured along the shortest legal line; a route file drawn along the
-# streets runs a little long. More than 1% off (about 420 m on a marathon) means a wrong file.
+# Certified courses are measured along the shortest legal line a runner may take. A route file
+# drawn along the streets runs a little long: more than 1% off (about 420 m on a marathon) means
+# the wrong file. A route traced along street centre lines runs longer still, because it takes
+# every corner wide and follows the middle of wide avenues and bridge ramps, so it gets more
+# room before the length means the trace is wrong.
 LENGTH_TOLERANCE = 0.01
+TRACED_LENGTH_TOLERANCE = 0.025
 
 
-OSM_SOURCE = Source(
-    id="openstreetmap",
-    title="OpenStreetMap (bridge locations along the course)",
-    url="https://www.openstreetmap.org/copyright",
-    licence="Open Database License (ODbL) 1.0",
-    accessed="2026-09-16",
-)
-OSM_ATTRIBUTION = Attribution(text="Bridges: © OpenStreetMap contributors", url="https://www.openstreetmap.org/copyright")
+OSM_COPYRIGHT = "https://www.openstreetmap.org/copyright"
 
 
 class BundleInvalid(ValueError):
@@ -46,16 +43,26 @@ def build_course_bundle(
     facts: CourseFacts,
     route: list[tuple[float, float]],
     elevation: ElevationModel,
+    decks: BridgeDeckModel | None = None,
 ) -> dict:
-    line = build_course_line(route, elevation, bridges=facts.bridges)
-    check_length(line.length_m, facts.certified_distance_m)
-    route_source = Source(
-        id="route",
-        title=f"{facts.name} {facts.route_edition} course file (GPX)",
-        url=facts.route_url,
-        licence="Course geometry of public roads (facts only; file not redistributed)",
-        accessed=facts.route_accessed,
-    )
+    line = build_course_line(route, elevation, bridges=facts.bridges, decks=decks)
+    check_length(line.length_m, facts.certified_distance_m, traced=bool(facts.route_waypoints))
+    if facts.route_url:
+        route_source = Source(
+            id="route",
+            title=f"{facts.name} {facts.route_edition} course file (GPX)",
+            url=facts.route_url,
+            licence="Course geometry of public roads (facts only; file not redistributed)",
+            accessed=facts.route_accessed,
+        )
+    else:
+        route_source = Source(
+            id="route",
+            title=f"{facts.name} {facts.route_edition} course streets from the organizer, traced on OpenStreetMap",
+            url=facts.route_source,
+            licence="Which streets the course uses: facts from the organizer. Street geometry: OpenStreetMap (ODbL)",
+            accessed=facts.route_accessed,
+        )
     bundle = {
         "schema_version": SCHEMA_VERSION,
         "course_id": facts.id,
@@ -76,23 +83,42 @@ def build_course_bundle(
         },
         "sources": [route_source.to_json(), elevation.source.to_json()],
         "attributions": [
-            Attribution(text=f"Course route: {facts.name}", url=facts.route_url).to_json(),
+            Attribution(text=f"Course route: {facts.name}", url=route_source.url).to_json(),
             elevation.attribution.to_json(),
         ],
     }
+    if decks is not None:
+        bundle["sources"].append(decks.source.to_json())
+        bundle["attributions"].append(decks.attribution.to_json())
+    osm_uses = []
+    if facts.route_waypoints:
+        osm_uses.append("course streets")
     if any("openstreetmap.org" in bridge.source for bridge in facts.bridges):
-        bundle["sources"].append(OSM_SOURCE.to_json())
-        bundle["attributions"].append(OSM_ATTRIBUTION.to_json())
+        osm_uses.append("bridge locations")
+    if osm_uses:
+        uses = " and ".join(osm_uses)
+        bundle["sources"].append(
+            Source(
+                id="openstreetmap",
+                title=f"OpenStreetMap ({uses} along the course)",
+                url=OSM_COPYRIGHT,
+                licence="Open Database License (ODbL) 1.0",
+                accessed=facts.route_accessed,
+            ).to_json()
+        )
+        bundle["attributions"].append(Attribution(text=f"{uses.capitalize()}: © OpenStreetMap contributors", url=OSM_COPYRIGHT).to_json())
     validate_bundle(bundle)
     return bundle
 
 
-def check_length(length_m: float, certified_m: float) -> None:
+def check_length(length_m: float, certified_m: float, traced: bool = False) -> None:
+    tolerance = TRACED_LENGTH_TOLERANCE if traced else LENGTH_TOLERANCE
     off = (length_m - certified_m) / certified_m
-    if abs(off) > LENGTH_TOLERANCE:
+    if abs(off) > tolerance:
+        what = "traced route" if traced else "route file"
         raise CourseLengthMismatch(
             f"Route is {length_m:.0f} m but the certified distance is {certified_m:.0f} m "
-            f"({off:+.1%}; tolerance is ±{LENGTH_TOLERANCE:.0%}). Is the route file right?"
+            f"({off:+.1%}; tolerance is ±{tolerance:.1%}). Is the {what} right?"
         )
 
 
