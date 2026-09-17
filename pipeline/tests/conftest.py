@@ -1,0 +1,54 @@
+"""Small synthetic inputs shared by the pipeline tests (no downloads)."""
+
+import math
+
+import numpy as np
+import pytest
+
+from geopace.provenance import Attribution, Source
+from geopace.elevation import ElevationModel
+
+EARTH_RADIUS_M = 6_371_008.8
+
+
+def straight_north_route(length_m: float, start=(52.5, 13.4), step_m: float = 250.0):
+    """A straight route heading due north, as (lat, lon) vertices every step_m."""
+    lat0, lon0 = start
+    n = int(length_m // step_m)
+    lats = [lat0 + math.degrees(i * step_m / EARTH_RADIUS_M) for i in range(n + 1)]
+    return [(lat, lon0) for lat in lats]
+
+
+def meters_north_of(lat, start_lat):
+    return np.radians(np.asarray(lat) - start_lat) * EARTH_RADIUS_M
+
+
+def synthetic_elevation(sample):
+    """Wrap a (lat, lon) -> meters function as an elevation model with made-up provenance."""
+    return ElevationModel(
+        sample=sample,
+        source=Source(
+            id="synthetic-dem",
+            title="Synthetic ground model",
+            url="https://example.org/dem",
+            licence="test data",
+            accessed="2026-09-16",
+        ),
+        attribution=Attribution(text="Synthetic DEM", url="https://example.org/dem"),
+    )
+
+
+@pytest.fixture
+def synthetic_facts():
+    source = {"source": "https://example.org/synthetic", "accessed": "2026-09-16"}
+    return {
+        "id": "synthetic",
+        "name": "Synthetic Marathon",
+        "city": "Testville",
+        "timezone": "Europe/Berlin",
+        **source,
+        "certified_distance": {"meters": 5000, **source},
+        "route": {"url": "https://example.org/synthetic.gpx", "edition": 2026, **source},
+        "start": {"lat": 52.5, "lon": 13.4, **source},
+        "landmarks": [{"name": "Turnaround", "km": 2.5, **source}],
+    }

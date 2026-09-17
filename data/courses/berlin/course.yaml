@@ -1,0 +1,148 @@
+# Hand-maintained facts about the Berlin Marathon course.
+# Rule: every fact about the world has a `source` URL and the date we `accessed` it.
+# Positions along the course are km from the start.
+
+id: berlin
+# Plain event name; no sponsor styling or trade dress (PLAN.md §9).
+name: Berlin Marathon
+city: Berlin
+timezone: Europe/Berlin
+source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+accessed: 2026-09-16
+
+certified_distance:
+  meters: 42195
+  source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+  accessed: 2026-09-16
+
+# The organizer's own course file. The pipeline downloads it into the local cache;
+# the file itself is never committed.
+route:
+  url: https://www.bmw-berlin-marathon.com/fileadmin/media/events/berlinmarathon/gpx/BM25_Marathon-Strecke.gpx
+  edition: 2025
+  source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+  accessed: 2026-09-16
+  note: No 2026 course file was published as of the accessed date; the 2025 file is used.
+
+# First point of the official course file (Straße des 17. Juni).
+start:
+  lat: 52.515214
+  lon: 13.3602
+  source: https://www.bmw-berlin-marathon.com/fileadmin/media/events/berlinmarathon/gpx/BM25_Marathon-Strecke.gpx
+  accessed: 2026-09-16
+
+# All km here are on ONE scale: distance measured along the official 2025 course file, the same
+# scale as the course line in the bundle. The file measures 42.28 km; the certified course is
+# 42.195 km because it is measured on the shortest legal line.
+# Places: km = distance along the course file to the point closest to the landmark, rounded to
+# 0.1 km; `source` locates the landmark. Half marathon and Finish: the certified positions
+# (21.0975 km, 42.195 km) scaled onto the course file (x 42.28 / 42.195).
+landmarks:
+  - name: Victory Column (Großer Stern)
+    km: 0.7
+    source: https://en.wikipedia.org/wiki/Victory_Column_(Berlin)
+    accessed: 2026-09-16
+  - name: Strausberger Platz
+    km: 12.0
+    source: https://en.wikipedia.org/wiki/Strausberger_Platz
+    accessed: 2026-09-16
+  - name: Moritzplatz
+    km: 14.4
+    source: https://en.wikipedia.org/wiki/Moritzplatz
+    accessed: 2026-09-16
+  - name: Kottbusser Tor
+    km: 15.3
+    source: https://en.wikipedia.org/wiki/Kottbusser_Tor
+    accessed: 2026-09-16
+  - name: Hermannplatz
+    km: 16.7
+    source: https://en.wikipedia.org/wiki/Hermannplatz
+    accessed: 2026-09-16
+  - name: Half marathon
+    km: 21.14
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-16
+  - name: Rathaus Schöneberg
+    km: 23.2
+    source: https://en.wikipedia.org/wiki/Rathaus_Sch%C3%B6neberg
+    accessed: 2026-09-16
+  - name: Fehrbelliner Platz
+    km: 32.1
+    source: https://en.wikipedia.org/wiki/Fehrbelliner_Platz
+    accessed: 2026-09-16
+  - name: Wittenbergplatz (KaDeWe)
+    km: 35.5
+    source: https://en.wikipedia.org/wiki/Wittenbergplatz
+    accessed: 2026-09-16
+  - name: Potsdamer Platz
+    km: 38.6
+    source: https://en.wikipedia.org/wiki/Potsdamer_Platz
+    accessed: 2026-09-16
+  - name: Gendarmenmarkt
+    km: 40.5
+    source: https://en.wikipedia.org/wiki/Gendarmenmarkt
+    accessed: 2026-09-16
+  - name: Brandenburg Gate
+    km: 41.8
+    source: https://en.wikipedia.org/wiki/Brandenburg_Gate
+    accessed: 2026-09-16
+  - name: Finish
+    km: 42.28
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-16
+
+# Stretches where the course runs on a bridge deck. Berlin's ground model (DGM1) leaves most
+# bridge decks out and reports the water underneath (the Spree is ~6 m below the Moltkebrücke
+# deck), so the pipeline carries the course straight across each span instead.
+# km range = where the bridge's OpenStreetMap way overlaps the official 2025 course file.
+bridges:
+  - name: Charlottenburger Brücke
+    km_start: 1.99
+    km_end: 2.06
+    source: https://www.openstreetmap.org/way/4609242
+    accessed: 2026-09-16
+  - name: Marchbrücke
+    km_start: 3.06
+    km_end: 3.12
+    source: https://www.openstreetmap.org/way/23213543
+    accessed: 2026-09-16
+  - name: Gotzkowskybrücke
+    km_start: 3.72
+    km_end: 3.79
+    source: https://www.openstreetmap.org/way/24654535
+    accessed: 2026-09-16
+  - name: Bridge on Alt-Moabit
+    km_start: 6.36
+    km_end: 6.43
+    source: https://www.openstreetmap.org/way/61765038
+    accessed: 2026-09-16
+  - name: Moltkebrücke
+    km_start: 6.57
+    km_end: 6.68
+    source: https://www.openstreetmap.org/way/34833363
+    accessed: 2026-09-16
+  - name: Kronprinzenbrücke
+    km_start: 7.13
+    km_end: 7.22
+    source: https://www.openstreetmap.org/way/188240631
+    accessed: 2026-09-16
+  - name: Michaelbrücke
+    km_start: 12.81
+    km_end: 12.90
+    source: https://www.openstreetmap.org/way/32590370
+    accessed: 2026-09-16
+  - name: Kottbusser Brücke
+    km_start: 15.64
+    km_end: 15.69
+    source: https://www.openstreetmap.org/way/981051251
+    accessed: 2026-09-16
+  - name: Hohenzollerndammbrücke (over the A100)
+    km_start: 31.18
+    km_end: 31.28
+    source: https://www.openstreetmap.org/way/4446413
+    accessed: 2026-09-16
+  - name: Potsdamer Brücke
+    km_start: 37.91
+    km_end: 37.96
+    source: https://www.openstreetmap.org/way/16943611
+    accessed: 2026-09-16

@@ -1,0 +1,26 @@
+[project]
+name = "geopace"
+version = "0.1.0"
+description = "GeoPace data pipeline: raw course inputs -> committed Course Bundles"
+authors = [
+    { name = "Daniwave100", email = "154252646+Daniwave100@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "jsonschema>=4.26.0",
+    "numpy>=2.5.3",
+    "pyproj>=3.8.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+geopace = "geopace.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

@@ -1,0 +1,40 @@
+/* Placeholder styling only. The visual identity comes from the chosen design direction (PLAN.md §6). */
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #111;
+  background: #fff;
+}
+header,
+main > section,
+footer {
+  padding: 0 16px;
+}
+#globe {
+  height: 60vh;
+  min-height: 360px;
+}
+#profile svg {
+  display: block;
+}
+.note {
+  font-size: 13px;
+  color: #444;
+  max-width: 80ch;
+}
+#error {
+  white-space: pre-wrap;
+  border: 2px solid #b00;
+  padding: 12px;
+  margin: 16px;
+  font-family: ui-monospace, monospace;
+}
+footer {
+  font-size: 13px;
+  border-top: 1px solid #ccc;
+  margin-top: 16px;
+  padding-bottom: 16px;
+}
+footer ul {
+  padding-left: 18px;
+}
