@@ -8,12 +8,17 @@ const MARGIN = { top: 150, right: 90, bottom: 44, left: 48 };
 const BAND_HEIGHT = 16;
 const BAND_BIN_KM = 0.1;
 
+let watchingWidth: ResizeObserver | undefined;
+
 export function renderProfile(container: HTMLElement, bundle: CourseBundle): void {
   const draw = () => {
     container.replaceChildren(summary(bundle), chart(bundle, Math.max(container.clientWidth, 600)), legend(bundle));
   };
   draw();
-  new ResizeObserver(debounce(draw, 150)).observe(container);
+  // One observer, redrawing whichever course is on screen now.
+  watchingWidth?.disconnect();
+  watchingWidth = new ResizeObserver(debounce(draw, 150));
+  watchingWidth.observe(container);
 }
 
 function chart(bundle: CourseBundle, width: number): SVGSVGElement {
@@ -141,7 +146,7 @@ function summary(bundle: CourseBundle): HTMLElement {
   const line = bundle.measured.course_line;
   const p = document.createElement("p");
   p.textContent =
-    `Measured along the course file: ${(line.length_m / 1000).toFixed(2)} km ` +
+    `Measured along the course line: ${(line.length_m / 1000).toFixed(2)} km ` +
     `(certified ${(bundle.course.certified_distance_m / 1000).toFixed(3)} km) · ` +
     `elevation ${min_m.toFixed(0)}–${max_m.toFixed(0)} m · gain ${gain_m.toFixed(0)} m · loss ${loss_m.toFixed(0)} m`;
   return p;

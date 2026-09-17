@@ -10,6 +10,12 @@ main > section,
 footer {
   padding: 0 16px;
 }
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
 #globe {
   height: 60vh;
   min-height: 360px;
