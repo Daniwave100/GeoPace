@@ -11,6 +11,7 @@ from geopace import berlin_dgm1, nyc_dem, nyc_lidar
 from geopace.bundle import build_course_bundle, write_bundle
 from geopace.cache import cache_dir, download
 from geopace.course_facts import CourseFacts, load_course_facts
+from geopace.edition_facts import load_editions
 from geopace.elevation import BridgeDeckModel, ElevationModel
 from geopace.route import parse_gpx
 from geopace.street_route import fetch_streets, trace_route
@@ -53,9 +54,13 @@ def load_route(facts: CourseFacts, allow_download: bool = True) -> list[tuple[fl
 def build(course_id: str) -> Path:
     print(f"Building the {course_id} Course Bundle")
     facts = load_course_facts(COURSES / course_id / "course.yaml")
+    editions = load_editions(COURSES / course_id, facts.timezone)
+    print(f"  editions: {', '.join(str(edition.edition) for edition in editions)}")
     route = load_route(facts)
     data = COURSE_DATA[course_id]
-    bundle = build_course_bundle(facts, route, data.elevation(), decks=data.decks() if data.decks else None)
+    bundle = build_course_bundle(
+        facts, route, data.elevation(), decks=data.decks() if data.decks else None, editions=editions
+    )
 
     out = DERIVED / course_id / "course-bundle.json"
     write_bundle(bundle, out)

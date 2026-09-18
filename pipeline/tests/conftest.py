@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pytest
 
+from geopace.edition_facts import EditionFacts, parse_edition_facts
 from geopace.provenance import Attribution, Source
 from geopace.elevation import BridgeDeckModel, ElevationModel
 
@@ -51,6 +52,17 @@ def synthetic_decks(returns):
         ),
         attribution=Attribution(text="Synthetic LiDAR", url="https://example.org/lidar"),
     )
+
+
+def synthetic_editions() -> list[EditionFacts]:
+    """One made-up edition, for tests that need a complete bundle but aren't about editions."""
+    source = {"source": "https://example.org/race-day", "accessed": "2026-09-18"}
+    raw = {
+        "edition": 2026,
+        "date": {"day": "2026-09-27", **source},
+        "waves": [{"id": "wave-1", "name": "Wave 1", "start_local": "09:00", **source}],
+    }
+    return [parse_edition_facts(raw, timezone="Europe/Berlin")]
 
 
 @pytest.fixture

@@ -13,11 +13,12 @@ import jsonschema
 from geopace import __version__, difficulty
 from geopace.course_facts import CourseFacts
 from geopace.course_line import CourseLine, build_course_line
+from geopace.edition_facts import EditionFacts
 from geopace.elevation import BridgeDeckModel, ElevationModel
 from geopace.provenance import Attribution, Source
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schema" / "course-bundle.schema.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Certified courses are measured along the shortest legal line a runner may take. A route file
 # drawn along the streets runs a little long: more than 1% off (about 420 m on a marathon) means
@@ -44,6 +45,8 @@ def build_course_bundle(
     route: list[tuple[float, float]],
     elevation: ElevationModel,
     decks: BridgeDeckModel | None = None,
+    *,
+    editions: list[EditionFacts],
 ) -> dict:
     line = build_course_line(route, elevation, bridges=facts.bridges, decks=decks)
     check_length(line.length_m, facts.certified_distance_m, traced=bool(facts.route_waypoints))
@@ -76,6 +79,7 @@ def build_course_bundle(
             "start": {"lat": facts.start_lat, "lon": facts.start_lon},
             "landmarks": [{"name": mark.name, "km": mark.km, "source": mark.source} for mark in facts.landmarks],
         },
+        "editions": [_edition_json(edition) for edition in editions],
         "measured": {
             "course_line": _course_line_json(line),
             "elevation_summary": _elevation_summary(line),
@@ -120,6 +124,31 @@ def check_length(length_m: float, certified_m: float, traced: bool = False) -> N
             f"Route is {length_m:.0f} m but the certified distance is {certified_m:.0f} m "
             f"({off:+.1%}; tolerance is ±{tolerance:.1%}). Is the {what} right?"
         )
+
+
+def _edition_json(edition: EditionFacts) -> dict:
+    """An edition's facts as the app reads them. Optional parts are left out rather than null."""
+    date = {"day": edition.date, "source": edition.date_source, "accessed": edition.date_accessed}
+    if edition.date_note:
+        date["note"] = edition.date_note
+    out: dict = {"edition": edition.edition, "date": date}
+    if edition.carried_over:
+        out["carried_over"] = {"from_edition": edition.carried_over.from_edition, "reason": edition.carried_over.reason}
+    out["waves"] = []
+    for wave in edition.waves:
+        wave_json = {
+            "id": wave.id,
+            "name": wave.name,
+            "start_local": wave.start_local,
+            "start": wave.start,
+            "carried_over": wave.carried_over,
+            "source": wave.source,
+            "accessed": wave.accessed,
+        }
+        if wave.note:
+            wave_json["note"] = wave.note
+        out["waves"].append(wave_json)
+    return out
 
 
 def _course_line_json(line: CourseLine) -> dict:

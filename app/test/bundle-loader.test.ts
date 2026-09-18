@@ -34,6 +34,7 @@ describe("Course Bundle loader", () => {
       const bundle = parseCourseBundle(JSON.parse(committed(course)), course);
 
       expect(bundle.course_id).toBe(course);
+      expect(bundle.editions.length).toBeGreaterThan(0);
       expect(bundle.course.landmarks.length).toBeGreaterThan(0);
       expect(bundle.measured.course_line.km.length).toBeGreaterThan(4000);
     }
@@ -51,11 +52,11 @@ describe("Course Bundle loader", () => {
   });
 
   it("rejects a bundle from a different format version with advice instead of a list of errors", () => {
-    const newer = { ...pipelineBundle(), schema_version: 2 };
+    const newer = { ...pipelineBundle(), schema_version: 3 };
 
     const message = rejectionOf(newer);
-    expect(message).toContain("format version 2");
-    expect(message).toContain("version 1");
+    expect(message).toContain("format version 3");
+    expect(message).toContain("version 2");
     expect(message).not.toContain("must be");
   });
 
