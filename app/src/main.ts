@@ -3,22 +3,26 @@ import "./style.css";
 import { browserStorage } from "./browser-storage";
 import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
+import { type Encoding, ENCODINGS } from "./core/encoding";
 import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
+import { HILL_LOOKS, type HillLook, hillLookFromUrl } from "./core/mark-look";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
 import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
+import { loadStripSize, saveStripSize } from "./core/strip-size";
 import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
 import { distanceNumber, type Units, unitName } from "./core/units";
 import { COURSES, courseFromUrl, urlForCourse } from "./courses";
 import { html, link } from "./dom";
 import { createLayerBar } from "./explore/layer-bar";
-import { createMapControls, MAP_HELP } from "./explore/map-controls";
+import { createMapControls, MAP_HELP, type MapControls } from "./explore/map-controls";
 import { createPlanSummary } from "./explore/plan-summary";
 import { createReadout } from "./explore/readout";
 import { createSentence, sentenceInWords } from "./explore/sentence-view";
 import { renderSources } from "./explore/sources";
+import { createStripEdge } from "./explore/strip-edge";
 import { createSwitches } from "./explore/switches";
 import { createPhotoreal, type Photoreal } from "./photoreal/photoreal";
 import { createPhotorealPanel, type PhotorealPanel } from "./photoreal/photoreal-panel";
@@ -26,11 +30,11 @@ import { createPlanPanel } from "./plan/plan-panel";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showLineMarks } from "./scene/course-marks";
-import { createGlobe, frameCourse, goTo, isStillFramed, showCourse, showRunner, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isStillFramed, showCourse, showMapTheme, showRunner, toggleStraightDown, watchCameraHeight } from "./scene/globe";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
-import { createStrip } from "./strip/strip";
+import { createStrip, type KeyEntry, rowsHeightAtSizeOne } from "./strip/strip";
 import type { Viewer } from "cesium";
 
 /** What is on screen: one course, one runner's plan for it, where on it the runner is, and its layers. */
@@ -59,7 +63,12 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let units: Units = loadUnits(storage);
 let themeChoice: ThemeChoice = loadThemeChoice(storage);
 let layerState: LayerState = NO_LAYERS;
+let stripSize = loadStripSize(storage);
+let fullMap = false;
+// ON TRIAL: which of the two looks for a hill is showing (core/mark-look.ts). Goes when the owner has chosen.
+let hillLook: HillLook = hillLookFromUrl(window.location.search);
 let viewer: Viewer | undefined;
+let mapControls: MapControls | undefined;
 let mapLabels: MapLabels | undefined;
 let photoreal: Photoreal | undefined;
 let photorealPanel: PhotorealPanel | undefined;
@@ -74,8 +83,19 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
   scrubTo(km);
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
-const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
+const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)), useHillLook);
 const strip = createStrip(byId("strip"), scrubTo);
+const stripEdge = createStripEdge(byId("strip-edge"), {
+  rowsHeightAtSizeOne: () => rowsHeightAtSizeOne({ layerRows: showing?.screen.rows ?? [] }),
+  onSize: (size) => useStripSize(size),
+  onDone: (size) => {
+    saveStripSize(storage, size);
+    reframeIfUntouched(mapWasUntouched);
+    mapWasUntouched = false;
+  },
+});
+/** Whether the map was still as the last framing left it when a resize began: read before the map changes shape. */
+let mapWasUntouched = false;
 const readoutView = createReadout(byId("readout"));
 const sentenceView = createSentence(byId("sentence"));
 
@@ -118,7 +138,14 @@ async function show(courseId: string): Promise<void> {
   if (!viewer) {
     viewer = createGlobe(byId("globe"));
     mapLabels = createMapLabels(viewer, byId("map-labels"));
-    createMapControls(byId("map-controls"), byId("globe"), viewer, () => frameWholeCourse(flightSeconds()), goToRunner);
+    const map = viewer;
+    mapControls = createMapControls(byId("map-controls"), byId("globe"), map, {
+      wholeCourse: () => frameWholeCourse(flightSeconds()),
+      whereIAm: goToRunner,
+      straightDown: () => toggleStraightDown(map, flightSeconds()),
+      fullMap: () => useFullMap(!fullMap),
+    });
+    showTheme();
   }
   showCourse(viewer, bundle);
   photoreal ??= startPhotoreal(viewer);
@@ -153,16 +180,50 @@ function useTheme(next: ThemeChoice): void {
 }
 
 function showTheme(): void {
-  document.documentElement.dataset.theme = resolveTheme(themeChoice, { systemPrefersDark: systemDark.matches });
+  const theme = resolveTheme(themeChoice, { systemPrefersDark: systemDark.matches });
+  document.documentElement.dataset.theme = theme;
+  if (viewer) showMapTheme(viewer, theme);
 }
 
 function useLayers(next: LayerState): void {
   layerState = next;
   const untouched = viewer !== undefined && isStillFramed(viewer);
   showLayers();
-  // The strip has just changed height, and the map with it. If the runner hasn't moved the map,
-  // fit the whole course into its new shape; if they have, it is theirs and stays where it is.
+  reframeIfUntouched(untouched);
+}
+
+/**
+ * The map has just changed shape (the strip opened, was resized, or went away). If the runner
+ * hadn't moved the map, fit the whole course into its new shape; if they had, it is theirs and
+ * stays where it is. `untouched` has to be read before the change: afterwards it is too late to tell.
+ */
+function reframeIfUntouched(untouched: boolean): void {
   if (untouched) requestAnimationFrame(() => frameWholeCourse(0));
+}
+
+/** ON TRIAL: flip between the two looks for a hill, on the map and on the strip at once. */
+function useHillLook(next: HillLook): void {
+  hillLook = next;
+  showLayers();
+}
+
+/** The runner dragged the strip's top edge: the rows follow at once; the map settles when the drag ends. */
+function useStripSize(size: number): void {
+  if (stripSize === size) return;
+  mapWasUntouched ||= viewer !== undefined && isStillFramed(viewer);
+  stripSize = size;
+  showLayers();
+}
+
+/** The map on the full screen: the readout, the strip and all but one line of the credits step aside. */
+function useFullMap(on: boolean): void {
+  const untouched = viewer !== undefined && isStillFramed(viewer);
+  fullMap = on;
+  byId("explore").toggleAttribute("data-full-map", on);
+  // The credits fold to one word, one press away; the map's own credits stay on the map.
+  (byId("credits-more") as HTMLDetailsElement).open = !on;
+  mapControls?.showFullMap(on);
+  reframeIfUntouched(untouched);
 }
 
 function showPlan(): void {
@@ -183,19 +244,27 @@ function showLayers(): void {
   if (!showing || !viewer || !mapLabels) return;
   const { bundle, baseRow, layers } = showing;
   const screen = (showing.screen = onScreen(layerState, layers));
-  layerBar.show(layerState, layers);
-  strip.show({
-    lengthKm: showing.planner.lengthKm,
-    landmarks: bundle.course.landmarks,
-    baseRow,
-    layerRows: screen.rows,
-    showKey: layerState.everything,
-    hasNotMeasured: bundle.measured.elevation_not_measured.length > 0,
-    units,
-  });
-  showLineMarks(viewer, bundle, screen.lineMarks);
+  layerBar.show(layerState, layers, hillLook);
+  document.documentElement.dataset.hillLook = hillLook;
+  strip.show({ lengthKm: showing.planner.lengthKm, landmarks: bundle.course.landmarks, baseRow, layerRows: screen.rows, key: keyFor(bundle, screen), size: stripSize, units });
+  stripEdge.show(stripSize);
+  showLineMarks(viewer, bundle, screen.lineMarks, hillLook);
   mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))]);
   scrubTo(showing.km);
+}
+
+/**
+ * What the marks on screen mean, in a line under the strip. Nothing while no layer is on: the
+ * first screen needs no key (PLAN.md principle 8). With a layer on, its marks on the course line
+ * come first, since an edge that is black here, white there and dashed somewhere else is a riddle
+ * without it; then the encodings that are in use.
+ */
+function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
+  if (layerState.active === null && !layerState.everything) return [];
+  const used = new Set<Encoding>([...screen.rows.map((row) => row.encoding), ...screen.lineMarks.map((mark) => mark.encoding)]);
+  if (bundle.measured.elevation_not_measured.length > 0) used.add("not-measured");
+  const hills = layerState.active === "hills" ? HILL_LOOKS.filter((look) => look.id === hillLook).map((look) => ({ name: "Hills.", meaning: `${look.key} A thin white edge is just the course.` })) : [];
+  return [...hills, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
 }
 
 function endLabels(bundle: CourseBundle): MapLabel[] {

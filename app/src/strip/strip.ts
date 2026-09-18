@@ -9,7 +9,7 @@
 // To a screen reader it is a slider, which is what it is: one value between two ends. All the
 // arithmetic lives in core/ (scrub.ts, trace.ts, layout.ts, units.ts), where it is tested; this
 // file only listens and draws.
-import { ENCODINGS, type Encoding } from "../core/encoding";
+import { ENCODINGS } from "../core/encoding";
 import type { StripRow } from "../core/layers";
 import { assignFreeLanes, linearScale, type Scale } from "../core/layout";
 import { kmAfterKey, kmAtFraction } from "../core/scrub";
@@ -27,6 +27,8 @@ const LANDMARK_CHAR = 6;
 const BASE_ROW_HEIGHT = 62;
 const LAYER_ROW_HEIGHT = 48;
 const LINE_HEIGHT = 40;
+/** A row squeezed below this has room for its name and its value, and no more. */
+const TIGHT_ROW_PX = 40;
 /** One bin of a trace per this many pixels: finer than the eye needs, coarse enough to redraw on every resize. */
 const PIXELS_PER_BIN = 3;
 
@@ -37,11 +39,21 @@ export interface StripContent {
   baseRow: StripRow;
   /** The rows of the layers that are on (or of all of them, with "Show everything"). */
   layerRows: StripRow[];
-  /** Whether the key to the encodings is shown: only with "Show everything". */
-  showKey: boolean;
-  /** Whether any of this course's height is filled in, so the key should say what grey means. */
-  hasNotMeasured: boolean;
+  /** What the marks on screen mean, in a line under the strip. Empty while no layer is on: the first screen needs no key. */
+  key: KeyEntry[];
+  /** How tall the runner has made the rows, as a multiple of their designed height (core/strip-size.ts). */
+  size: number;
   units: Units;
+}
+
+export interface KeyEntry {
+  name: string;
+  meaning: string;
+}
+
+/** How tall the rows that resize are at the designed size: what the strip's top edge needs to turn a drag into a size. */
+export function rowsHeightAtSizeOne(content: Pick<StripContent, "layerRows">): number {
+  return BASE_ROW_HEIGHT + content.layerRows.length * LAYER_ROW_HEIGHT;
 }
 
 export interface Strip {
@@ -107,8 +119,8 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
       rowsBox.style.height = `${stripHeight(next)}px`;
       slider.setAttribute("aria-label", `Where you are on the course, in ${unitName(next.units, "many")}`);
       slider.setAttribute("aria-valuemax", distanceNumber(next.lengthKm, next.units));
-      key.hidden = !next.showKey;
-      key.replaceChildren(...keyEntries([next.baseRow, ...next.layerRows], next.hasNotMeasured));
+      key.hidden = next.key.length === 0;
+      key.replaceChildren(...next.key.map((entry) => html("span", {}, html("b", { text: `${entry.name} ` }), entry.meaning)));
       redraw();
     },
     setKm(value, spoken) {
@@ -120,8 +132,9 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   };
 }
 
+/** The rows are what resizes; the landmarks' lane and the blue line keep their height, since they are type, not traces. */
 function rowHeight(row: StripRow, content: StripContent): number {
-  return row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT;
+  return Math.round((row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT) * content.size);
 }
 
 /** The landmarks' lane, every row, and the blue line. */
@@ -164,7 +177,7 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   let top = LANDMARKS_HEIGHT;
   for (const row of rows) {
     const rowH = rowHeight(row, content);
-    drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }), traceGroup(row, row.bins(binCount), x, top, rowH));
+    drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }), traceGroup(row, binCount, x, top, rowH));
     headCells.push(headCell(row, top, rowH, content.units));
     top += rowH;
   }
@@ -230,14 +243,18 @@ function landmarkLane(content: StripContent, x: Scale): SVGGElement {
 }
 
 /** One row's trace: solid with a light fill where measured, dashed grey where the value is filled in, a grey block where there is none. */
-function traceGroup(row: StripRow, bins: ReturnType<StripRow["bins"]>, x: Scale, top: number, height: number): SVGGElement {
+function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, height: number): SVGGElement {
   const group = svg("g", {});
-  const paths = tracePaths(row, bins, { x, top, height });
+  const bins = row.bins(binCount);
+  const paths = tracePaths(row, bins, { x, top, height }, row.levels?.(binCount));
   const solid = ENCODINGS[row.encoding].cssClass;
   const gap = ENCODINGS["not-measured"].cssClass;
   if (row.baseline !== "bottom") group.append(svg("line", { x1: x(bins[0].startKm), x2: x(bins[bins.length - 1].endKm), y1: paths.baselineY, y2: paths.baselineY, class: "strip-baseline" }));
   for (const block of paths.noValue) group.append(svg("rect", { x: block.x, y: top + 2, width: block.width, height: height - 4, class: `${gap} trace-block` }));
-  for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }), svg("path", { d: piece.line, class: solid }));
+  for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }));
+  // How much, as well as where: the same steps as the marks on the map (style.css draws them in the look on trial).
+  for (const block of paths.levelBlocks) group.append(svg("rect", { x: block.x, y: block.y, width: block.width + 0.4, height: block.height, class: `trace-level level-${block.level}` }));
+  for (const piece of paths.measured) group.append(svg("path", { d: piece.line, class: solid }));
   for (const line of paths.notMeasured) group.append(svg("path", { d: line, class: gap }));
   return group;
 }
@@ -249,6 +266,7 @@ function headCell(row: StripRow, top: number, height: number, units: Units): Hea
   if (row.summary) node.append(html("span", { class: "strip-head-scale", text: row.summary(units) }));
   node.style.top = `${top}px`;
   node.style.height = `${height}px`;
+  node.classList.toggle("is-tight", height < TIGHT_ROW_PX);
   return {
     node,
     update(km, shownIn) {
@@ -266,13 +284,6 @@ function lineHead(top: number, units: Units): HeadCell {
   node.style.top = `${top}px`;
   node.style.height = `${LINE_HEIGHT}px`;
   return { node, update: () => undefined };
-}
-
-/** What the marks mean, for the encodings that are on screen. Only shown with "Show everything". */
-function keyEntries(rows: StripRow[], hasNotMeasured: boolean): HTMLElement[] {
-  const used = new Set<Encoding>(rows.map((row) => row.encoding));
-  if (hasNotMeasured) used.add("not-measured");
-  return (Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => html("span", {}, html("b", { text: `${ENCODINGS[encoding].name}. ` }), ENCODINGS[encoding].meaning));
 }
 
 /** A name short enough to set along the strip; the full one is in its tooltip. */

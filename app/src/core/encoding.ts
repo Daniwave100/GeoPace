@@ -35,7 +35,7 @@ export const ENCODINGS: Record<Encoding, EncodingLook> = {
     saidAfter: "",
   },
   "not-measured": {
-    name: "Grey and struck through is not measured here",
+    name: "Grey, dashed or struck through is not measured here",
     meaning: "The survey has nothing at this spot, so the value is filled in and says so.",
     cssClass: "enc-not-measured",
     mapLine: "grey-dashes",

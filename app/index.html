@@ -21,7 +21,7 @@
   </head>
   <body>
     <!-- Explore: the map, full-bleed, with the poster laid over it as opaque blocks (PLAN.md D32, D34). -->
-    <div class="explore">
+    <div id="explore" class="explore">
       <header class="banner">
         <h1 class="banner-brand">GeoPace</h1>
         <p class="banner-course">
@@ -44,6 +44,7 @@
         <div id="photoreal"></div>
         <div id="map-controls" class="map-controls"></div>
       </main>
+      <div id="strip-edge" class="strip-edge"></div>
       <section class="strip-block" aria-labelledby="strip-heading">
         <h2 id="strip-heading" class="visually-hidden">The course, from start to finish</h2>
         <div id="layers" class="layer-bar"></div>
@@ -51,7 +52,12 @@
       </section>
       <footer class="credits">
         <p class="credits-unofficial"><strong>Unofficial. Not affiliated with any race organizer.</strong></p>
-        <ul id="attributions" class="credits-list" aria-label="Data and map credits"></ul>
+        <!-- Always open, except with the map on the full screen, where it folds to the one word "Credits".
+             The map's own credits (OpenStreetMap's, Google's) are on the map itself and never fold. -->
+        <details id="credits-more" class="credits-more" open>
+          <summary>Credits</summary>
+          <ul id="attributions" class="credits-list" aria-label="Data and map credits"></ul>
+        </details>
         <div id="sources"></div>
         <p id="map-help" class="credits-help"></p>
       </footer>

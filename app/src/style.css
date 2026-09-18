@@ -27,14 +27,17 @@
   color-scheme: light;
 }
 
+/* Dark is charcoal, not black (owner, 09-18: "not so dark"). The banner stays black in both
+   themes, so in the dark one it still reads as the darkest thing on the page; and the keyless map
+   goes quiet to match (scene/globe.ts, showMapTheme). */
 :root[data-theme="dark"] {
-  --paper: #000;
+  --paper: #262624;
   --ink: #f4f4f0;
-  --blue: #5a7dff;
+  --blue: #7391ff;
   --on-blue: #000;
-  --grey: #7c7c78;
-  --grey-text: #a9a9a4;
-  --alarm: #ff6b5e;
+  --grey: #8a8a86;
+  --grey-text: #b9b9b4;
+  --alarm: #ff7a6e;
   color-scheme: dark;
 }
 
@@ -433,6 +436,39 @@ svg .enc-sample {
   stroke: none;
 }
 
+/* ── How steep, on the strip: ON TRIAL, two looks (core/mark-look.ts) ───────────────────── */
+
+/* A, ink weight: the fill under the grade gets heavier the steeper it is. */
+svg .trace-level {
+  stroke: none;
+  fill: var(--ink);
+}
+
+:root[data-hill-look="ink"] svg .level-1 {
+  fill-opacity: 0.14;
+}
+
+:root[data-hill-look="ink"] svg .level-2 {
+  fill-opacity: 0.42;
+}
+
+:root[data-hill-look="ink"] svg .level-3 {
+  fill-opacity: 0.85;
+}
+
+/* B, colour: the same warm ramp as the marks on the map, paler to darker. */
+:root[data-hill-look="colour"] svg .level-1 {
+  fill: #ffd84d;
+}
+
+:root[data-hill-look="colour"] svg .level-2 {
+  fill: #f07f1f;
+}
+
+:root[data-hill-look="colour"] svg .level-3 {
+  fill: #a3150f;
+}
+
 /* ── Labels and controls on the map ─────────────────────────────────────────────────────── */
 
 .map-labels {
@@ -788,12 +824,53 @@ button.map-label {
   border-width: 1.5px;
 }
 
+/* ── The strip's top edge: drag it to resize the strip ──────────────────────────────────── */
+
+/* It is the 3px rule between the map and the strip, with a grip in the middle and a taller
+   invisible band round it so it is easy to catch. */
+.strip-edge {
+  position: relative;
+  z-index: 1;
+  height: var(--rule);
+  background: var(--ink);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.strip-edge::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.strip-edge::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 56px;
+  height: 11px;
+  margin-left: -28px;
+  box-sizing: border-box;
+  background: var(--paper);
+  border: var(--rule) solid var(--ink);
+}
+
+.strip-edge:hover,
+.strip-edge:focus-visible {
+  background: var(--blue);
+}
+
+.strip-edge:hover::after,
+.strip-edge:focus-visible::after {
+  border-color: var(--blue);
+}
+
 /* ── The strip: the whole course as one line, and the control for where you are ─────────── */
 
 .strip-block {
   color: var(--ink);
   background: var(--paper);
-  border-top: var(--rule) solid var(--ink);
 }
 
 .layer-bar {
@@ -813,7 +890,16 @@ button.map-label {
 .layer-switches {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px 10px;
+}
+
+/* On trial: set apart from the real switches, and wearing the sample tape so nobody takes it for a feature. */
+.layer-trial {
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1.5px solid var(--ink);
+  font-size: 12px;
 }
 
 .layer-bar-help {
@@ -887,6 +973,11 @@ button.map-label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A row squeezed small keeps its name and its value; the scale comes back when there is room. */
+.strip-head.is-tight .strip-head-scale {
+  display: none;
 }
 
 /* The value under the cursor, printed in the row's header. */
@@ -988,6 +1079,11 @@ button.map-label {
   font-size: 12px;
 }
 
+/* Inside the folding credits the list still sits in the footer's own row of things. */
+.credits-more[open] .credits-list {
+  display: flex;
+}
+
 .credits-unofficial {
   font-size: 13px;
   font-stretch: 88%;
@@ -998,6 +1094,16 @@ button.map-label {
   flex-wrap: wrap;
   gap: 2px 14px;
   list-style: none;
+}
+
+/* The credits are always open, and their "Credits" heading hidden, except with the map on the
+   full screen, where they fold to that one word. */
+.credits-more {
+  display: contents;
+}
+
+.credits-more > summary {
+  display: none;
 }
 
 /* "Sources" and the line about moving the map share a row; opened, the sources take the full width. */
@@ -1028,6 +1134,38 @@ button.map-label {
 
 .sources small {
   color: var(--grey-text);
+}
+
+/* ── The map on the full screen ─────────────────────────────────────────────────────────── */
+
+/* The readout, the strip and its edge step aside. The banner stays (it is how you change course
+   and get back), the map keeps its own credits on it, and ours fold to one line with "Credits"
+   and "Sources" one press away: attributions are never out of reach. */
+.explore[data-full-map] .where,
+.explore[data-full-map] .strip-edge,
+.explore[data-full-map] .strip-block,
+.explore[data-full-map] .credits-help {
+  display: none;
+}
+
+.explore[data-full-map] .credits {
+  padding-block: 4px;
+  border-top: var(--rule) solid var(--ink);
+}
+
+.explore[data-full-map] .credits-more {
+  display: block;
+}
+
+.explore[data-full-map] .credits-more > summary {
+  display: list-item;
+  width: fit-content;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.explore[data-full-map] .credits-more[open] {
+  flex-basis: 100%;
 }
 
 /* ── Narrow or short screens: the blocks stop overlapping the map and stack under it ────── */

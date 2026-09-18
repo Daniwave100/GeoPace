@@ -68,7 +68,12 @@ export interface StripRow {
   stepped: boolean;
   /** The value where the runner is, as it is printed in the row's header. */
   valueAt(km: number, units: Units): RowValue;
+  /** How strongly each of `binCount` slices is drawn, 0 (not at all) to 3, for a row whose fill says how much as well as where. */
+  levels?(binCount: number): MarkLevel[];
 }
+
+/** How strongly something is marked, on a layer's own scale: for Hills, gentle, a proper hill, steep. 0 is not marked. */
+export type MarkLevel = 0 | 1 | 2 | 3;
 
 export interface RowValue {
   text: string;
@@ -81,6 +86,8 @@ export interface LineMark {
   fromKm: number;
   toKm: number;
   encoding: Encoding;
+  /** How strongly it is marked, where the layer has more to say than "here": how steep a hill is. */
+  level?: Exclude<MarkLevel, 0>;
 }
 
 /** A label on the map for something a layer marks: a hill, later an aid station or a cheer zone. */

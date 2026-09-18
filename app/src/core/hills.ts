@@ -15,6 +15,20 @@ const HILL_GRADE = 0.01;
 const SAME_HILL_GAP_KM = 0.15;
 /** Less height than this, up or down, isn't worth marking: a kerb ramp, an underpass dip. */
 const MIN_HILL_HEIGHT_M = 5;
+/**
+ * Where gentle, a proper hill and steep begin, as a percentage, up or down alike. Chosen so that
+ * all three show on New York (about 10 km, 7 km and 3 km of it) and Berlin is gentle throughout,
+ * which is what runners say of both.
+ */
+const STEEPNESS_STEPS = [HILL_GRADE * 100, 2, 3.5];
+
+/** 0 flat · 1 gentle · 2 a proper hill · 3 steep. */
+export type Steepness = 0 | 1 | 2 | 3;
+
+/** How steep a grade is, going up or coming down: a ramp down off a bridge hurts too. */
+export function steepnessLevel(gradePercent: number): Steepness {
+  return STEEPNESS_STEPS.filter((step) => Math.abs(gradePercent) >= step).length as Steepness;
+}
 
 export interface HillsAt {
   elevationM: number;

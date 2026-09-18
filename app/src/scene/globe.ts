@@ -7,6 +7,7 @@
 // gets there, and never drifts from the readout.
 import {
   BoundingSphere,
+  Cartesian2,
   Cartesian3,
   Cartesian4,
   Cartographic,
@@ -201,6 +202,41 @@ export function goTo(viewer: Viewer, place: RoadPosition, seconds = 0): void {
     offset: new HeadingPitchRange(viewer.camera.heading, -CAMERA_TILT_RAD, rangeM),
     duration: seconds,
   });
+}
+
+/** Steeper than this and the camera counts as looking straight down. */
+const STRAIGHT_DOWN_RAD = CesiumMath.toRadians(80);
+
+export function isLookingStraightDown(viewer: Viewer): boolean {
+  return -viewer.camera.pitch > STRAIGHT_DOWN_RAD;
+}
+
+/**
+ * Look at the same place from straight above, north up, like a paper map; or, if the camera is
+ * already there, tip back to the tilted view. What is in the middle of the map stays in the middle,
+ * at the same distance, so it is a way back from road height as well as a way to read the course
+ * like a map.
+ */
+export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
+  const canvas = viewer.canvas;
+  const middle = viewer.camera.pickEllipsoid(new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
+  if (!middle) return; // looking at the sky: there is no place to keep in the middle
+  const rangeM = Math.max(Cartesian3.distance(viewer.camera.positionWC, middle), 300);
+  const tiltRad = isLookingStraightDown(viewer) ? CAMERA_TILT_RAD : CesiumMath.PI_OVER_TWO;
+  viewer.camera.flyToBoundingSphere(new BoundingSphere(middle, 1), { offset: new HeadingPitchRange(0, -tiltRad, rangeM), duration: seconds });
+}
+
+/**
+ * In the dark theme the keyless map goes quiet: dimmer and almost without colour, so a bright map
+ * doesn't glare out of a dark screen and the blue line is the brightest thing on it. Only our own
+ * basemap layer is touched. Photoreal imagery is Google's and is shown as it comes.
+ */
+export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
+  const basemap = viewer.imageryLayers.get(0);
+  if (!basemap) return;
+  basemap.brightness = theme === "dark" ? 0.55 : 1;
+  basemap.contrast = theme === "dark" ? 1.15 : 1;
+  basemap.saturation = theme === "dark" ? 0.15 : 1;
 }
 
 /** How far the camera is above the plain ground under it, or above the ellipsoid where no ground is loaded. */
