@@ -9,18 +9,16 @@
 // layers come from sample-data.ts and carry `sample: true` everywhere they surface.
 import type { CourseBundle } from "../bundle/types";
 import { type Side, type WindOnRunner, sunOnRunner, windOnRunner } from "../core/bearing";
+import { type CarriedOver, createPlanner, defaultPlan, plannerCourse } from "../core/planner";
 import { type RaceClock, raceClock } from "../core/race-clock";
 import { clamp, nearestIndex } from "../core/series";
 import { type SunPosition, sunPosition } from "../core/solar";
 import {
-  FALLBACK_EDITION,
   FALLBACK_MASSING,
   SAMPLE_AID_STATIONS,
-  SAMPLE_EDITIONS,
   SAMPLE_MASSING,
   SAMPLE_NOTES,
   SAMPLE_PREVAILING_WIND,
-  type SampleEdition,
   type SampleNote,
   sampleNoise,
 } from "./sample-data";
@@ -129,9 +127,21 @@ export interface StripBin {
   windSpeedMs: number;
 }
 
+/** The edition the mockups plan for: sourced edition facts from the Course Bundle (#5), not samples. */
+export interface StoryEdition {
+  /** Local calendar date of the race. */
+  date: string;
+  /** What the edition facts say about how the date is known, when there is something to say. */
+  dateNote?: string;
+  waveLabel: string;
+  waveStartLocal: string;
+  /** Set when the wave's start time is copied from an earlier edition: flag it, with the reason. */
+  carriedOver: CarriedOver | null;
+}
+
 export interface CourseStory {
   course: { id: string; name: string; city: string; timezone: string };
-  edition: SampleEdition;
+  edition: StoryEdition;
   /** Sample: what the street model's invented buildings are generated from. */
   massing: { seed: number; maxHeightM: number };
   clock: RaceClock;
@@ -161,7 +171,15 @@ export function certifiedKmToLineKm(certifiedKm: number, bundle: CourseBundle): 
 export function buildStory(bundle: CourseBundle, plan: RacePlan): CourseStory {
   const line = bundle.measured.course_line;
   const courseId = bundle.course_id;
-  const edition = SAMPLE_EDITIONS[courseId] ?? FALLBACK_EDITION;
+  // The mockups show a new runner's plan: the latest edition, its first wave with a published time.
+  const planned = createPlanner(plannerCourse(bundle), defaultPlan(plannerCourse(bundle)));
+  const edition: StoryEdition = {
+    date: planned.edition.date.day,
+    dateNote: planned.edition.date.note,
+    waveLabel: planned.wave.name,
+    waveStartLocal: planned.wave.start_local as string, // the Planner only runs for a wave that has one
+    carriedOver: planned.carriedOver,
+  };
   const prevailingWind = SAMPLE_PREVAILING_WIND[courseId] ?? { fromDeg: 270, speedMs: 4 };
   const lengthKm = line.length_m / 1000;
 

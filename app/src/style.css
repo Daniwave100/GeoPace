@@ -16,9 +16,128 @@ footer {
   gap: 8px;
   font-size: 14px;
 }
+/* The plan beside the map on a wide screen, above it on a narrow one. */
+.planning {
+  display: flex;
+  flex-wrap: wrap;
+}
+.plan-panel {
+  flex: 1 1 280px;
+  max-width: 360px;
+  padding: 0 16px;
+  font-size: 14px;
+}
 #globe {
+  flex: 3 1 480px;
   height: 60vh;
   min-height: 360px;
+}
+.plan label {
+  display: block;
+  margin: 8px 0 2px;
+}
+.plan fieldset {
+  margin: 12px 0;
+  padding: 4px 10px 8px;
+}
+.plan fieldset label {
+  display: inline-block;
+  margin-right: 12px;
+}
+.plan input[type="text"] {
+  display: block;
+  margin-top: 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.plan p {
+  margin: 4px 0;
+}
+.plan-fact,
+.plan-note {
+  font-size: 13px;
+  color: #444;
+}
+.plan-summary {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.plan-error {
+  color: #b00;
+}
+/* Carried over: details copied from an earlier edition. Flagged, never blended in. */
+.plan-flag {
+  border-left: 4px solid #8a8a86;
+  padding: 4px 8px;
+  background: #eee;
+}
+
+#readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+}
+.figure {
+  display: flex;
+  flex-direction: column;
+}
+.figure-label,
+.figure-note {
+  font-size: 12px;
+  color: #444;
+}
+.figure-value {
+  font-size: 28px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums; /* so the numbers don't jiggle while scrubbing */
+}
+.figure.carried-over .figure-value {
+  color: #8a8a86;
+}
+
+/* The km strip. Side padding matches the elevation chart's margins (profile.ts), so a km on the
+   strip sits above the same km on the chart. */
+#strip {
+  min-width: 600px;
+  box-sizing: border-box;
+  padding: 0 90px 0 48px;
+}
+.strip {
+  padding: 10px 0 22px;
+  cursor: ew-resize;
+  touch-action: none; /* a finger drags the runner, not the page */
+  user-select: none;
+}
+.strip:focus-visible {
+  outline: 2px solid #1546ff;
+  outline-offset: 2px;
+}
+.strip-track {
+  position: relative;
+  height: 12px;
+  background: #ddd;
+  border: 1px solid #222;
+}
+.strip-tick {
+  position: absolute;
+  top: 100%;
+  width: 0;
+  height: 5px;
+  border-left: 1px solid #222;
+  font-size: 11px;
+  text-indent: -0.5ch;
+  line-height: 28px;
+  white-space: nowrap;
+}
+.strip-marker {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  width: 6px;
+  margin-left: -4px;
+  background: #1546ff;
+  border: 1px solid #fff;
+  pointer-events: none;
 }
 #profile svg {
   display: block;

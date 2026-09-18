@@ -129,13 +129,19 @@ function mount(stage: HTMLElement, context: MockupContext): void {
 
 function banner(story: CourseStory): HTMLElement {
   const date = html("span", { class: "ps-banner__item", text: show.raceDate(story.edition.date) });
-  if (!story.edition.dateVerified) date.append(html("small", { title: story.edition.dateNote, text: " unconfirmed" }));
+  if (story.edition.dateNote) date.append(html("small", { title: story.edition.dateNote, text: " see note" }));
+  const carriedOver = story.edition.carriedOver;
   return html(
     "header",
     { class: "ps-banner" },
     html("h1", { text: story.course.name }),
     date,
-    html("span", { class: "ps-banner__item" }, `${story.edition.waveLabel} starts ${story.edition.waveStartLocal} `, tape()),
+    html(
+      "span",
+      { class: "ps-banner__item" },
+      `${story.edition.waveLabel} starts ${story.edition.waveStartLocal}`,
+      ...(carriedOver ? [html("small", { title: carriedOver.reason, text: ` carried over from ${carriedOver.fromEdition}` })] : []),
+    ),
     html("span", {
       class: "ps-banner__item",
       text: `Goal ${show.formatElapsed(story.clock.elapsedSecondsAtKm(story.lengthKm))} at ${show.formatPace(story.clock.goalPaceSecondsPerKm)}/km`,

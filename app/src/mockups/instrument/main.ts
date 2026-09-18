@@ -117,7 +117,8 @@ function mount(stage: HTMLElement, context: MockupContext): void {
 
 function identity(story: CourseStory): HTMLElement {
   const date = html("span", { text: show.raceDate(story.edition.date) });
-  if (!story.edition.dateVerified) date.append(html("i", { title: story.edition.dateNote, text: " (unconfirmed)" }));
+  if (story.edition.dateNote) date.append(html("i", { title: story.edition.dateNote, text: " (see note)" }));
+  const carriedOver = story.edition.carriedOver;
   return html(
     "div",
     { class: "fi-identity" },
@@ -126,7 +127,12 @@ function identity(story: CourseStory): HTMLElement {
       "p",
       {},
       date,
-      html("span", {}, `${story.edition.waveLabel} ${story.edition.waveStartLocal} `, tag()),
+      html(
+        "span",
+        {},
+        `${story.edition.waveLabel} ${story.edition.waveStartLocal}`,
+        ...(carriedOver ? [html("i", { title: carriedOver.reason, text: ` (carried over from ${carriedOver.fromEdition})` })] : []),
+      ),
       html("span", {
         text: `goal ${show.formatElapsed(story.clock.elapsedSecondsAtKm(story.lengthKm))}, ${show.formatPace(story.clock.goalPaceSecondsPerKm)}/km even`,
       }),

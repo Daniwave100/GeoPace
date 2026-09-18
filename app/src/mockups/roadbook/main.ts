@@ -123,14 +123,19 @@ function titleBlock(story: CourseStory): HTMLElement {
   )}, which is ${show.formatPace(story.clock.goalPaceSecondsPerKm)} per kilometre at an even pace.`;
 
   const date = html("p", { class: "rb-title__date", text: show.raceDate(story.edition.date) });
-  if (!story.edition.dateVerified)
-    date.append(html("span", { class: "rb-approx", title: story.edition.dateNote, text: " date believed, not yet confirmed" }));
+  if (story.edition.dateNote) date.append(html("span", { class: "rb-approx", title: story.edition.dateNote, text: " see note" }));
+  const carriedOver = story.edition.carriedOver;
 
   block.append(
     html("p", { class: "rb-title__series", text: "GeoPace course sheet" }),
     html("h1", { text: story.course.name }),
     date,
-    html("p", { class: "rb-title__plan" }, plan, " ", stamp("sample start time")),
+    html(
+      "p",
+      { class: "rb-title__plan" },
+      plan,
+      ...(carriedOver ? [html("span", { class: "rb-approx", title: carriedOver.reason, text: ` Start time carried over from ${carriedOver.fromEdition}.` })] : []),
+    ),
     html("p", {
       class: "rb-title__facts",
       text: `${story.lengthKm.toFixed(2)} km along the course line. Climbs ${story.elevation.gainM.toFixed(0)} m, drops ${story.elevation.lossM.toFixed(0)} m, between ${story.elevation.minM.toFixed(0)} and ${story.elevation.maxM.toFixed(0)} m.`,

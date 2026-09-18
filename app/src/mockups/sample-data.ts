@@ -12,43 +12,6 @@
 // meteorological "from" direction, aid stations sit on the organizer's certified kilometres and
 // have to be converted onto the course line (D20).
 
-export interface SampleEdition {
-  /** Local calendar date of the race edition. */
-  date: string;
-  /** Whether the date is confirmed against an official source, or still believed (PLAN.md §5). */
-  dateVerified: boolean;
-  /** Why we believe the date — a URL when verified, a plain note when not. */
-  dateNote: string;
-  waveLabel: string;
-  waveStartLocal: string;
-}
-
-/** Race dates are real; wave times are invented until #5 adds sourced edition facts. */
-export const SAMPLE_EDITIONS: Record<string, SampleEdition> = {
-  berlin: {
-    date: "2026-09-27",
-    dateVerified: true,
-    dateNote: "https://www.bmw-berlin-marathon.com/en/your-race/course/",
-    waveLabel: "Wave 2",
-    waveStartLocal: "09:15",
-  },
-  nyc: {
-    date: "2026-11-01",
-    dateVerified: false,
-    dateNote: "Believed, not yet verified with NYRR — and the day US clocks go back.",
-    waveLabel: "Wave 2 · Blue",
-    waveStartLocal: "10:40",
-  },
-};
-
-export const FALLBACK_EDITION: SampleEdition = {
-  date: "2026-09-27",
-  dateVerified: false,
-  dateNote: "No edition facts for this course yet.",
-  waveLabel: "Wave 1",
-  waveStartLocal: "09:00",
-};
-
 /** Prevailing wind, invented per course, as a meteorological "blows from" bearing. */
 export const SAMPLE_PREVAILING_WIND: Record<string, { fromDeg: number; speedMs: number }> = {
   berlin: { fromDeg: 250, speedMs: 4.2 },
