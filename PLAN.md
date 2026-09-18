@@ -79,6 +79,8 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D23 | ✅ **NYC bridge decks come from the 2017 city LiDAR** (returns classified "bridge deck"), read straight out of NOAA's Cloud-Optimized Point Cloud copies over HTTP, corridor only. Where two decks are stacked, the course facts say which one runners use (`deck: upper` for the Verrazzano, `lower` for the Queensboro). A layer with far fewer returns than the busiest one is a ramp or walkway passing over, not a deck. | NYC's bare-earth DEM removes every deck: the Verrazzano start read as sea level. Berlin's straight-span trick (D18) can't work for high bridges with long ramps. The LiDAR measures the real deck, including the 6.4 m between the Queensboro's two levels. | 09-17 |
 | D24 | ✅ **NYC elevation = the 2017 1-ft bare-earth DEM** (same flight as the bridge decks), read block by block from NOAA's Cloud-Optimized GeoTIFFs. ⛔ NYC Open Data's own 1-ft DEM download (a single 3.3 GB zip, 2010 LiDAR). | Same scan and datum as the decks, and a COG can be read ~156 m block at a time so a build downloads the corridor instead of 20 GB. | 09-17 |
 | D25 | ✅ **The start line comes from the course's USATF certification, not from reading a map.** The certified course is [NY22001JHP](https://certifiedroadraces.com/certificate/?type=l&id=NY22001JHP) (measured 2022, valid to 2032, replaces NY15001DB). Its record says start and finish are **47.22% of 42.195 km = 19,924 m apart** in a straight line; the start is the point on the bridge's upper Brooklyn-bound roadway exactly that far from the finish by Tavern on the Green. A test keeps the course line agreeing with it. | Nobody publishes coordinates for the start line, and guessing it from the course map moved everything downstream by a few hundred meters. 1 m along the bridge changes the separation by 0.68 m, so the certificate's rounding pins it to ~3 m; what is left is the finish line's own position. The certificate's drop (0.12 m/km) also matches the bare-earth ground at start and finish, which is how certifiers read elevations. | 09-17 |
+| D26 | ✅ **The mockups draw the architectural model as an SVG axonometric, not in Cesium.** Massing is invented; the sun's altitude and azimuth, and therefore every shadow, are computed for the real place and minute (`app/src/core/solar.ts`, `shadow.ts`). | The mockups exist to choose a look. Three Cesium scenes on real building data is #7's job and would have decided nothing extra; a drawing restyles completely per direction, which a 3D scene can't. The tested sun/shadow/clock core carries over to #5 and #7 unchanged. | 09-18 |
+| D27 | ✅ **Typefaces are open-licence and self-hosted** (npm `@fontsource` packages, bundled by Vite). ⛔ No font CDN. | The app runs locally (D2): it should render the same offline, and a design shouldn't make a third-party request per visit. Every candidate face was checked for tabular figures, because a readout that jiggles while you scrub is unusable. | 09-18 |
 
 ---
 
@@ -146,14 +148,17 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 
 ---
 
-## 6. Design & identity — 🟡 OPEN (current decision frontier)
+## 6. Design & identity — 🟡 OPEN: mockups built, owner to pick
 
 **Directive:** neat, clean, and above all **unique and new**. Not Godseye's look; not the generic
 dark HUD every 3D map demo uses.
 
 **Decided:** km strip as UI spine (D14) · architectural-model analysis mode (D15) · choose via 3 mockups (D13).
 
-**Still open:** which of the three directions (or a mix) wins.
+**Still open:** which of the three directions (or a mix) wins. The mockups are at
+`http://localhost:5173/mockups/` with the app running (code in `app/src/mockups/`). All three show
+identical content by construction: one module (`story.ts` + `content.ts`) decides what is on
+screen and how honest each number is; a design only decides how it looks.
 
 **Starting thesis:**
 - **The course is the interface.** One continuous kilometer strip — the "roadbook" — where every
@@ -161,11 +166,27 @@ dark HUD every 3D map demo uses.
   Scrubbing the strip moves the runner, the clock, the sun, and the camera together.
 - **Analysis mode as an architectural model**: untextured, matte buildings on a quiet ground,
   where crisp real shadows are the hero. Looks like a physical city maquette, not a video game.
-- **Measured vs. subjective encoded visually** (e.g. solid ink for measured data, hand-annotated
-  style for forum/opinion data) so principle 3 is part of the aesthetic, not a legend footnote.
+- **Measured vs. subjective encoded visually** so principle 3 is part of the aesthetic, not a
+  legend footnote.
+
+### The three candidates (tokens as built)
+
+| | A · Roadbook | B · Race poster | C · Field instrument |
+|---|---|---|---|
+| **Borrowed from** | A topographic survey sheet + a rally co-driver's roadbook | The blue line both cities paint down the course + Swiss grid posters | A geologist's well log / strip-chart recorder |
+| **Layout concept** | km strip runs **down** the page as a route card pinned to the left; sheet (title, readout, plate, ledger) scrolls beside it | Strict 12-column grid with the rules showing; giant km numeral; km strip as a full-width band of solid rows | km strip **is** the screen: stacked tracks sharing one km axis, one crosshair, each track's header shows the value under the cursor; side panels for model and sky dial |
+| **Type** | Besley (a Clarendon, the face of old survey maps) + Kalam (handwriting) | Archivo variable, one family: width 62% / weight 900 for numerals, normal width for text | B612 (designed for Airbus cockpit displays; fixed-width digits) |
+| **Palette** | paper `#ebe6d5` · ink `#1d2a33` · sepia `#9a6a3c` · route red `#b8322a` · pencil purple `#7d2e8c` · sun ochre `#d9a23a` / tree green `#8fae6e` | paper `#f4f4f0` · black `#000` · blue `#1546ff` (dark theme: inverted, blue `#5a7dff`) | ground `#e6eaed` · panel `#f6f8f9` · ink `#17212a` · trace `#23607a` · cursor orange `#e8590c` |
+| **Measured** | Printed ink | Solid | Solid trace, upright type |
+| **Subjective** | Purple pencil handwriting in the margin (purple is what survey maps overprint unchecked revisions in) | Hollow: outlined shapes and outlined type | Below a double rule: dashed open markers, italic type |
+| **Not measured here** | Dashed grey line, value struck through | Hatched grey, value struck through | Dashed grey trace, value struck through |
+| **Sample data** | Blue rubber stamp | Hazard-stripe tape | Dotted tag |
+| **Street model** | Engraved: ink outlines, hachured shadows | Flat: white blocks, solid black shadows | Drafting film: cool grey massing, translucent shadows |
+| **Theme** | Light only (it is paper) | Follows the system, light or dark | Light only (a dark instrument is the HUD we're avoiding) |
 
 **Open questions:**
-- 🟡 Pick direction from mockups: (a) Roadbook · (b) Race poster · (c) Field instrument — or a mix
+- 🟡 Pick direction from mockups: (a) Roadbook · (b) Race poster · (c) Field instrument — or a mix.
+  When picked: record it as a decision, copy the winning tokens here as *the* tokens, and #6 applies them.
 - 🟡 Light vs. dark default; typography; color system (falls out of the pick)
 
 ---
@@ -257,7 +278,7 @@ arrival times are approximate — state that in the UI.
 
 ## 10. Open items
 
-- 🟡 **Design direction (§6)** — mockups in progress; owner picks.
+- 🟡 **Design direction (§6)** — the three mockups are built (#4); **waiting on the owner's pick.**
 - 🟡 UI framework confirmation (Svelte 5 proposed; the first slice is plain TypeScript).
 - ⚠️ **GitHub repo `Daniwave100/GeoPace` is currently public**, but D10 says private until the demo.
   Owner to decide whether to flip it to private (GitHub → Settings → Danger Zone).
@@ -285,3 +306,6 @@ arrival times are approximate — state that in the UI.
 - **2026-09-17** — Verified the NYC course against the city's official street list (every segment, in order) and the
   USATF certification NY22001JHP; moved the start line onto the certified separation and re-derived every bridge span
   and landmark from sourced coordinates. Added D25 and a test that keeps the course line on the certified geometry.
+- **2026-09-18** — Design mockups (#4): three clickable directions built on one shared, tested core (sun position, race clock
+  with the Nov 1 DST change, wind/sun bearings, shadows). Added D26 (SVG model in mockups) and D27 (self-hosted open fonts);
+  §6 now lists each candidate's tokens. Direction still open — owner picks.
