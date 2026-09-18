@@ -1,13 +1,11 @@
 // Seam: the real CesiumJS request code on one side, the network on the other. `fetch` is replaced
 // by a recorder, so this sees every request the app would make for photoreal imagery, and nothing
-// leaves the machine. What must hold (PLAN.md D3, §9): the runner's own key appears only in
-// requests to the provider it belongs to. The keys are invented (see photoreal-key.test.ts).
+// leaves the machine. What must hold (PLAN.md D43, §9): the runner's own key appears only in
+// requests to the provider it belongs to. The keys are invented (see photoreal-fixtures.ts).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { KEY_PROVIDERS, type OwnKey } from "../src/photoreal/key";
+import { KEY_PROVIDERS } from "../src/photoreal/key";
 import { requestPhotorealTileset } from "../src/scene/photoreal-tileset";
-
-const GOOGLE: OwnKey = { provider: "google", secret: "AIza" + "Sy-invented_0123456789-abcdefghijklmnop".slice(0, 35) };
-const ION: OwnKey = { provider: "cesium-ion", secret: ["eyJ" + "hbGciOiJIUzI1NiJ9", "eyJ" + "pZCI6MX0", "invented-signature"].join(".") };
+import { GOOGLE, ION } from "./photoreal-fixtures";
 
 /** The smallest tileset CesiumJS will accept: one empty tile around the whole Earth. */
 const TILESET = { asset: { version: "1.0" }, geometricError: 1000, root: { boundingVolume: { sphere: [0, 0, 0, 6400000] }, geometricError: 100, refine: "REPLACE" } };
@@ -51,6 +49,18 @@ describe("requests for photoreal imagery", () => {
     expect(seen.map((request) => request.host)).toEqual([KEY_PROVIDERS["cesium-ion"].sentTo, "tile.googleapis.com"]);
     expect(seen[0].everything).toContain(ION.secret);
     expect(seen[1].everything).not.toContain(ION.secret);
+  });
+
+  it("asks for every later tile the same way: from Google's tile server, without the ion token", async () => {
+    recordRequests((url) => json(url.host === "api.cesium.com" ? ION_ENDPOINT : TILESET));
+
+    const tileset = await requestPhotorealTileset(ION);
+    // Every tile's address is worked out from the tileset's own, as CesiumJS does when it draws.
+    const tile = new URL(tileset.resource.getDerivedResource({ url: "datasets/invented/tile.glb?session=invented" }).url);
+
+    expect(tile.host).toBe("tile.googleapis.com");
+    expect(tile.href).not.toContain(ION.secret);
+    expect(tile.searchParams.get("key")).toBe("ions-own-key");
   });
 
   it("passes on the provider's refusal, status and all, without the key in the message", async () => {

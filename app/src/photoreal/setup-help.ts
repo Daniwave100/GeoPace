@@ -2,12 +2,11 @@
 // facts about the world, so each carries its source and the day it was checked (CLAUDE.md). The
 // providers change their prices and free allowances from time to time: re-check before a release.
 // The times are our own rough estimates, not the providers' claims, and the panel says "about".
+import type { Source } from "../dom";
 import type { KeyProvider } from "./key";
 
-export interface Sourced {
+export interface Sourced extends Source {
   text: string;
-  source: string;
-  accessed: string;
 }
 
 export interface KeyHelp {
@@ -18,7 +17,9 @@ export interface KeyHelp {
   steps: string[];
   /** Where the steps start. */
   startAt: { text: string; url: string };
-  stepsSource: { source: string; accessed: string };
+  stepsSource: Source;
+  /** What to check when the provider refuses the key. */
+  ifRefused: string;
 }
 
 /** Cesium ion first: it is free for a runner's own use, so it is the one most runners should pick. */
@@ -36,6 +37,7 @@ export const KEY_HELP: Record<KeyProvider, KeyHelp> = {
     steps: ["Create a free Cesium ion account.", "Open “Access Tokens”. Every account already has a default token.", "Copy the token and paste it below."],
     startAt: { text: "ion.cesium.com (Access Tokens)", url: "https://ion.cesium.com/tokens" },
     stepsSource: { source: "https://cesium.com/learn/ion/cesium-ion-access-tokens/", accessed: "2026-09-18" },
+    ifRefused: "Check that the token was copied whole, and that “Google Photorealistic 3D Tiles” is among My Assets in your ion account (it can be added from ion's Asset Depot).",
   },
   google: {
     heading: "A Google Maps key: straight from Google, needs a payment card",
@@ -60,6 +62,7 @@ export const KEY_HELP: Record<KeyProvider, KeyHelp> = {
     ],
     startAt: { text: "Google’s own step-by-step guide", url: "https://developers.google.com/maps/documentation/tile/get-api-key" },
     stepsSource: { source: "https://developers.google.com/maps/documentation/tile/get-api-key", accessed: "2026-09-18" },
+    ifRefused: "Check that the key was copied whole, that its project has billing switched on, and that the Map Tiles API is enabled for it.",
   },
 };
 

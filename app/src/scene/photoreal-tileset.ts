@@ -1,13 +1,24 @@
-// Asks for Google's Photorealistic 3D Tiles with the runner's own key: directly from Google with a
-// Google Maps key, or through Cesium ion with an ion token. This is the only code that hands the
-// key to anything, and the key is handed over explicitly each time. It is never set as a CesiumJS
-// default (`Ion.defaultAccessToken`, `GoogleMaps.defaultApiKey`), because a default is sent along
-// by any part of CesiumJS that happens to reach for it.
+// Google's Photorealistic 3D Tiles in the scene, with the runner's own key: asked for directly from
+// Google with a Google Maps key, or through Cesium ion with an ion token. This is the only code that
+// hands the key to anything, and the key is handed over explicitly each time. It is never set as a
+// CesiumJS default (`Ion.defaultAccessToken`, `GoogleMaps.defaultApiKey`), because a default is sent
+// along by any part of CesiumJS that happens to reach for it (PLAN.md D43).
 //
 // Google's terms (PLAN.md D5, §9): the imagery is for looking at only. Nothing here or anywhere
-// else stores it, reads heights or shapes out of it, or fetches tiles the camera isn't looking at.
+// else stores it, works anything out from it, or fetches tiles the camera isn't looking at. CesiumJS
+// does rest the course line and the runner on the imagery's surface; that is drawing our own things
+// on top of it, which Google's policies allow, and nothing of it is kept.
 import { Cesium3DTileset, createGooglePhotorealistic3DTileset, IonResource } from "cesium";
 import type { OwnKey } from "../photoreal/key";
+import type { PhotorealTiles } from "../photoreal/photoreal";
+
+/** As much of the CesiumJS viewer as the imagery touches: the plain ground, and the list of what is drawn. */
+export interface SceneForPhotoreal {
+  scene: {
+    globe: { show: boolean };
+    primitives: { add(primitive: Cesium3DTileset): unknown; remove(primitive: Cesium3DTileset): boolean };
+  };
+}
 
 /** Google Photorealistic 3D Tiles as Cesium ion lists them: the id CesiumJS itself uses in createGooglePhotorealistic3DTileset. */
 const ION_ASSET_ID = 2275207;
@@ -34,3 +45,51 @@ export async function requestPhotorealTileset(key: OwnKey): Promise<Cesium3DTile
   const resource = await IonResource.fromAssetId(ION_ASSET_ID, { accessToken: key.secret });
   return Cesium3DTileset.fromUrl(resource, { ...OPTIONS });
 }
+
+/** One Load: ask the provider for the imagery, ready to be shown in this viewer. */
+export async function loadPhotorealTiles(viewer: SceneForPhotoreal, key: OwnKey): Promise<PhotorealTiles> {
+  return photorealTiles(viewer, await requestPhotorealTileset(key));
+}
+
+/**
+ * The imagery, ready to go into the scene. The keyless map stays where it is until the imagery's
+ * first view has fully arrived, and comes straight back when the imagery is removed, so the view
+ * is never blank (PLAN.md D44). The course and the runner are clamped to the ground, which
+ * CesiumJS takes to mean the imagery's surface once the plain ground is hidden.
+ */
+export function photorealTiles(viewer: SceneForPhotoreal, tileset: Cesium3DTileset): PhotorealTiles {
+  const globe = viewer.scene.globe;
+  let onTile: (arrived: boolean) => void = () => undefined;
+  let hidTheGround = false;
+  let removed = false;
+
+  // Listening from the very start, and deliberately deaf to what CesiumJS says about a failed tile:
+  // with no listener CesiumJS prints the tile's address to the console, and that address has the
+  // runner's key in it. Nothing here reads, shows, logs or passes on what it is handed.
+  tileset.tileFailed.addEventListener(() => onTile(false));
+  tileset.tileLoad.addEventListener(() => onTile(true));
+  // Google's imagery has its own ground. Left on, the plain ground pokes through it in patches.
+  tileset.initialTilesLoaded.addEventListener(() => {
+    if (removed) return;
+    globe.show = false;
+    hidTheGround = true;
+  });
+
+  return {
+    show(listener) {
+      onTile = listener;
+      viewer.scene.primitives.add(tileset);
+    },
+    remove() {
+      if (removed) return;
+      removed = true;
+      onTile = () => undefined;
+      // Only what this imagery took away is put back: other imagery may be the one on screen.
+      if (hidTheGround) globe.show = true;
+      tileset.show = false;
+      // A tile can fail in the middle of drawing a frame. Taking the imagery apart waits until that frame is done.
+      setTimeout(() => viewer.scene.primitives.remove(tileset), 0);
+    },
+  };
+}
+

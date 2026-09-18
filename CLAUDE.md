@@ -38,8 +38,6 @@ ask before anything that changes scope or look.
   Decks come from LiDAR; on a double-deck bridge the course facts say which deck runners use.
 - Wind "from" direction convention (a headwind must not come out as a tailwind).
 - Timezone/DST: **US DST ends Sun 2026-11-01**, likely NYC race day.
-- The runner's own key: read only from the paste box or the browser's storage, sent only to the provider it
-  belongs to, never printed or logged (a photoreal tile's address has the key in it) — see D43.
 - Course length stays within tolerance of the certified 42.195 km (a route traced along street
   centre lines gets a wider tolerance than an organizer's course file — see D21/D22).
 

@@ -1,10 +1,10 @@
 // Seam: what the runner pastes into the photoreal box -> whose key it is, and so where it may be sent.
-// The keys here are invented, and built from pieces so that no file in the repo holds a key-shaped string.
 import { describe, expect, it } from "vitest";
 import { KEY_PROVIDERS, recognizeKey } from "../src/photoreal/key";
+import { GOOGLE, ION } from "./photoreal-fixtures";
 
-const GOOGLE_KEY = "AIza" + "Sy-invented_0123456789-abcdefghijklmnop".slice(0, 35);
-const ION_TOKEN = ["eyJ" + "hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "eyJ" + "qdGkiOiJpbnZlbnRlZCIsImlkIjoxfQ", "invented-signature_0123456789"].join(".");
+const GOOGLE_KEY = GOOGLE.secret;
+const ION_TOKEN = ION.secret;
 
 describe("recognizing an own key", () => {
   it("knows a Google Maps key by its shape", () => {

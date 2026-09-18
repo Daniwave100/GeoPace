@@ -20,4 +20,6 @@ export const PROVIDER_ATTRIBUTIONS = [
   { text: "Map: © OpenStreetMap contributors", url: "https://www.openstreetmap.org/copyright" },
   { text: "Terrain: Re:Earth Terrain · Mapterhorn (CC BY 4.0)", url: "https://mapterhorn.com/attribution" },
   { text: "3D engine: CesiumJS", url: "https://cesium.com/platform/cesiumjs/" },
+  // Only ever on screen with the runner's own key. Google's logo and each tile's data credits are shown on the map itself.
+  { text: "Photoreal, with your own key: Google Photorealistic 3D Tiles, direct or through Cesium ion", url: "https://developers.google.com/maps/documentation/tile/3d-tiles" },
 ];

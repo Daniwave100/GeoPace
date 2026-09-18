@@ -3,41 +3,46 @@
 // must hold: the key comes from the paste box or from storage and nowhere else, and whatever goes
 // wrong with the imagery, the app is back on the keyless look and says why.
 import { describe, expect, it } from "vitest";
+import type { BrowserStorage } from "../src/browser-storage";
 import type { OwnKey } from "../src/photoreal/key";
-import { type KeyStorage, loadPhotoreal, rememberKey } from "../src/photoreal/key-store";
+import { rememberedPhotoreal, rememberPhotoreal } from "../src/photoreal/key-store";
 import { createPhotoreal, type PhotorealState, type PhotorealTiles } from "../src/photoreal/photoreal";
+import { fakeStorage, GOOGLE, ION } from "./photoreal-fixtures";
 
-const GOOGLE: OwnKey = { provider: "google", secret: "AIza" + "Sy-invented_0123456789-abcdefghijklmnop".slice(0, 35) };
-const ION: OwnKey = { provider: "cesium-ion", secret: ["eyJ" + "hbGciOiJIUzI1NiJ9", "eyJ" + "pZCI6MX0", "invented-signature"].join(".") };
-
-function fakeStorage(): KeyStorage {
-  const items: Record<string, string> = {};
-  return { getItem: (key) => items[key] ?? null, setItem: (key, value) => void (items[key] = value), removeItem: (key) => void delete items[key] };
-}
-
-/** The 3D scene, minus the 3D: it records which keys it was asked to load tiles with, and what became of them. */
+/** The 3D scene, minus the 3D: it records which keys it was asked for tiles with, and what became of the tiles. */
 function fakeScene(loads: (key: OwnKey) => Promise<void> = async () => undefined) {
   const scene = {
     askedWith: [] as OwnKey[],
+    /** Whose tiles were ever put on screen, in order. */
+    shownWith: [] as OwnKey[],
     showing: 0,
-    /** Pretend a tile arrived (true) or failed (false) in the tiles loaded last. */
+    /** Pretend a tile arrived (true) or failed (false) in the tiles shown last. */
     tile: (_arrived: boolean): void => undefined,
     loadTiles: async (key: OwnKey): Promise<PhotorealTiles> => {
       scene.askedWith.push(key);
       await loads(key);
-      scene.showing += 1;
+      let shown = false;
       return {
-        watch: (onTile) => void (scene.tile = onTile),
-        remove: () => void (scene.showing -= 1),
+        show(onTile) {
+          shown = true;
+          scene.showing += 1;
+          scene.shownWith.push(key);
+          scene.tile = onTile;
+        },
+        remove() {
+          if (shown) scene.showing -= 1;
+          shown = false;
+        },
       };
     },
   };
   return scene;
 }
 
-function photorealWith(storage: KeyStorage, scene: ReturnType<typeof fakeScene>) {
+function photorealWith(storage: BrowserStorage, scene: ReturnType<typeof fakeScene>) {
   const seen: PhotorealState[] = [];
-  const photoreal = createPhotoreal({ storage, loadTiles: scene.loadTiles, onChange: (state) => seen.push(state) });
+  const photoreal = createPhotoreal({ storage, loadTiles: scene.loadTiles });
+  photoreal.onChange((state) => seen.push(state));
   return { photoreal, seen };
 }
 
@@ -68,7 +73,7 @@ describe("Photoreal", () => {
     expect(scene.askedWith).toEqual([ION]);
     expect(looks(seen)).toEqual(["keyless", "loading", "photoreal"]);
     expect(photoreal.state).toEqual({ look: "photoreal", key: ION, problem: null, thisVisitOnly: false });
-    expect(loadPhotoreal(storage)).toEqual({ key: ION, on: true });
+    expect(rememberedPhotoreal(storage)).toEqual({ key: ION, on: true });
   });
 
   it("refuses a paste that is neither kind of key, and sends it nowhere", async () => {
@@ -81,12 +86,12 @@ describe("Photoreal", () => {
 
     expect(scene.askedWith).toEqual([]);
     expect(photoreal.state.look).toBe("keyless");
-    expect(loadPhotoreal(storage).key).toBeNull();
+    expect(rememberedPhotoreal(storage).key).toBeNull();
   });
 
   it("after a reload, reads the key from the browser's storage and opens in photoreal again", async () => {
     const storage = fakeStorage();
-    rememberKey(storage, GOOGLE);
+    rememberPhotoreal(storage, GOOGLE, true);
     const scene = fakeScene();
     const { photoreal } = photorealWith(storage, scene);
 
@@ -120,7 +125,7 @@ describe("Photoreal", () => {
       expect(photoreal.state, problem).toEqual({ look: "keyless", key: GOOGLE, problem, thisVisitOnly: false });
       expect(scene.showing, problem).toBe(0);
       // The key is kept, so the runner can fix it at the provider and try again without pasting.
-      expect(loadPhotoreal(storage).key, problem).toEqual(GOOGLE);
+      expect(rememberedPhotoreal(storage).key, problem).toEqual(GOOGLE);
     }
   });
 
@@ -182,7 +187,7 @@ describe("Photoreal", () => {
 
     expect(photoreal.state.look).toBe("photoreal");
     expect(scene.showing).toBe(1);
-    expect(loadPhotoreal(storage).on).toBe(true);
+    expect(rememberedPhotoreal(storage).on).toBe(true);
   });
 
   it("forgets the key: the imagery goes, and nothing of the key is left in the browser", async () => {
@@ -195,7 +200,7 @@ describe("Photoreal", () => {
 
     expect(photoreal.state).toEqual({ look: "keyless", key: null, problem: null, thisVisitOnly: false });
     expect(scene.showing).toBe(0);
-    expect(loadPhotoreal(storage)).toEqual({ key: null, on: false });
+    expect(rememberedPhotoreal(storage)).toEqual({ key: null, on: false });
     await photoreal.turnOn(); // nothing to turn on with
     expect(scene.askedWith).toEqual([GOOGLE]);
   });
@@ -243,8 +248,26 @@ describe("Photoreal", () => {
     await Promise.all([second, third]);
 
     expect(scene.askedWith).toEqual([GOOGLE, ION]);
+    expect(scene.shownWith).toEqual([ION]); // the first key's imagery arrived too late to be wanted, and never reached the screen
     expect(scene.showing).toBe(1);
     expect(photoreal.state).toEqual({ look: "photoreal", key: ION, problem: null, thisVisitOnly: false });
+  });
+
+  it("never puts late imagery on screen, even for a moment, when the second key's imagery is already showing", async () => {
+    const finish: (() => void)[] = [];
+    const scene = fakeScene(() => new Promise((resolve) => finish.push(resolve)));
+    const { photoreal } = photorealWith(fakeStorage(), scene);
+
+    const first = photoreal.useKey(ION.secret);
+    const second = photoreal.useKey(GOOGLE.secret);
+    finish[1](); // the second key's imagery arrives first...
+    await second;
+    finish[0](); // ...and the first key's arrives after it
+    await first;
+
+    expect(scene.shownWith).toEqual([GOOGLE]);
+    expect(scene.showing).toBe(1);
+    expect(photoreal.state.look).toBe("photoreal");
   });
 
   it("replaces one key with another: the first key's imagery goes before the second is used", async () => {
@@ -258,11 +281,11 @@ describe("Photoreal", () => {
     expect(scene.askedWith).toEqual([GOOGLE, ION]);
     expect(scene.showing).toBe(1);
     expect(photoreal.state.key).toEqual(ION);
-    expect(loadPhotoreal(storage).key).toEqual(ION);
+    expect(rememberedPhotoreal(storage).key).toEqual(ION);
   });
 
   it("says so when the browser won't keep the key, and still shows photoreal for this visit", async () => {
-    const blocked: KeyStorage = {
+    const blocked: BrowserStorage = {
       getItem: () => null,
       setItem: () => {
         throw new Error("storage is blocked");

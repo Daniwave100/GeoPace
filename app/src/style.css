@@ -71,9 +71,10 @@ footer {
   background: #fff;
   border-left: 0;
 }
-.photoreal-control button:disabled {
+.photoreal-control button[aria-disabled="true"] {
   cursor: progress;
   background: #444;
+  border-color: #444;
 }
 .photoreal-control button:focus-visible {
   outline: 3px solid #1546ff;
@@ -126,6 +127,10 @@ footer {
   width: 100%;
   padding: 6px;
   font: inherit;
+}
+/* The key is masked as it is typed, without making this a password box (see photoreal-panel.ts). */
+.photoreal-secret {
+  -webkit-text-security: disc;
 }
 .photoreal-buttons {
   display: flex;
@@ -301,6 +306,18 @@ footer {
 }
 #profile svg {
   display: block;
+}
+.map-help {
+  margin: 6px 16px 0;
+}
+/* On the page for screen readers, which need it there before its words change; not for the eye. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .note {
   font-size: 13px;
