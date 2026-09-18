@@ -120,6 +120,20 @@ _Avoid_: bird's-eye mode, 2D mode, top view
 The black bar across the top: the course, the Race Plan in one line, the units and the theme.
 _Avoid_: header, toolbar, nav
 
+### The course on the map
+
+**Draped**:
+Said of the course line painted onto whatever surface the map shows above the route. How it is drawn on the keyless map, where nothing stands over the road.
+_Avoid_: clamped, on the ground
+
+**At road height**:
+Said of the course line drawn in 3D at the height the pipeline measured for the road, a little above it. How it is drawn over Photoreal, where a draped line would land on trees and bridge structures.
+_Avoid_: on the road (that is a camera), 3D line, floating
+
+**Lift**:
+How far above the measured road the line is drawn at road height, so that it doesn't sink into a photographed surface that disagrees with the survey by a metre or so.
+_Avoid_: offset, clearance
+
 ### Layers
 
 **Layer**:
@@ -165,7 +179,7 @@ _Avoid_: crowd, crowding, busyness
 A place where congestion is known to happen.
 
 **Line mark**:
-A stretch of the course line that a layer marks on the map, drawn wider under the blue line.
+A stretch of the course line that a layer marks on the map: the line is drawn wider there, with the layer's colour or dashes either side of the blue.
 _Avoid_: highlight, segment, overlay
 
 **Hill**:
@@ -228,6 +242,14 @@ _Avoid_: session, request, hit
 
 **Course Bundle**:
 Everything the app needs about one course, prepared ahead of time by the pipeline. The one contract between the two halves.
+
+**Height above the ellipsoid**:
+A course-line point's height counted from the WGS84 ellipsoid, the smooth mathematical surface a 3D globe counts heights from, instead of from sea level. Only for placing things in the 3D scene; a runner is never shown it.
+_Avoid_: altitude, elevation (elevation is the height above sea level, the one a runner is told)
+
+**Geoid model**:
+The published table of how far sea level is from the ellipsoid, place by place: what turns a surveyed height into a height above the ellipsoid.
+_Avoid_: datum shift, correction
 
 **Course facts** / **Edition facts**:
 Hand-maintained sourced facts about a course, and about one edition of it.
