@@ -9,8 +9,10 @@
 // draped line lands on tree canopies, bridge cables and the Queensboro's upper deck, and slides
 // against the road as the camera moves (issue #22). The height comes from our own data; nothing
 // here reads Google's surface, which is for looking at only (PLAN.md D5).
-import { ArcType, Cartesian3, Color, type MaterialProperty, type PolylineGraphics, PolylineDashMaterialProperty, PolylineOutlineMaterialProperty } from "cesium";
+import { ArcType, Cartesian3, type PolylineGraphics } from "cesium";
 import type { CourseLine } from "../bundle/types";
+import type { MarkLook } from "../core/mark-look";
+import { CourseRibbonProperty, ribbonWidthPx } from "./course-ribbon";
 
 export type Placement = "draped" | "road-height";
 
@@ -38,71 +40,38 @@ export const ROAD_LOOK = {
   faintAlpha: 0.45,
 };
 
-/** What lies on what, bottom to top: a mark's band, the dashes on a band, the blue course line. */
-export type Level = 0 | 1 | 2;
-export const LEVEL_MARK: Level = 0;
-export const LEVEL_DASHES: Level = 1;
-export const LEVEL_COURSE: Level = 2;
-/**
- * At road height there is no "on top", only nearer the camera: each level sits this much higher
- * than the one under it. Enough for the scene to tell them apart from 50 km up, too little to see
- * from the roadside.
- */
-const LEVEL_STEP_M = 0.15;
-
-/** One line to draw along a stretch of the course. Colours are #rrggbb. */
-export interface Stroke {
-  widthPx: number;
-  color: string;
-  /** A solid line's edge. */
-  edge?: { color: string; px: number };
-  /** Makes it dashed, with this between the dashes. */
-  gap?: string;
-  level: Level;
-}
-
 /** A place on the course in the scene: on the ellipsoid when draped (CesiumJS then finds the ground), at the road's height otherwise. */
-export function scenePosition(place: { lat: number; lon: number; roadHeightM: number }, placement: Placement, level: Level = LEVEL_COURSE): Cartesian3 {
-  return placement === "draped" ? Cartesian3.fromDegrees(place.lon, place.lat) : Cartesian3.fromDegrees(place.lon, place.lat, heightInScene(place.roadHeightM, level));
+export function scenePosition(place: { lat: number; lon: number; roadHeightM: number }, placement: Placement): Cartesian3 {
+  return placement === "draped" ? Cartesian3.fromDegrees(place.lon, place.lat) : Cartesian3.fromDegrees(place.lon, place.lat, place.roadHeightM + ROAD_LOOK.liftM);
 }
 
-/** What CesiumJS draws for one stroke along samples `first` to `last` of the course line. */
-export function strokeGraphics(line: CourseLine, first: number, last: number, stroke: Stroke, placement: Placement, measured = true): PolylineGraphics.ConstructorOptions {
-  if (placement === "draped") {
-    return { positions: linePositions(line, first, last), width: stroke.widthPx, clampToGround: true, zIndex: stroke.level + 1, material: material(stroke, 1) };
-  }
+/**
+ * What CesiumJS draws for samples `first` to `last` of the course line: one line, the plain course
+ * or the course with a layer's `mark` beside it. `measured` is whether the height there is.
+ */
+export function stretchGraphics(line: CourseLine, first: number, last: number, mark: MarkLook | null, placement: Placement, measured: boolean): PolylineGraphics.ConstructorOptions {
+  const asItIs = { width: ribbonWidthPx(mark), material: new CourseRibbonProperty(mark, 1) };
+  if (placement === "draped") return { ...asItIs, positions: linePositions(line, first, last), clampToGround: true };
   const behind = measured ? ROAD_LOOK.behind : ROAD_LOOK.behindWhereNotMeasured;
   return {
-    positions: roadPositions(line, first, last, stroke.level),
-    width: stroke.widthPx,
+    ...asItIs,
+    positions: roadPositions(line, first, last),
     clampToGround: false,
     // Samples are 10 m apart: a straight line between two of them never leaves the road.
     arcType: ArcType.NONE,
-    material: material(stroke, 1),
-    depthFailMaterial: behind === "hidden" ? undefined : material(stroke, behind === "faint" ? ROAD_LOOK.faintAlpha : 1),
+    depthFailMaterial: behind === "hidden" ? undefined : new CourseRibbonProperty(mark, behind === "faint" ? ROAD_LOOK.faintAlpha : 1),
   };
 }
 
-/** The course line's positions between two of its samples, on the ellipsoid: for draping, and for framing the camera. */
-export function linePositions(line: CourseLine, first: number, last: number): Cartesian3[] {
+/** The course line's positions between two of its samples, on the ellipsoid: for draping. */
+function linePositions(line: CourseLine, first: number, last: number): Cartesian3[] {
   const degrees: number[] = [];
   for (let i = first; i <= last; i += 1) degrees.push(line.lon[i], line.lat[i]);
   return Cartesian3.fromDegreesArray(degrees);
 }
 
-function roadPositions(line: CourseLine, first: number, last: number, level: Level): Cartesian3[] {
+function roadPositions(line: CourseLine, first: number, last: number): Cartesian3[] {
   const degreesAndHeights: number[] = [];
-  for (let i = first; i <= last; i += 1) degreesAndHeights.push(line.lon[i], line.lat[i], heightInScene(line.ellipsoid_height_m[i], level));
+  for (let i = first; i <= last; i += 1) degreesAndHeights.push(line.lon[i], line.lat[i], line.ellipsoid_height_m[i] + ROAD_LOOK.liftM);
   return Cartesian3.fromDegreesArrayHeights(degreesAndHeights);
-}
-
-function heightInScene(roadHeightM: number, level: Level): number {
-  return roadHeightM + ROAD_LOOK.liftM + level * LEVEL_STEP_M;
-}
-
-function material(stroke: Stroke, alpha: number): MaterialProperty {
-  const color = Color.fromCssColorString(stroke.color).withAlpha(alpha);
-  if (stroke.gap !== undefined) return new PolylineDashMaterialProperty({ color, gapColor: Color.fromCssColorString(stroke.gap).withAlpha(alpha), dashLength: 14 });
-  const edge = stroke.edge ?? { color: stroke.color, px: 0 };
-  return new PolylineOutlineMaterialProperty({ color, outlineColor: Color.fromCssColorString(edge.color).withAlpha(alpha), outlineWidth: edge.px });
 }

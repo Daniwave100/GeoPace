@@ -1,7 +1,6 @@
-// The 3D globe: keyless basemap and terrain, with the course and the runner drawn on it: draped on
-// the ground of the keyless map, at the road's own height in photoreal (placement.ts).
-// The course is the blue line (PLAN.md D28): blue means the course and where you are on it, and
-// nothing else. A layer that is switched on marks stretches of that line (course-marks.ts).
+// The 3D globe: keyless basemap and terrain, the camera, and the runner. The course itself is
+// drawn by course-line.ts; both are draped on the ground of the keyless map and stand at the
+// road's own height in photoreal (placement.ts).
 //
 // The scene has no clock of its own. Cesium's clock is stopped and set from the Planner's race
 // clock every time the runner moves, so Cesium's sun is where the sun will be when the runner
@@ -16,10 +15,7 @@ import {
   Color,
   ConstantPositionProperty,
   Credit,
-  type Entity,
-  type EntityCollection,
   HeadingPitchRange,
-  HeightReference,
   ImageryLayer,
   Ion,
   JulianDate,
@@ -33,30 +29,19 @@ import {
   Viewer,
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
-import type { CourseBundle, CourseLine } from "../bundle/types";
+import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
-import { stretchesByMeasured } from "../core/measured-stretches";
 import type { RoadPosition } from "../core/scrub";
-import { LEVEL_COURSE, type Placement, scenePosition, type Stroke, strokeGraphics } from "./placement";
+import { heightReference, type SceneForCourse } from "./course-line";
+import { COURSE_BLUE, registerCourseRibbon } from "./course-ribbon";
+import { type Placement, scenePosition } from "./placement";
 import { BASEMAP, TERRAIN } from "./providers";
 
 const RUNNER_ID = "runner";
-/** The poster's blue, the same in both themes on the map: the map itself doesn't change with the theme. */
-export const COURSE_BLUE = "#1546ff";
-/** A thin white edge keeps the blue readable on any ground: a pale map, dark imagery, water. */
-const COURSE_STROKE: Stroke = { widthPx: 6, color: COURSE_BLUE, edge: { color: "#ffffff", px: 2 }, level: LEVEL_COURSE };
 const EARTH_RADIUS_M = 6_371_000;
 /** How far down the camera looks when it frames the course: from above, tilted enough that the city reads as 3D. */
 const CAMERA_TILT_RAD = CesiumMath.toRadians(60);
 
-/** As much of the CesiumJS viewer as drawing the course and the runner touches: the list of what is drawn, and the clock. */
-export interface SceneForCourse {
-  entities: EntityCollection;
-  clock: { currentTime: JulianDate };
-}
-
-/** What is drawn for the course on each map now, so the next course can take its place. */
-const courseEntities = new WeakMap<SceneForCourse, Entity[]>();
 /** How the runner on each map is drawn now. */
 const runnerPlacement = new WeakMap<SceneForCourse, Placement>();
 /** Where the camera was left by the last framing of the whole course, to tell whether the runner has moved the map since. */
@@ -68,6 +53,7 @@ export function createGlobe(container: HTMLElement): Viewer {
   // until a runner brings their own key (PLAN.md D3), so the demo token is switched off: nothing
   // here can reach ion by accident, and a runner's token is only ever handed over explicitly.
   Ion.defaultAccessToken = "";
+  registerCourseRibbon();
 
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
@@ -131,35 +117,6 @@ export function showRunner(viewer: SceneForCourse, place: RoadPosition, instant:
     });
   }
   viewer.clock.currentTime = JulianDate.fromDate(instant);
-}
-
-/**
- * Draw one course: the blue line, and a dot at its start and its finish. At road height the line
- * is cut where its height stops being measured, because those stretches are never hidden (placement.ts).
- */
-export function showCourse(viewer: SceneForCourse, bundle: CourseBundle, placement: Placement): void {
-  const line = bundle.measured.course_line;
-  for (const entity of courseEntities.get(viewer) ?? []) viewer.entities.remove(entity);
-  const last = line.km.length - 1;
-  const stretches = placement === "draped" ? [{ first: 0, last, measured: true }] : stretchesByMeasured(line.km, bundle.measured.elevation_not_measured);
-  courseEntities.set(viewer, [
-    ...stretches.map((stretch) =>
-      viewer.entities.add({ name: `${bundle.course.name} course`, polyline: strokeGraphics(line, stretch.first, stretch.last, COURSE_STROKE, placement, stretch.measured) }),
-    ),
-    endDot(viewer, line, 0, placement),
-    endDot(viewer, line, last, placement),
-  ]);
-}
-
-function endDot(viewer: SceneForCourse, line: CourseLine, sample: number, placement: Placement): Entity {
-  return viewer.entities.add({
-    position: scenePosition({ lat: line.lat[sample], lon: line.lon[sample], roadHeightM: line.ellipsoid_height_m[sample] }, placement),
-    point: { pixelSize: 8, color: Color.WHITE, outlineColor: Color.BLACK, outlineWidth: 3, heightReference: heightReference(placement), disableDepthTestDistance: Number.POSITIVE_INFINITY },
-  });
-}
-
-function heightReference(placement: Placement): HeightReference {
-  return placement === "draped" ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE;
 }
 
 /**

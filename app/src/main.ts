@@ -28,8 +28,8 @@ import { createPhotorealPanel, type PhotorealPanel } from "./photoreal/photoreal
 import { createPlanPanel } from "./plan/plan-panel";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
-import { showLineMarks } from "./scene/course-marks";
-import { createGlobe, frameCourse, goTo, isStillFramed, showCourse, showMapTheme, showRunner, toggleStraightDown, watchCameraHeight } from "./scene/globe";
+import { showCourseLine } from "./scene/course-line";
+import { createGlobe, frameCourse, goTo, isStillFramed, showMapTheme, showRunner, toggleStraightDown, watchCameraHeight } from "./scene/globe";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import type { Placement } from "./scene/placement";
@@ -151,7 +151,6 @@ async function show(courseId: string): Promise<void> {
     });
     showTheme();
   }
-  showCourse(viewer, bundle, placement);
   photoreal ??= startPhotoreal(viewer);
 
   const course = plannerCourse(bundle);
@@ -235,8 +234,9 @@ function showPlan(): void {
 }
 
 /**
- * The layer that is on, put in all three places at once: its marks on the course line, its rows
- * on the strip, and (through scrubTo) its clause in the sentence. Off, it leaves all three.
+ * The course on the map, and the layer that is on put in all three places at once: its marks on
+ * the course line, its rows on the strip, and (through scrubTo) its clause in the sentence. Off,
+ * it leaves all three, and the plain blue line is what is left on the map.
  */
 function showLayers(): void {
   if (!showing || !viewer || !mapLabels) return;
@@ -244,7 +244,7 @@ function showLayers(): void {
   const screen = (showing.screen = onScreen(layerState, layers));
   layerBar.show(layerState, layers);
   showStrip();
-  showLineMarks(viewer, bundle, screen.lineMarks, placement);
+  showCourseLine(viewer, bundle, screen.lineMarks, placement);
   mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))], placement);
   scrubTo(showing.km);
 }
@@ -257,9 +257,7 @@ function showLayers(): void {
 function usePlacement(next: Placement): void {
   if (placement === next) return;
   placement = next;
-  if (!showing || !viewer) return;
-  showCourse(viewer, showing.bundle, placement);
-  showLayers(); // the marks and the labels, and through scrubTo the runner
+  showLayers(); // the course line with its marks, the labels, and through scrubTo the runner
 }
 
 /** The strip as it should be now: its rows, its key, and the size the runner has made it. */

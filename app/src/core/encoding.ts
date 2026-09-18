@@ -1,7 +1,7 @@
 // The four ways GeoPace draws a claim, so a runner can tell at a glance how much to trust it
 // (PLAN.md principle 3, and the Race poster's encodings in §6). One table drives every surface:
 // the strip's marks and the words in the sentence take `cssClass` (style.css draws it), and the
-// course line on the map takes `mapLine` (scene/course-marks.ts draws it). A layer never picks a
+// course line on the map takes `mapLine` (scene/course-line.ts draws it). A layer never picks a
 // colour or a dash pattern of its own; it says which kind of claim it is making.
 
 export type Encoding = "measured" | "runner-report" | "not-measured" | "sample";
