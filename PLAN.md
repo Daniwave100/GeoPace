@@ -47,6 +47,9 @@ Success for v1 = a few hundred stars within a few months of launch.
 6. **Good enough to screenshot.** Visual quality is a feature, not polish.
 7. **Unique, clean, and new.** *(Added 2026-09-16.)* GeoPace must not look like another dark
    glass-HUD 3D map. It should have its own recognizable visual identity. See §6.
+8. **Easy for a runner who isn't technical.** *(Added 2026-09-18, owner directive.)* The first
+   screen shows little and explains itself; everything else is one deliberate step away. If a
+   screen needs a legend to be usable, it is showing too much at once.
 
 ---
 
@@ -81,6 +84,8 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D25 | ✅ **The start line comes from the course's USATF certification, not from reading a map.** The certified course is [NY22001JHP](https://certifiedroadraces.com/certificate/?type=l&id=NY22001JHP) (measured 2022, valid to 2032, replaces NY15001DB). Its record says start and finish are **47.22% of 42.195 km = 19,924 m apart** in a straight line; the start is the point on the bridge's upper Brooklyn-bound roadway exactly that far from the finish by Tavern on the Green. A test keeps the course line agreeing with it. | Nobody publishes coordinates for the start line, and guessing it from the course map moved everything downstream by a few hundred meters. 1 m along the bridge changes the separation by 0.68 m, so the certificate's rounding pins it to ~3 m; what is left is the finish line's own position. The certificate's drop (0.12 m/km) also matches the bare-earth ground at start and finish, which is how certifiers read elevations. | 09-17 |
 | D26 | ✅ **The mockups draw the architectural model as an SVG axonometric, not in Cesium.** Massing is invented; the sun's altitude and azimuth, and therefore every shadow, are computed for the real place and minute (`app/src/core/solar.ts`, `shadow.ts`). | The mockups exist to choose a look. Three Cesium scenes on real building data is #7's job and would have decided nothing extra; a drawing restyles completely per direction, which a 3D scene can't. The tested sun/shadow/clock core carries over to #5 and #7 unchanged. | 09-18 |
 | D27 | ✅ **Typefaces are open-licence and self-hosted** (npm `@fontsource` packages, bundled by Vite). ⛔ No font CDN. | The app runs locally (D2): it should render the same offline, and a design shouldn't make a third-party request per visit. Every candidate face was checked for tabular figures, because a readout that jiggles while you scrub is unusable. | 09-18 |
+| D28 | ✅ **Visual direction: B · Race poster.** Black, white and one blue on a strict grid with the rules showing; Archivo (one variable family: width 62% / weight 900 for numerals); solid = measured, hollow = hearsay, halftone dots = "depends on the trees", grey and struck = not measured, hazard stripes = sample; flat street model with solid black shadows; follows the system's light or dark theme. Tokens in §6. The blue refers to the line painted on the road at both races: picked by the owner after the D12 question was raised, no organizer palette, typeface or mark is used. | Owner's pick from the three mockups (#4): "the one that looked the coolest". | 09-18 |
+| D29 | ✅ **The mockup's screen is the *everything* view, not the first screen.** Owner on seeing it: love the look, but "there's a lot" — it has to be easy for a runner who isn't technical (principle 8). #6 applies the look with far less on screen by default; how (see §6 "Simplifying the screen") is 🟡 proposed, not yet agreed. | A design that wins on looks and loses the user on first contact doesn't earn stars. | 09-18 |
 
 ---
 
@@ -148,14 +153,40 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 
 ---
 
-## 6. Design & identity — 🟡 OPEN: mockups built, owner to pick
+## 6. Design & identity — ✅ direction picked: B · Race poster (D28)
 
 **Directive:** neat, clean, and above all **unique and new**. Not Godseye's look; not the generic
 dark HUD every 3D map demo uses.
 
-**Decided:** km strip as UI spine (D14) · architectural-model analysis mode (D15) · choose via 3 mockups (D13).
+**Decided:** km strip as UI spine (D14) · architectural-model analysis mode (D15) · choose via 3 mockups (D13) ·
+**B · Race poster wins (D28)** · the first screen must be much simpler than the mockup (D29).
 
-**Still open:** which of the three directions (or a mix) wins. The mockups are at
+### The tokens (from B, as built in `app/src/mockups/poster/`)
+
+- **Palette.** Light: paper `#f4f4f0`, ink `#000`, blue `#1546ff`, grey `#8a8a86`. Dark: the inverse — ground `#000`,
+  ink `#f4f4f0`, blue `#5a7dff`, grey `#7c7c78`. Blue means exactly one thing: the course and where you are on it.
+- **Type.** Archivo variable, self-hosted (D27), tabular figures everywhere. Numerals: width 62%, weight 900.
+  Headings: width 75–88%, weight 800–900. Text: normal width, weight 500. Sentence case; no all-caps labels.
+- **Layout concept.** Twelve columns, 3px rules showing, no rounded corners, no shadows, no gradients. One giant
+  numeral per screen (the kilometre). The km strip is a full-width band of solid rows on one km axis.
+- **Encoding.** Solid = measured · hollow (outlined) = what runners say · halftone dots = sun that depends on the
+  leaves · flat grey + struck through = not measured here · hazard stripes + the word "sample" = placeholder.
+- **Street model.** White blocks, black outlines, solid black shadows, blue course line, north arrow and sun ray.
+- **Theme.** Follows the system; both are flat ink, neither is a glass HUD.
+
+### Simplifying the screen — 🟡 proposed by Claude 09-18, owner to confirm
+
+The mockup shows every layer and every number at once, which was right for judging a look and is wrong for a first
+visit. Proposal: **the app is a video player for the course.** The 3D view is most of the screen; the km strip is its
+seek bar (elevation silhouette + you, nothing else by default); play/pause, drag, space bar and arrow keys work the way
+they do in any player. Beside it: the kilometre, the time of day, and **one sentence** about where you are
+("Climbing 2% onto the Queensboro Bridge. Sun behind you. Water in 500 m."). Layers (Hills · Sun · Wind · Aid ·
+Runners say) are switched on one at a time; "show everything" opens the full poster for people who want it.
+The ride stops at **chapters** — the 8–12 places where something happens — instead of treating all 42 km alike.
+
+### How the direction was chosen
+
+The three mockups are still at
 `http://localhost:5173/mockups/` with the app running (code in `app/src/mockups/`). All three draw
 the same layers and print the same readout fields, entries and credits, because one module
 (`story.ts` + `content.ts`) decides what is on screen and how honest each number is; a design only
@@ -190,12 +221,8 @@ diagram with the sun's path over the whole race.
 | **Theme** | Light only (it is paper) | Follows the system, light or dark | Light only (a dark instrument is the HUD we're avoiding) |
 
 **Open questions:**
-- 🟡 **The blue line (direction B).** The poster's one colour refers to the blue line painted on the road at both
-  races. A road marking is not a logo, and no organizer's palette, typeface or mark is used — but D12 says "no trade
-  dress", so the owner should be comfortable with it before B (or its blue) is picked.
-- 🟡 Pick direction from mockups: (a) Roadbook · (b) Race poster · (c) Field instrument — or a mix.
-  When picked: record it as a decision, copy the winning tokens here as *the* tokens, and #6 applies them.
-- 🟡 Light vs. dark default; typography; color system (falls out of the pick)
+- 🟡 Confirm (or change) "Simplifying the screen" above before #6 starts.
+- 🟡 Whether the Roadbook's margin notes or the Field instrument's sky dial should be carried into B.
 
 ---
 
@@ -286,7 +313,7 @@ arrival times are approximate — state that in the UI.
 
 ## 10. Open items
 
-- 🟡 **Design direction (§6)** — the three mockups are built (#4); **waiting on the owner's pick.**
+- ✅ **Design direction (§6)** — owner picked **B · Race poster** on 09-18 (D28). 🟡 Open: how the first screen is simplified (D29, §6).
 - 🟡 UI framework confirmation (Svelte 5 proposed; the first slice is plain TypeScript).
 - ⚠️ **GitHub repo `Daniwave100/GeoPace` is currently public**, but D10 says private until the demo.
   Owner to decide whether to flip it to private (GitHub → Settings → Danger Zone).
@@ -317,3 +344,6 @@ arrival times are approximate — state that in the UI.
 - **2026-09-18** — Design mockups (#4): three clickable directions built on one shared, tested core (sun position, race clock
   with the Nov 1 DST change, wind/sun bearings, shadows). Added D26 (SVG model in mockups) and D27 (self-hosted open fonts);
   §6 now lists each candidate's tokens. Direction still open — owner picks.
+- **2026-09-18** — Owner picked **B · Race poster** (D28) and asked for a much simpler, non-technical first screen
+  (principle 8, D29). §6 now holds B's tokens as *the* tokens, plus a proposed "video player for the course" layout
+  that the owner has not yet confirmed.
