@@ -50,6 +50,21 @@ footer {
   font: inherit;
   font-variant-numeric: tabular-nums;
 }
+.plan input[type="time"] {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.plan button {
+  font: inherit;
+  font-size: 13px;
+}
+/* The start time box with its "use the published time" button beside it, not inside its label. */
+.plan-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 4px 8px;
+}
 .plan p {
   margin: 4px 0;
 }

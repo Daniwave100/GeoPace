@@ -180,7 +180,7 @@ export function buildStory(bundle: CourseBundle, plan: RacePlan): CourseStory {
     dateConfirmed: planned.edition.date.confirmed,
     dateNote: planned.edition.date.note,
     waveLabel: planned.wave.name,
-    waveStartLocal: planned.wave.start_local,
+    waveStartLocal: planned.startLocal,
     carriedOver: planned.carriedOver,
   };
   const prevailingWind = SAMPLE_PREVAILING_WIND[courseId] ?? { fromDeg: 270, speedMs: 4 };

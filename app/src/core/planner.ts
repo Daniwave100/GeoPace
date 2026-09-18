@@ -5,7 +5,8 @@
 //
 // It is built on the race clock (race-clock.ts), which owns the time-zone arithmetic. What the
 // Planner adds is the edition facts: which waves exist, which of them have a published start
-// time, and which times are carried over from an earlier edition and must be flagged.
+// time, and which times are carried over from an earlier edition and must be flagged. And the
+// one thing that outranks them: the runner's own start time, read off their start card.
 import type { CourseBundle, Edition, Wave } from "../bundle/types";
 import { raceClock } from "./race-clock";
 
@@ -18,9 +19,16 @@ export type Goal =
 /** The runner's own choices. (Units and the fueling plan join it in later tickets.) */
 export interface RacePlan {
   courseId: string;
-  /** The year. */
+  /** Which edition: the calendar year it is run in. */
   edition: number;
   waveId: string;
+  /**
+   * The start time the runner typed in themselves, HH:MM on the course's wall clock, or null to
+   * use the wave's published one. It is the only way to plan with a wave whose time nobody has
+   * published, and it outranks a published or carried-over time: the runner's own start card is
+   * a better source for that runner than any schedule.
+   */
+  ownStartLocal: string | null;
   goal: Goal;
 }
 
@@ -58,12 +66,16 @@ export interface CarriedOver {
 export interface Planner {
   plan: RacePlan;
   edition: Edition;
-  /** Always a wave with a published start time: there is no Planner for one without. */
-  wave: TimedWave;
+  wave: Wave;
+  /** The start the clock runs from, HH:MM on the course's wall clock: the runner's own, else the wave's. */
+  startLocal: string;
+  /** true when `startLocal` is the runner's own rather than the wave's published time. */
+  ownStartTime: boolean;
   /**
-   * Set when the wave's start time is carried over, so every time of day (and the sun with it)
-   * is last edition's. Whoever draws those times greys them and shows the reason; elapsed time
-   * comes from the runner's own goal and is unaffected. null when the organizer has confirmed it.
+   * Set when the clock runs from a carried-over wave time, so every time of day (and the sun with
+   * it) is last edition's. Whoever draws those times greys them and shows the reason; elapsed
+   * time comes from the runner's own goal and is unaffected. null when the organizer has
+   * confirmed the time, or the runner gave their own.
    */
   carriedOver: CarriedOver | null;
   /** Length of the course line in km; scrubbing runs from 0 to here. */
@@ -71,7 +83,7 @@ export interface Planner {
   /** The goal both ways round, whichever way the runner gave it. */
   goalFinishSeconds: number;
   goalPaceSecondsPerKm: number;
-  /** The moment the wave starts. */
+  /** The moment this runner's race starts. */
   startInstant: Date;
   at(km: number): Readout;
   /** The other direction: the km the runner has reached at that moment (0 before the start). */
@@ -81,14 +93,16 @@ export interface Planner {
 export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
   const edition = course.editions.find((candidate) => candidate.edition === plan.edition);
   const wave = edition?.waves.find((candidate) => candidate.id === plan.waveId);
-  if (!edition || !wave || !hasStartTime(wave)) {
+  const startLocal = plan.ownStartLocal ?? wave?.start_local ?? null;
+  if (!edition || !wave || startLocal === null) {
     throw new Error(`No race clock for ${plan.courseId} ${plan.edition} ${plan.waveId}: pass the plan through sanitizePlan first.`);
   }
+  const ownStartTime = plan.ownStartLocal !== null;
   const finishSeconds = goalFinishSeconds(plan.goal, course);
   const clock = raceClock({
     date: edition.date.day,
     timezone: course.timezone,
-    waveStartLocal: wave.start_local,
+    waveStartLocal: startLocal,
     goalFinishSeconds: finishSeconds,
     lineLengthM: course.lineLengthM,
     certifiedDistanceM: course.certifiedDistanceM,
@@ -98,8 +112,10 @@ export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
     plan,
     edition,
     wave,
+    startLocal,
+    ownStartTime,
     carriedOver:
-      wave.carried_over && edition.carried_over
+      !ownStartTime && wave.carried_over && edition.carried_over
         ? { fromEdition: edition.carried_over.from_edition, reason: edition.carried_over.reason }
         : null,
     lengthKm: clock.lineLengthKm,
@@ -150,6 +166,7 @@ const SLOWEST_FINISH_SECONDS = 10 * 3600;
 
 const FINISH_TIME = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/; // h:mm or h:mm:ss
 const PACE = /^(\d{1,2}):([0-5]\d)$/; // m:ss
+const START_TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/; // h:mm or hh:mm on a 24-hour clock
 
 /** A wave whose start time is published: the wall-clock time and the instant it means. */
 export type TimedWave = Wave & { start_local: string; start: string };
@@ -162,7 +179,7 @@ export function hasStartTime(wave: Wave): wave is TimedWave {
 /** Where a new runner starts: the latest edition, its first wave with a published time. */
 export function defaultPlan(course: PlannerCourse): RacePlan {
   const edition = latestEdition(course);
-  return { courseId: course.courseId, edition: edition.edition, waveId: firstWaveWithStartTime(edition).id, goal: DEFAULT_GOAL };
+  return { courseId: course.courseId, edition: edition.edition, waveId: firstWaveWithStartTime(edition).id, ownStartLocal: null, goal: DEFAULT_GOAL };
 }
 
 /**
@@ -173,8 +190,25 @@ export function defaultPlan(course: PlannerCourse): RacePlan {
 export function sanitizePlan(course: PlannerCourse, candidate: unknown): RacePlan {
   const remembered = (typeof candidate === "object" && candidate !== null ? candidate : {}) as Partial<Record<keyof RacePlan, unknown>>;
   const edition = course.editions.find((known) => known.edition === remembered.edition) ?? latestEdition(course);
-  const wave = edition.waves.find((known) => known.id === remembered.waveId && hasStartTime(known)) ?? firstWaveWithStartTime(edition);
-  return { courseId: course.courseId, edition: edition.edition, waveId: wave.id, goal: sanitizeGoal(remembered.goal, course) };
+  const ownStartLocal = typeof remembered.ownStartLocal === "string" ? parseStartTime(remembered.ownStartLocal) : null;
+  // A wave can be planned with if it has a published start time, or the runner has given their own.
+  const wave = edition.waves.find((known) => known.id === remembered.waveId && (hasStartTime(known) || ownStartLocal !== null)) ?? firstWaveWithStartTime(edition);
+  return { courseId: course.courseId, edition: edition.edition, waveId: wave.id, ownStartLocal, goal: sanitizeGoal(remembered.goal, course) };
+}
+
+/**
+ * What to remember when the runner types `startLocal` for `wave`: their own start time, or null
+ * when it only repeats a time the organizer has confirmed. Repeating a carried-over time is not
+ * nothing: it says the runner's start card agrees with last edition's, so it becomes their own.
+ */
+export function ownStartTimeFor(wave: Wave, startLocal: string): string | null {
+  return hasStartTime(wave) && !wave.carried_over && wave.start_local === startLocal ? null : startLocal;
+}
+
+/** Reads "9:05" or "09:05" as a time of day and gives it back as "09:05". null if it isn't one. */
+export function parseStartTime(text: string): string | null {
+  const match = START_TIME.exec(text.trim());
+  return match ? `${match[1].padStart(2, "0")}:${match[2]}` : null;
 }
 
 /** Reads "3:45" or "3:45:30" as a finish time, "5:20" as a pace per km. null if it isn't one. */

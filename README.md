@@ -24,7 +24,8 @@ nowhere else.
 Times assume an even pace, and the app says so. Where a start time is the last edition's because
 this one's isn't published, every time that rests on it is greyed and marked **carried over**, with
 the reason; a race date the organizer hasn't stated yet is marked **not confirmed**. A wave whose
-start time nobody has published is listed but can't be picked: it is never filled with a guess.
+start time nobody has published is never filled with a guess: pick it and type in **your own start
+time**, from your start card. You can do the same on any wave, and your own time always wins.
 
 The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
 app needs an internet connection.

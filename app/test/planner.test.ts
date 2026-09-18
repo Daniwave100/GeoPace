@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { Edition } from "../src/bundle/types";
-import { createPlanner, defaultPlan, goalWrittenAs, hasStartTime, parseGoal, plannerCourse, type PlannerCourse, type RacePlan, sanitizePlan } from "../src/core/planner";
+import { createPlanner, defaultPlan, goalWrittenAs, hasStartTime, ownStartTimeFor, parseGoal, parseStartTime, plannerCourse, type PlannerCourse, type RacePlan, sanitizePlan } from "../src/core/planner";
 import { formatElapsed } from "../src/core/race-clock";
 
 const SOURCE = { source: "https://example.org/race-day", accessed: "2026-09-18" };
@@ -37,6 +37,7 @@ const plan = (overrides: Partial<RacePlan> = {}): RacePlan => ({
   courseId: "nyc",
   edition: 2026,
   waveId: "wave-1",
+  ownStartLocal: null,
   goal: { kind: "finish", seconds: 4 * 3600 },
   ...overrides,
 });
@@ -138,6 +139,30 @@ describe("Planner", () => {
   it("refuses to run a clock for a wave whose start time nobody has published", () => {
     expect(() => createPlanner(NYC, plan({ waveId: "wave-3" }))).toThrow(/No race clock/);
   });
+
+  it("runs the clock from the runner's own start time when they give one", () => {
+    const planner = createPlanner(NYC, plan({ ownStartLocal: "09:33" }));
+
+    expect(planner.startLocal).toBe("09:33");
+    expect(planner.ownStartTime).toBe(true);
+    expect(planner.at(0).instant.toISOString()).toBe("2026-11-01T14:33:00.000Z"); // 09:33 EST
+    expect(planner.at(21.0975).localClock).toBe("11:33");
+    // Without one, it is the wave's published time.
+    expect(createPlanner(NYC, plan()).startLocal).toBe("09:10");
+    expect(createPlanner(NYC, plan()).ownStartTime).toBe(false);
+  });
+
+  it("lets a wave with no published start time be planned with, once the runner gives their own", () => {
+    const planner = createPlanner(NYC, plan({ waveId: "wave-3", ownStartLocal: "10:20" }));
+
+    expect(planner.wave.name).toBe("Wave 3");
+    expect(planner.at(0).localClock).toBe("10:20");
+  });
+
+  it("does not flag the runner's own start time as carried over: it is theirs, not last edition's", () => {
+    expect(createPlanner(NYC, plan({ waveId: "wave-2" })).carriedOver).not.toBeNull();
+    expect(createPlanner(NYC, plan({ waveId: "wave-2", ownStartLocal: "09:50" })).carriedOver).toBeNull();
+  });
 });
 
 describe("Race Plan", () => {
@@ -149,11 +174,11 @@ describe("Race Plan", () => {
   };
 
   it("starts a new runner on the latest edition, in its first wave with a published time, aiming for four hours", () => {
-    expect(defaultPlan(course)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", goal: { kind: "finish", seconds: 14400 } });
+    expect(defaultPlan(course)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 14400 } });
   });
 
   it("keeps a remembered plan that still makes sense", () => {
-    const remembered: RacePlan = { courseId: "nyc", edition: 2025, waveId: "wave-2", goal: { kind: "pace", secondsPerKm: 320 } };
+    const remembered: RacePlan = { courseId: "nyc", edition: 2025, waveId: "wave-2", ownStartLocal: "09:50", goal: { kind: "pace", secondsPerKm: 320 } };
 
     expect(sanitizePlan(course, remembered)).toEqual(remembered);
   });
@@ -162,10 +187,10 @@ describe("Race Plan", () => {
     const goal = { kind: "finish", seconds: 3 * 3600 + 45 * 60 };
 
     // A wave that has since been removed, or has no start time: first wave that has one.
-    expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-9", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", goal });
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-9", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal });
     expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-3", goal }).waveId).toBe("wave-1");
     // An edition we have no facts for: the latest one.
-    expect(sanitizePlan(course, { courseId: "nyc", edition: 2019, waveId: "wave-2", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", goal });
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2019, waveId: "wave-2", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal });
     // A goal nobody could mean.
     for (const nonsense of [{ kind: "finish", seconds: -5 }, { kind: "finish", seconds: "fast" }, { kind: "pace", secondsPerKm: 1 }, { kind: "stroll" }, null]) {
       expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-2", goal: nonsense }).goal).toEqual({ kind: "finish", seconds: 14400 });
@@ -174,6 +199,40 @@ describe("Race Plan", () => {
     for (const junk of [null, undefined, "plan", 7, [], { goal: {} }]) {
       expect(sanitizePlan(course, junk)).toEqual(defaultPlan(course));
     }
+  });
+
+  it("keeps a remembered own start time, and with it a wave that has no published one", () => {
+    const goal = { kind: "finish", seconds: 14400 };
+
+    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal });
+    // A plan remembered before own start times existed has none.
+    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", goal }).ownStartLocal).toBeNull();
+    // An own start time that isn't a time of day is dropped, and the wave with it if it has no time of its own.
+    for (const junk of ["25:00", "9:5", "soon", 620, {}, ""]) {
+      expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", ownStartLocal: junk, goal }), String(junk)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal });
+      expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: junk, goal }).waveId, String(junk)).toBe("wave-1");
+    }
+  });
+
+  it("reads a start time the way a runner types it", () => {
+    expect(parseStartTime("09:33")).toBe("09:33");
+    expect(parseStartTime(" 9:05 ")).toBe("09:05");
+    expect(parseStartTime("23:59")).toBe("23:59");
+    for (const text of ["", "24:00", "9:60", "9.30", "0933", "9:5", "soon"]) {
+      expect(parseStartTime(text), `"${text}"`).toBeNull();
+    }
+  });
+
+  it("counts a typed start time as the runner's own only when it tells us something the wave doesn't", () => {
+    const [confirmed, carriedOver, notPublished] = NYC_2026.waves;
+
+    expect(ownStartTimeFor(confirmed, "09:12")).toBe("09:12");
+    expect(ownStartTimeFor(notPublished, "10:20")).toBe("10:20");
+    // The organizer's confirmed time, typed back in: nothing new, so no override to remember.
+    expect(ownStartTimeFor(confirmed, "09:10")).toBeNull();
+    // A carried-over time, typed in on purpose: the runner's start card agrees with last edition's.
+    // That is a confirmation from the best source there is, so it is theirs, and no longer greyed.
+    expect(ownStartTimeFor(carriedOver, "09:45")).toBe("09:45");
   });
 
   it("always yields a plan the Planner can run", () => {

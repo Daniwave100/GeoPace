@@ -34,7 +34,7 @@ const brokenStorage: PlanStorage = {
 describe("Race Plan store", () => {
   it("remembers the plan across a reload", () => {
     const storage = fakeStorage();
-    const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", goal: { kind: "pace", secondsPerKm: 320 } };
+    const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:02", goal: { kind: "pace", secondsPerKm: 320 } };
 
     savePlan(storage, plan);
 
@@ -43,8 +43,8 @@ describe("Race Plan store", () => {
 
   it("remembers a plan for each course, and which course was planned last", () => {
     const storage = fakeStorage();
-    const berlin: RacePlan = { courseId: "berlin", edition: 2026, waveId: "wave-2", goal: { kind: "finish", seconds: 12600 } };
-    const nyc: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", goal: { kind: "finish", seconds: 16200 } };
+    const berlin: RacePlan = { courseId: "berlin", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal: { kind: "finish", seconds: 12600 } };
+    const nyc: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 } };
 
     savePlan(storage, berlin);
     savePlan(storage, nyc);
@@ -61,10 +61,10 @@ describe("Race Plan store", () => {
 
   it("checks a remembered plan against today's edition facts", () => {
     const storage = fakeStorage();
-    savePlan(storage, { courseId: "nyc", edition: 2026, waveId: "wave-3", goal: { kind: "finish", seconds: 16200 } });
+    savePlan(storage, { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 } });
     const withoutWave3 = course("nyc", [edition("2026-11-01", ["wave-1", "wave-2"])]);
 
-    expect(loadPlan(storage, withoutWave3)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", goal: { kind: "finish", seconds: 16200 } });
+    expect(loadPlan(storage, withoutWave3)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 } });
   });
 
   it("carries on with the default plan when what is stored is unreadable", () => {
