@@ -18,11 +18,11 @@ import { type Entry, type Field, NOTE_HEADINGS, entriesNear, headlineFields, lay
 import { contourSegments, sampleTerrain } from "../contours";
 import { buildCredits } from "../credits";
 import * as show from "../format";
-import { effortReach, heightDomain, linearScale, measuredRuns, spreadLabels, windArrowOnPage } from "../layout";
+import { effortReach, heightDomain, linearScale, measuredRuns, spreadLabels, windArrowOnPage } from "../../core/layout";
 import { type MaquetteStyle, renderMaquette } from "../maquette";
 import { type MockupContext, startMockup } from "../shell";
 import type { CourseStory, StripBin } from "../story";
-import { drawToFit, html, link, perFrame, svg } from "../svg";
+import { drawToFit, html, link, perFrame, svg } from "../../svg";
 
 const INK = "#1d2a33";
 const SEPIA = "#9a6a3c";

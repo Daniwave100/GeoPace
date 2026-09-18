@@ -14,11 +14,11 @@ import "./poster.css";
 import { type Entry, type Field, NOTE_HEADINGS, entriesNear, headlineFields, layerFields } from "../content";
 import { buildCredits } from "../credits";
 import * as show from "../format";
-import { effortReach, heightDomain, linearScale, measuredRuns, spreadLabels, windArrowOnPage } from "../layout";
+import { effortReach, heightDomain, linearScale, measuredRuns, spreadLabels, windArrowOnPage } from "../../core/layout";
 import { type MaquetteStyle, renderMaquette } from "../maquette";
 import { type MockupContext, startMockup } from "../shell";
 import type { CourseStory, StripBin } from "../story";
-import { drawToFit, html, link, perFrame, svg } from "../svg";
+import { drawToFit, html, link, perFrame, svg } from "../../svg";
 
 /** How many of the twelve columns each fact gets. Long sentences get room; numbers don't need it. */
 const FIELD_SPAN: Record<string, number> = { elevation: 1, grade: 1, difficulty: 2, sun: 2, exposure: 2, wind: 2, aid: 2 };

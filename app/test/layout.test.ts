@@ -2,7 +2,7 @@
 // The designs draw differently, but they all have to put a kilometre at the right pixel and keep
 // labels that sit close together on the course from printing on top of each other.
 import { describe, expect, it } from "vitest";
-import { assignLanes, effortReach, heightDomain, linearScale, measuredRuns, spreadLabels } from "../src/mockups/layout";
+import { assignLanes, effortReach, heightDomain, linearScale, measuredRuns, spreadLabels } from "../src/core/layout";
 
 describe("linear scale", () => {
   it("maps a domain onto a range", () => {

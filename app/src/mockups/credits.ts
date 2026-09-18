@@ -3,7 +3,7 @@
 // each direction — but none of them gets to leave any of it out (PLAN.md §9).
 import { SAMPLE_NOTICE, UNOFFICIAL_NOTICE } from "./content";
 import type { CourseStory } from "./story";
-import { html, link } from "./svg";
+import { html, link } from "../svg";
 
 /**
  * Builds the credits with plain, prefixed class names (`<prefix>-credits__…`) for a design to

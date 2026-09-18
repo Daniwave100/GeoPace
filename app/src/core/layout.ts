@@ -1,6 +1,7 @@
-// Putting things at the right place on a page. Shared by all three directions: they disagree
-// about what a kilometre should look like, not about where it goes.
-import { localVector } from "../core/bearing";
+// Putting things at the right place on a page: scales, labels that don't overprint each other,
+// measured and filled-in runs. Written for the three design mockups (#4), which disagreed about
+// what a kilometre should look like, not about where it goes; the app's strip uses it too.
+import { localVector } from "./bearing";
 
 export type Scale = (value: number) => number;
 
@@ -129,14 +130,18 @@ export interface MeasuredRun<Bin> {
  * Splits a profile into consecutive stretches that are measured and stretches that are filled
  * in, so a design can draw the two differently. With `bridgeGaps`, an unmeasured stretch also
  * takes the one measured bin either side of it, so its dashed line joins up with the solid line
- * instead of leaving a hole; measured stretches are never widened.
+ * instead of leaving a hole; measured stretches are never widened. `isMeasured` says which bins
+ * are measured, for bins that don't carry an `elevationMeasured` flag of their own.
  */
-export function measuredRuns<Bin extends { elevationMeasured: boolean }>(bins: Bin[], options: { bridgeGaps?: boolean } = {}): MeasuredRun<Bin>[] {
+export function measuredRuns<Bin extends { elevationMeasured: boolean }>(bins: Bin[], options?: { bridgeGaps?: boolean }): MeasuredRun<Bin>[];
+export function measuredRuns<Bin>(bins: Bin[], options: { bridgeGaps?: boolean; isMeasured: (bin: Bin) => boolean }): MeasuredRun<Bin>[];
+export function measuredRuns<Bin>(bins: Bin[], options: { bridgeGaps?: boolean; isMeasured?: (bin: Bin) => boolean } = {}): MeasuredRun<Bin>[] {
+  const isMeasured = options.isMeasured ?? ((bin: Bin) => (bin as { elevationMeasured: boolean }).elevationMeasured);
   const runs: MeasuredRun<Bin>[] = [];
   let start = 0;
   for (let index = 1; index <= bins.length; index += 1) {
-    if (index < bins.length && bins[index].elevationMeasured === bins[start].elevationMeasured) continue;
-    const measured = bins[start].elevationMeasured;
+    if (index < bins.length && isMeasured(bins[index]) === isMeasured(bins[start])) continue;
+    const measured = isMeasured(bins[start]);
     const reach = !measured && options.bridgeGaps ? 1 : 0;
     runs.push({ measured, bins: bins.slice(Math.max(0, start - reach), Math.min(bins.length, index + reach)) });
     start = index;

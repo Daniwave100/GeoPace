@@ -1,7 +1,7 @@
-// SVG helpers for the mockups, next to the HTML ones they share with the app (../dom.ts).
-import { applyAttrs, type Attrs } from "../dom";
+// SVG helpers, next to the HTML ones (dom.ts). Shared by the app's strip and the design mockups.
+import { applyAttrs, type Attrs } from "./dom";
 
-export { html, link } from "../dom";
+export { html, link } from "./dom";
 
 export const SVG_NS = "http://www.w3.org/2000/svg";
 
