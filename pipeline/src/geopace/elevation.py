@@ -1,4 +1,4 @@
-"""The interfaces every elevation source provides (Berlin DGM1, NYC DEM and LiDAR, synthetic test data)."""
+"""The interfaces every elevation source provides (Berlin DGM1, NYC DEM and LiDAR, the geoid, synthetic test data)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -29,5 +29,17 @@ class BridgeDeckModel:
     """Surface data (LiDAR) that still has the bridge decks a bare-earth model leaves out."""
 
     returns: DeckReturnsFn
+    source: Source
+    attribution: Attribution
+
+
+@dataclass(frozen=True)
+class GeoidModel:
+    """How far sea level, where a survey's heights count from, sits above the WGS84 ellipsoid,
+    where a 3D globe's heights count from. Tens of meters, and different from place to place."""
+
+    # (lat degrees, lon degrees) arrays -> meters to add to a height above sea level to get the
+    # height above the ellipsoid, same shape. Negative where sea level is below the ellipsoid.
+    offset: SampleFn
     source: Source
     attribution: Attribution

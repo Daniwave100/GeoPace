@@ -2,7 +2,7 @@
 // keep these types in step with it (the loader validates every bundle against the schema).
 
 export interface CourseBundle {
-  schema_version: 3;
+  schema_version: 4;
   course_id: string;
   generated_at: string;
   pipeline_version: string;
@@ -57,7 +57,14 @@ export interface CourseLine {
   lon: number[];
   /** km from the start */
   km: number[];
+  /** meters above sea level: what a runner is told */
   elevation_m: number[];
+  /**
+   * The same height in meters above the WGS84 ellipsoid, which is where the 3D scene counts
+   * heights from: tens of meters away from sea level, by a different amount in each city. Only
+   * for placing things in the scene; never shown to the runner.
+   */
+  ellipsoid_height_m: number[];
   /** rise over run, 0.05 = 5% uphill */
   grade: number[];
   /** energy cost relative to flat; null where the grade is outside the model's valid range */

@@ -28,6 +28,7 @@ function threeKmCourse(notMeasured: CourseBundle["measured"]["elevation_not_meas
     lat: km.map((at) => 52.5 + at * 0.009),
     lon: km.map(() => 13.4),
     elevation_m: elevation,
+    ellipsoid_height_m: elevation.map((height) => height + 39.5),
     grade,
     difficulty: grade.map((g) => 1 + g * 5),
     bearing_deg: km.map(() => 0),

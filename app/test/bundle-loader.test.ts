@@ -68,12 +68,33 @@ describe("Course Bundle loader", () => {
   });
 
   it("rejects a bundle from a different format version with advice instead of a list of errors", () => {
-    const newer = { ...pipelineBundle(), schema_version: 4 };
+    const older = { ...pipelineBundle(), schema_version: 3 };
 
-    const message = rejectionOf(newer);
-    expect(message).toContain("format version 4");
-    expect(message).toContain("version 3");
+    const message = rejectionOf(older);
+    expect(message).toContain("format version 3");
+    expect(message).toContain("version 4");
     expect(message).not.toContain("must be");
+  });
+
+  it("rejects a bundle without the height above the ellipsoid, rather than drawing the course at a guess", () => {
+    const silent = pipelineBundle();
+    delete silent.measured.course_line.ellipsoid_height_m;
+    expect(rejectionOf(silent)).toContain('measured.course_line is missing "ellipsoid_height_m"');
+
+    const short = pipelineBundle();
+    short.measured.course_line.ellipsoid_height_m.pop();
+    expect(rejectionOf(short)).toMatch(/different lengths/);
+  });
+
+  it("carries the height above the ellipsoid for every sample: below sea level's in New York, above it in Berlin", () => {
+    // Sea level is about 32.5 m under the ellipsoid in New York and 39.5 m over it in Berlin.
+    for (const [course, from, to] of [["nyc", -33.2, -32.3], ["berlin", 39.3, 39.9]] as const) {
+      const line = parseCourseBundle(JSON.parse(committed(course)), course).measured.course_line;
+      expect(line.ellipsoid_height_m.length).toBe(line.km.length);
+      const seaLevel = line.ellipsoid_height_m.map((height, i) => height - line.elevation_m[i]);
+      expect(Math.min(...seaLevel)).toBeGreaterThan(from);
+      expect(Math.max(...seaLevel)).toBeLessThan(to);
+    }
   });
 
   it("rejects columns that don't line up sample for sample", () => {

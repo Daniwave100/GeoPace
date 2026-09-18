@@ -17,6 +17,9 @@ Steps, in order:
 3. Smooth the elevation, THEN compute grade. Grade from unsmoothed data is dominated by
    noise: 0.5 m of error across 10 m looks like a 5% hill.
 4. Turn grade into a difficulty factor with a published energy-cost model.
+5. Add each point's height above the ellipsoid: the smoothed height above sea level plus what a
+   published geoid model says separates the two at that place. The app's 3D scene needs it to
+   draw the course at the road's own height (a globe's heights count from the ellipsoid).
 """
 
 from dataclasses import dataclass
@@ -26,7 +29,7 @@ from pyproj import Geod
 
 from geopace import difficulty
 from geopace.course_facts import Bridge
-from geopace.elevation import BridgeDeckModel, ElevationModel
+from geopace.elevation import BridgeDeckModel, ElevationModel, GeoidModel
 from geopace.lidar_decks import deck_heights
 
 WGS84 = Geod(ellps="WGS84")
@@ -58,6 +61,8 @@ class CourseLine:
     lon: np.ndarray
     distance_m: np.ndarray
     elevation_m: np.ndarray
+    # The same height counted from the WGS84 ellipsoid instead of from sea level.
+    ellipsoid_height_m: np.ndarray
     grade: np.ndarray
     difficulty: list[float | None]
     bearing_deg: np.ndarray
@@ -71,6 +76,8 @@ def build_course_line(
     spacing_m: float = DEFAULT_SPACING_M,
     bridges: list[Bridge] = (),
     decks: BridgeDeckModel | None = None,
+    *,
+    geoid: GeoidModel,
 ) -> CourseLine:
     lat, lon, distance_m = resample(route, spacing_m)
     raw_elevation = np.asarray(elevation.sample(lat, lon), dtype=float)
@@ -88,6 +95,13 @@ def build_course_line(
         )
     smoothed = smooth_elevation(ground, spacing_m)
     grade = np.gradient(smoothed, distance_m)
+    sea_level_above_ellipsoid = np.asarray(geoid.offset(lat, lon), dtype=float)
+    if not np.all(np.isfinite(sea_level_above_ellipsoid)):
+        bad = int(np.flatnonzero(~np.isfinite(sea_level_above_ellipsoid))[0])
+        raise ValueError(
+            f"The geoid model has no value at km {distance_m[bad] / 1000:.3f} ({lat[bad]:.6f}, {lon[bad]:.6f}). "
+            "Does the model cover this city?"
+        )
     return CourseLine(
         spacing_m=spacing_m,
         length_m=float(distance_m[-1]),
@@ -95,6 +109,7 @@ def build_course_line(
         lon=lon,
         distance_m=distance_m,
         elevation_m=smoothed,
+        ellipsoid_height_m=smoothed + sea_level_above_ellipsoid,
         grade=grade,
         difficulty=difficulty.difficulty_factor(grade),
         bearing_deg=bearings(lat, lon),

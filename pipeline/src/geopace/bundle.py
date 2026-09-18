@@ -14,11 +14,11 @@ from geopace import __version__, difficulty
 from geopace.course_facts import CourseFacts
 from geopace.course_line import CourseLine, build_course_line
 from geopace.edition_facts import EditionFacts
-from geopace.elevation import BridgeDeckModel, ElevationModel
+from geopace.elevation import BridgeDeckModel, ElevationModel, GeoidModel
 from geopace.provenance import Attribution, Source
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schema" / "course-bundle.schema.json"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Certified courses are measured along the shortest legal line a runner may take. A route file
 # drawn along the streets runs a little long: more than 1% off (about 420 m on a marathon) means
@@ -47,8 +47,9 @@ def build_course_bundle(
     decks: BridgeDeckModel | None = None,
     *,
     editions: list[EditionFacts],
+    geoid: GeoidModel,
 ) -> dict:
-    line = build_course_line(route, elevation, bridges=facts.bridges, decks=decks)
+    line = build_course_line(route, elevation, bridges=facts.bridges, decks=decks, geoid=geoid)
     check_length(line.length_m, facts.certified_distance_m, traced=bool(facts.route_waypoints))
     if facts.route_url:
         route_source = Source(
@@ -98,6 +99,8 @@ def build_course_bundle(
     if decks is not None:
         bundle["sources"].append(decks.source.to_json())
         bundle["attributions"].append(decks.attribution.to_json())
+    bundle["sources"].append(geoid.source.to_json())
+    bundle["attributions"].append(geoid.attribution.to_json())
     osm_uses = []
     if facts.route_waypoints:
         osm_uses.append("course streets")
@@ -172,6 +175,7 @@ def _course_line_json(line: CourseLine) -> dict:
         "lon": rounded(line.lon, 6),
         "km": rounded(line.distance_m / 1000, 4),
         "elevation_m": rounded(line.elevation_m, 2),
+        "ellipsoid_height_m": rounded(line.ellipsoid_height_m, 2),
         "grade": rounded(line.grade, 4),
         "difficulty": [None if d is None else round(d, 3) for d in line.difficulty],
         # 359.96 rounds to 360.0, which is the same direction as 0.
@@ -207,7 +211,7 @@ def validate_bundle(bundle: dict) -> None:
 
 
 def _column_problems(line: dict) -> list[str]:
-    columns = ["lat", "lon", "km", "elevation_m", "grade", "difficulty", "bearing_deg"]
+    columns = ["lat", "lon", "km", "elevation_m", "ellipsoid_height_m", "grade", "difficulty", "bearing_deg"]
     lengths = {name: len(line[name]) for name in columns}
     if len(set(lengths.values())) > 1:
         return [f"course_line columns have different lengths: {lengths}"]

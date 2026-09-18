@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from geopace import berlin_dgm1, berlin_dom1
+from geopace import berlin_dgm1, berlin_dom1, geoid_egm2008
 from geopace.bundle import build_course_bundle, validate_bundle
 from geopace.cache import cache_dir
 from geopace.course_facts import load_course_facts
@@ -23,6 +23,24 @@ SURFACE_TILES = cache_dir() / "berlin" / "dom1"
 def test_committed_berlin_bundle_matches_the_schema():
     bundle = json.loads((REPO / "data" / "derived" / "berlin" / "course-bundle.json").read_text())
     validate_bundle(bundle)
+
+
+def check_berlin_ellipsoid_heights(line: dict) -> None:
+    """In Berlin sea level is about 39.5 m *above* the ellipsoid; in New York it is 32.5 m below.
+    Opposite signs, so the two cities' offsets can't be swapped, dropped or flipped unnoticed."""
+    sea_level = np.array(line["ellipsoid_height_m"]) - np.array(line["elevation_m"])
+    # Published independently of this pipeline: GeographicLib's GeoidEval gives EGM2008 as +39.56 m
+    # at the start on Straße des 17. Juni (52.5147, 13.3615)
+    # (https://geographiclib.sourceforge.io/cgi-bin/GeoidEval, accessed 2026-09-18).
+    assert sea_level[0] == pytest.approx(39.56, abs=0.06)
+    assert 39.3 < sea_level.min() and sea_level.max() < 39.9
+
+
+def test_committed_berlin_bundle_carries_the_height_above_the_ellipsoid():
+    bundle = json.loads((REPO / "data" / "derived" / "berlin" / "course-bundle.json").read_text())
+
+    check_berlin_ellipsoid_heights(bundle["measured"]["course_line"])
+    assert "geoid-egm2008" in {source["id"] for source in bundle["sources"]}
 
 
 def test_berlins_bridges_are_measured_not_drawn_as_straight_lines():
@@ -60,10 +78,12 @@ def test_real_berlin_course_is_marathon_length_with_no_absurd_grades():
             berlin_dgm1.elevation_model(allow_download=False),
             decks=berlin_dom1.deck_model(allow_download=False),
             editions=load_editions(REPO / "data" / "courses" / "berlin", facts.timezone),
+            geoid=geoid_egm2008.geoid_model(allow_download=False),
         )
-    except berlin_dgm1.TilesNotCached as missing:
+    except (berlin_dgm1.TilesNotCached, geoid_egm2008.GridNotCached) as missing:
         pytest.skip(str(missing))
     line = bundle["measured"]["course_line"]
+    check_berlin_ellipsoid_heights(line)
 
     assert line["length_m"] == pytest.approx(42195, rel=0.01)
     # Berlin is famously flat; the steepest real stretch is the ~3% ramp off the Kronprinzenbrücke.

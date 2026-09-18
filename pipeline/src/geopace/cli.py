@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from geopace import berlin_dgm1, berlin_dom1, nyc_dem, nyc_lidar
+from geopace import berlin_dgm1, berlin_dom1, geoid_egm2008, nyc_dem, nyc_lidar
 from geopace.bundle import build_course_bundle, write_bundle
 from geopace.cache import cache_dir, download
 from geopace.course_facts import CourseFacts, load_course_facts
@@ -59,7 +59,13 @@ def build(course_id: str) -> Path:
     route = load_route(facts)
     data = COURSE_DATA[course_id]
     bundle = build_course_bundle(
-        facts, route, data.elevation(), decks=data.decks() if data.decks else None, editions=editions
+        facts,
+        route,
+        data.elevation(),
+        decks=data.decks() if data.decks else None,
+        editions=editions,
+        # One worldwide geoid model for every course (PLAN.md D51).
+        geoid=geoid_egm2008.geoid_model(),
     )
 
     out = DERIVED / course_id / "course-bundle.json"
@@ -70,6 +76,10 @@ def build(course_id: str) -> Path:
     print(f"  length {line['length_m'] / 1000:.3f} km (certified {facts.certified_distance_m / 1000:.3f} km)")
     print(f"  elevation {summary['min_m']:.1f}–{summary['max_m']:.1f} m, gain {summary['gain_m']:.0f} m, loss {summary['loss_m']:.0f} m")
     print(f"  steepest grade {max(grades):+.1%} / {min(grades):+.1%}")
+    sea_level = [h - e for h, e in zip(line["ellipsoid_height_m"], line["elevation_m"])]
+    side = "above" if min(sea_level) > 0 else "below"
+    nearest, furthest = sorted([abs(min(sea_level)), abs(max(sea_level))])
+    print(f"  sea level is {nearest:.2f}–{furthest:.2f} m {side} the ellipsoid along the course (EGM2008)")
     print(f"  wrote {out.relative_to(REPO)} ({out.stat().st_size / 1024:.0f} KB)")
     return out
 

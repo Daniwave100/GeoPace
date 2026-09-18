@@ -7,7 +7,7 @@
   "required": ["schema_version", "course_id", "generated_at", "pipeline_version", "course", "editions", "measured", "sources", "attributions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 3 },
+    "schema_version": { "const": 4 },
     "course_id": { "$ref": "#/$defs/id" },
     "generated_at": {
       "description": "When the pipeline wrote this bundle, ISO-8601 with an explicit UTC offset.",
@@ -229,7 +229,7 @@
     "course_line": {
       "description": "The course resampled at a fixed spacing. Columns are parallel arrays: index i of every column describes the same sample. The last sample is the finish, so its spacing to the previous one can be shorter.",
       "type": "object",
-      "required": ["spacing_m", "length_m", "lat", "lon", "km", "elevation_m", "grade", "difficulty", "bearing_deg"],
+      "required": ["spacing_m", "length_m", "lat", "lon", "km", "elevation_m", "ellipsoid_height_m", "grade", "difficulty", "bearing_deg"],
       "additionalProperties": false,
       "properties": {
         "spacing_m": { "type": "number", "exclusiveMinimum": 0 },
@@ -242,6 +242,10 @@
         },
         "elevation_m": {
           "description": "Terrain-corrected, smoothed elevation in meters above sea level (the ground model's vertical datum).",
+          "$ref": "#/$defs/column"
+        },
+        "ellipsoid_height_m": {
+          "description": "The same height in meters above the WGS84 ellipsoid, which is where a 3D globe counts heights from: elevation_m plus the geoid model's offset at that place (the model is listed in sources). The two differ by tens of meters, by a different amount in each city. The app draws the course at this height where a photographed city stands over the road.",
           "$ref": "#/$defs/column"
         },
         "grade": {

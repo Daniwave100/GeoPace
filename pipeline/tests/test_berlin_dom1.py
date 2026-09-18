@@ -12,7 +12,7 @@ from geopace.bundle import build_course_bundle
 from geopace.course_facts import parse_course_facts
 from geopace.elevation import BridgeDeckModel
 
-from conftest import meters_north_of, parsed_synthetic_editions, straight_north_route, synthetic_elevation
+from conftest import meters_north_of, parsed_synthetic_editions, straight_north_route, synthetic_elevation, synthetic_geoid
 
 START_LAT = 52.5
 ORIGIN = berlin_dom1.to_utm33(13.4, START_LAT)  # the synthetic route runs due north from here
@@ -55,6 +55,7 @@ def build(synthetic_facts, heights):
         elevation=synthetic_elevation(river_ground),
         decks=decks,
         editions=parsed_synthetic_editions(),
+        geoid=synthetic_geoid(),
     )
 
 

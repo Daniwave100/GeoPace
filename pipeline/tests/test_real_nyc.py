@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pyproj import Geod
 
-from geopace import nyc_dem, nyc_lidar
+from geopace import geoid_egm2008, nyc_dem, nyc_lidar
 from geopace.bundle import build_course_bundle, validate_bundle
 from geopace.cache import cache_dir
 from geopace.cli import load_route
@@ -50,6 +50,25 @@ def check_nyc_course_line(line: dict) -> None:
     assert all(d is not None for d in line["difficulty"])
 
 
+def check_nyc_ellipsoid_heights(line: dict) -> None:
+    """The height the 3D scene draws the course at. In New York sea level is about 32.5 m *below*
+    the ellipsoid (in Berlin it is 39.5 m above), so a missing, swapped or sign-flipped offset
+    would put the line tens of meters under the road or over it."""
+    km = np.array(line["km"])
+    sea_level = np.array(line["ellipsoid_height_m"]) - np.array(line["elevation_m"])
+    # Published independently of this pipeline: GeographicLib's GeoidEval gives EGM2008 as -32.54 m
+    # on the Queensboro Bridge (40.7568, -73.9545) and -33.00 m at the Verrazzano start
+    # (https://geographiclib.sourceforge.io/cgi-bin/GeoidEval, accessed 2026-09-18).
+    assert sea_level[np.argmin(np.abs(km - 25.1))] == pytest.approx(-32.54, abs=0.06)
+    assert sea_level[0] == pytest.approx(-33.00, abs=0.06)
+    assert -33.2 < sea_level.min() and sea_level.max() < -32.3
+    # On the Queensboro the course is on the lower deck, 6.4 m under the upper one (D23). The
+    # conversion shifts the whole bridge by one amount to within a few centimeters, so the line
+    # is still on that deck: nothing on it moved by anything like the gap between the two.
+    on_the_queensboro = sea_level[(km >= 24.2) & (km <= 25.8)]
+    assert on_the_queensboro.max() - on_the_queensboro.min() < 0.1
+
+
 def check_nyc_not_measured(spans: list[dict]) -> None:
     """The 2017 scan has no returns at all over the middle of the Verrazzano's main span, so the
     crest of the course's biggest hill is a straight line, not a measurement. The bundle has to
@@ -69,9 +88,10 @@ def test_committed_nyc_bundle_matches_the_schema_and_the_real_course():
     validate_bundle(bundle)
     assert bundle["course"]["timezone"] == "America/New_York"
     check_nyc_course_line(bundle["measured"]["course_line"])
+    check_nyc_ellipsoid_heights(bundle["measured"]["course_line"])
     check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])
     # The data it was built from is named, with a licence and the date it was fetched.
-    assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "openstreetmap"} == {s["id"] for s in bundle["sources"]}
+    assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "geoid-egm2008", "openstreetmap"} == {s["id"] for s in bundle["sources"]}
 
 
 @pytest.mark.skipif(not (CACHE / "dem").exists() or not (CACHE / "lidar").exists(), reason="real NYC inputs not cached")
@@ -84,9 +104,11 @@ def test_real_nyc_course_rebuilds_from_the_cached_inputs():
             nyc_dem.elevation_model(allow_download=False),
             decks=nyc_lidar.deck_model(allow_download=False),
             editions=load_editions(FACTS.parent, facts.timezone),
+            geoid=geoid_egm2008.geoid_model(allow_download=False),
         )
-    except FileNotFoundError as missing:  # streets, DEM blocks or LiDAR points not cached
+    except FileNotFoundError as missing:  # streets, DEM blocks, LiDAR points or the geoid grid not cached
         pytest.skip(str(missing))
 
     check_nyc_course_line(bundle["measured"]["course_line"])
+    check_nyc_ellipsoid_heights(bundle["measured"]["course_line"])
     check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])

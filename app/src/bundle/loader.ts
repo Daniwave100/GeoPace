@@ -5,7 +5,7 @@ import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
 import schema from "../../../schema/course-bundle.schema.json";
 import type { CourseBundle } from "./types";
 
-export const SUPPORTED_SCHEMA_VERSION = 3;
+export const SUPPORTED_SCHEMA_VERSION = 4;
 const MAX_LISTED_PROBLEMS = 8;
 
 export class BundleError extends Error {
@@ -65,7 +65,7 @@ export function parseCourseBundle(data: unknown, courseId: string): CourseBundle
 /** Things JSON Schema can't express: every column has one value per sample, and km increases. */
 function columnProblems(bundle: CourseBundle): string[] {
   const line = bundle.measured.course_line;
-  const columns = ["lat", "lon", "km", "elevation_m", "grade", "difficulty", "bearing_deg"] as const;
+  const columns = ["lat", "lon", "km", "elevation_m", "ellipsoid_height_m", "grade", "difficulty", "bearing_deg"] as const;
   const lengths = columns.map((name) => `${name}=${line[name].length}`);
   if (new Set(columns.map((name) => line[name].length)).size > 1) {
     return [`measured.course_line columns have different lengths (${lengths.join(", ")})`];
