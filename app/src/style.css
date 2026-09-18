@@ -7,7 +7,7 @@
      solid = measured · hollow = what runners say · grey and struck through = not measured here ·
      hazard stripes and the word "sample" = a stand-in.
    Light and dark are both first-class (D31). index.html sets data-theme before the first paint
-   and explore/theme-switch.ts keeps it in step with the runner's choice and the system. */
+   and main.ts keeps it in step with the runner's choice and the system (core/theme.ts). */
 
 :root {
   --paper: #f4f4f0;
@@ -268,7 +268,8 @@ input {
   color: var(--blue);
   font-weight: 900;
   font-stretch: 62%;
-  font-size: clamp(84px, 9.5vw, 148px);
+  /* As big as the window allows, in both directions: on a short window the sentence still has to fit under it. */
+  font-size: clamp(64px, min(9.5vw, 12.5vh), 148px);
   line-height: 0.82;
   letter-spacing: -0.025em;
 }
@@ -290,7 +291,7 @@ input {
 }
 
 .readout-of {
-  padding: 8px 16px 10px;
+  padding: 6px 16px 8px;
   font-size: 12px;
   color: var(--grey-text);
 }
@@ -305,7 +306,7 @@ input {
   display: grid;
   align-content: start;
   gap: 2px;
-  padding: 10px 16px;
+  padding: 8px 16px;
 }
 
 .readout-time + .readout-time {
@@ -338,8 +339,19 @@ input {
   color: var(--grey-text);
 }
 
+/* Why a value isn't measured here, printed where anyone can read it rather than left to a tooltip. */
+.sentence-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  font-stretch: 100%;
+  line-height: 1.35;
+  color: var(--grey-text);
+}
+
 .sentence {
-  padding: 12px 16px 14px;
+  padding: 10px 16px 12px;
   border-top: var(--rule) solid var(--ink);
   font-size: 18px;
   font-weight: 700;
@@ -450,22 +462,42 @@ button.map-label {
   cursor: pointer;
 }
 
-/* The same encodings, on the map's labels. Solid is a solid block. */
+/* The same four encodings, on the map's labels. */
+
+/* Measured is a solid block of ink. */
+.map-label.enc-measured {
+  color: #f4f4f0;
+  background: #000;
+}
+
+/* What runners say is hollow: paper, with an ink frame. */
 .map-label.enc-runner-report {
+  padding: 2px 7px;
   color: #000;
   background: #f4f4f0;
 }
 
+/* Not measured here: grey, a dashed edge like its stretch of line, and the value struck through. */
 .map-label.enc-not-measured {
   color: #000;
   background: #c9c9c5;
-  border-color: #8a8a86;
+  border-color: #5c5c58;
   border-style: dashed;
 }
 
-.map-label-place {
+/* A sample wears the hazard tape, on paper so the stripes show. */
+.map-label.enc-sample {
+  padding: 2px 7px;
   color: #000;
-  background: #f4f4f0;
+  background: repeating-linear-gradient(135deg, #f4f4f0 0 4px, #b9b9b4 4px 8px);
+}
+
+/* The start and the finish are the course's own, so they are the course's blue, and can't be
+   mistaken for a hollow runner report. */
+.map-label-place {
+  color: #fff;
+  background: #1546ff;
+  border-color: #1546ff;
 }
 
 #photoreal {
@@ -778,6 +810,12 @@ button.map-label {
   font-stretch: 88%;
 }
 
+.layer-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
 .layer-bar-help {
   margin-left: auto;
   font-size: 12px;
@@ -811,7 +849,7 @@ button.map-label {
   outline-offset: -3px;
 }
 
-.strip-chart svg {
+.strip-rows svg {
   display: block;
 }
 
@@ -897,12 +935,6 @@ button.map-label {
   stroke-width: 1;
 }
 
-.strip-gap-label {
-  font: 600 10px "Archivo Variable", Arial, sans-serif;
-  font-stretch: 80%;
-  fill: var(--grey-text);
-}
-
 /* The blue line: the course, with a notch and a number every five. */
 .strip-line {
   fill: var(--blue);
@@ -968,8 +1000,13 @@ button.map-label {
   list-style: none;
 }
 
-.credits details {
+/* "Sources" and the line about moving the map share a row; opened, the sources take the full width. */
+.credits details[open] {
   flex-basis: 100%;
+}
+
+.credits-help {
+  color: var(--grey-text);
 }
 
 .credits summary {

@@ -1,6 +1,7 @@
 // Seam: the runner's theme choice + what the system asks for -> the theme on screen, remembered.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeStorage } from "../src/core/theme";
+import { loadThemeChoice, resolveTheme, saveThemeChoice, THEME_KEY, type ThemeStorage } from "../src/core/theme";
 
 function fakeStorage(initial: Record<string, string> = {}): ThemeStorage & { items: Record<string, string> } {
   const items = { ...initial };
@@ -40,5 +41,13 @@ describe("the theme", () => {
     };
     expect(loadThemeChoice(blocked)).toBe("system");
     expect(() => saveThemeChoice(blocked, "dark")).not.toThrow();
+  });
+
+  it("is read before the first paint from the same place it is remembered in", () => {
+    // index.html sets the theme in a few lines of its own, before any of the app has loaded. If
+    // the two ever disagreed about where the choice is kept, a dark screen would flash white.
+    const page = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    expect(page).toContain(`localStorage.getItem("${THEME_KEY}")`);
+    expect(page).toContain("prefers-color-scheme: dark");
   });
 });

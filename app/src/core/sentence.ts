@@ -40,9 +40,14 @@ export function sentenceAt({ bundle, planner, km, units, layerClause }: Sentence
   return [layerClause(readout.km, units), placeClause(bundle.course.landmarks, readout.km, units), sun].filter((clause) => clause !== null);
 }
 
-/** The landmark the runner is at, or the next one if it is close ahead; null when nothing is near. */
+/**
+ * The landmark the runner is at (the nearest one, where two are close: New York's half-marathon
+ * mark is 240 m past the Pulaski Bridge), or the next one if it is close ahead; null when nothing
+ * is near. A landmark is a sourced fact, not a measurement, but the poster has no fifth look for
+ * those (PLAN.md D28): like everything that isn't hearsay, a filled-in value or a sample, it is solid.
+ */
 export function placeClause(landmarks: { name: string; km: number }[], km: number, units: Units): Clause | null {
-  const at = landmarks.find((landmark) => Math.abs(landmark.km - km) <= AT_KM);
+  const at = landmarks.filter((landmark) => Math.abs(landmark.km - km) <= AT_KM).sort((a, b) => Math.abs(a.km - km) - Math.abs(b.km - km))[0];
   if (at) return { text: `${plainName(at.name)}.`, encoding: "measured" };
   const next = landmarks.find((landmark) => landmark.km > km && landmark.km - km <= AHEAD_KM);
   return next ? { text: `${plainName(next.name)} in ${formatNearby(next.km - km, units)}.`, encoding: "measured" } : null;

@@ -5,7 +5,7 @@
 //   solid = measured · hollow = what runners say · grey dashes = not measured here · stripes = sample.
 import { Color, type Entity, type MaterialProperty, PolylineDashMaterialProperty, PolylineOutlineMaterialProperty, type Viewer } from "cesium";
 import type { CourseBundle } from "../bundle/types";
-import { ENCODINGS, type EncodingStyle } from "../core/encoding";
+import { ENCODINGS, type EncodingLook } from "../core/encoding";
 import type { LineMark } from "../core/layers";
 import { nearestIndex } from "../core/series";
 import { linePositions, Z_MARKS } from "./globe";
@@ -17,7 +17,7 @@ const INK = Color.BLACK;
 const PAPER = Color.fromCssColorString("#f4f4f0");
 const GREY = Color.fromCssColorString("#8a8a86");
 
-const MATERIALS: Record<EncodingStyle["mapLine"], () => MaterialProperty> = {
+const MATERIALS: Record<EncodingLook["mapLine"], () => MaterialProperty> = {
   // Ink, with a hairline of paper round it so it still reads on dark imagery.
   solid: () => new PolylineOutlineMaterialProperty({ color: INK, outlineColor: PAPER, outlineWidth: 1 }),
   hollow: () => new PolylineOutlineMaterialProperty({ color: PAPER, outlineColor: INK, outlineWidth: 3 }),
@@ -25,13 +25,14 @@ const MATERIALS: Record<EncodingStyle["mapLine"], () => MaterialProperty> = {
   stripes: () => new PolylineDashMaterialProperty({ color: INK, gapColor: PAPER, dashLength: 28, dashPattern: 0b1111000011110000 }),
 };
 
-let drawn: Entity[] = [];
+/** The marks on each map now, so the next layer's can take their place. */
+const drawn = new WeakMap<Viewer, Entity[]>();
 
 /** Replace whatever marks are on the course line with these. An empty list leaves the plain blue line. */
 export function showLineMarks(viewer: Viewer, bundle: CourseBundle, marks: LineMark[]): void {
-  for (const entity of drawn) viewer.entities.remove(entity);
+  for (const entity of drawn.get(viewer) ?? []) viewer.entities.remove(entity);
   const line = bundle.measured.course_line;
-  drawn = marks.flatMap((mark) => {
+  const entities = marks.flatMap((mark) => {
     const first = nearestIndex(line.km, mark.fromKm);
     const last = nearestIndex(line.km, mark.toKm);
     if (last <= first) return [];
@@ -41,4 +42,5 @@ export function showLineMarks(viewer: Viewer, bundle: CourseBundle, marks: LineM
       }),
     ];
   });
+  drawn.set(viewer, entities);
 }

@@ -7,6 +7,7 @@ import { hillsLayer } from "../src/core/hills-layer";
 import { NO_LAYERS, onScreen, pressLayer } from "../src/core/layers";
 import { createPlanner, defaultPlan, plannerCourse } from "../src/core/planner";
 import { placeClause, sentenceAt, sunClause } from "../src/core/sentence";
+import { sentenceInWords } from "../src/explore/sentence-view";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -79,6 +80,12 @@ describe("the place clause", () => {
     expect(placeClause(landmarks, 25.6, "km")?.text).toBe("First Avenue in 400 m.");
   });
 
+  it("names the nearest landmark when two are close, not the first on the list", () => {
+    // New York's half-marathon mark (km 21.34) is 240 m past the Pulaski Bridge (km 21.1).
+    expect(placeClause(nyc.course.landmarks, 21.34, "km")?.text).toBe("Half marathon.");
+    expect(placeClause(nyc.course.landmarks, 21.15, "km")?.text).toBe("Pulaski Bridge.");
+  });
+
   it("says nothing when nothing is near: an empty stretch is not news", () => {
     expect(placeClause(landmarks, 10, "km")).toBeNull();
     expect(placeClause(landmarks, 30, "km")).toBeNull();
@@ -101,5 +108,17 @@ describe("the sun clause", () => {
   it("says so when the sun is down, instead of giving a side nobody can see", () => {
     expect(sunClause({ altitudeDeg: -3, azimuthDeg: 260 }, 0)).toBe("The sun is down.");
     expect(sunClause({ altitudeDeg: 0, azimuthDeg: 260 }, 0)).toBe("The sun is down.");
+  });
+});
+
+describe("the sentence, said aloud by the strip's slider", () => {
+  it("says what the look shows: that a value is not measured here, that a layer is a sample", () => {
+    const spoken = sentenceInWords([
+      { text: "Downhill 1%.", encoding: "not-measured", note: "A bridge." },
+      { text: "Water in 400 m.", encoding: "sample" },
+      { text: "Sun on your right.", encoding: "measured" },
+    ]);
+
+    expect(spoken).toBe("Downhill 1%. Not measured here. Water in 400 m. (sample) Sun on your right.");
   });
 });

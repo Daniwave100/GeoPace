@@ -45,5 +45,3 @@ export function perFrame(fn: () => void): () => void {
     queued = requestAnimationFrame(fn);
   };
 }
-
-/** A link that opens in a new tab without handing the opener over. */

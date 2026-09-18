@@ -48,10 +48,15 @@ export function formatDistance(km: number, units: Units, digits = 2): string {
   return `${distanceNumber(km, units, digits)} ${units}`;
 }
 
-/** A height, or a climb: "78 m" or "256 ft". Whole numbers: the data is good to about a metre. */
-export function formatHeight(meters: number, units: Units): string {
+/** A height as a bare whole number in the shown unit: the data is good to about a metre. */
+export function heightNumber(meters: number, units: Units): number {
   const value = Math.round(units === "mi" ? metersToFeet(meters) : meters);
-  return `${value === 0 ? 0 : value} ${units === "mi" ? "ft" : "m"}`; // never "-0"
+  return value === 0 ? 0 : value; // never -0
+}
+
+/** A height, or a climb: "78 m" or "256 ft". */
+export function formatHeight(meters: number, units: Units): string {
+  return `${heightNumber(meters, units)} ${heightUnit(units)}`;
 }
 
 /** "m" or "ft": the unit a height scale is labelled in. */

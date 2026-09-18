@@ -3,8 +3,12 @@
 // ones that do something are real buttons the keyboard can reach. Each frame they are moved to
 // where their place on the course is on screen; where two would overprint, the more important
 // one stays (core/declutter.ts) and the other comes back when the runner zooms in.
+//
+// The map's own credits run along its bottom edge (OpenStreetMap's, and Google's in photoreal).
+// No label is ever put there: attributions stay visible (CLAUDE.md).
 import { Cartesian2, Cartesian3, Cartographic, sampleTerrainMostDetailed, SceneTransforms, type Viewer } from "cesium";
 import { keepLabels } from "../core/declutter";
+import { type Encoding, ENCODINGS } from "../core/encoding";
 import { isOverTheHorizon } from "../core/horizon";
 import { html } from "../dom";
 
@@ -12,10 +16,11 @@ export interface MapLabel {
   lat: number;
   lon: number;
   text: string;
-  /** How it is drawn: an encoding's class, or the plain place-name look. */
-  className: string;
+  /** The kind of claim it makes, drawn as everywhere else; or "place" for the start and the finish, which are the course's own. */
+  look: Encoding | "place";
   priority: number;
-  title?: string;
+  /** More, for whoever asks: said by a tooltip, and read out with the label. */
+  note?: string;
   /** Makes it a button. */
   onPick?: () => void;
 }
@@ -34,23 +39,28 @@ interface Placed {
 
 /** How far above its place on the course a label sits, so it doesn't cover the line it names. */
 const LIFT_PX = 12;
+/** The strip along the bottom of the map that belongs to the map's own credits. */
+const CREDITS_BAND_PX = 40;
 
 export function createMapLabels(viewer: Viewer, container: HTMLElement): MapLabels {
   let placed: Placed[] = [];
   let shown = 0;
   const onScreen = new Cartesian2();
+  // The ground's height at each place asked about so far, so switching units or a layer doesn't ask again.
+  const groundHeights = new Map<string, number>();
 
   viewer.scene.postRender.addEventListener(() => {
     if (placed.length === 0) return;
     const eye = viewer.camera.positionWC;
     const radii = viewer.scene.globe.ellipsoid.radii;
-    const view = { width: container.clientWidth, height: container.clientHeight };
+    const view = { width: container.clientWidth, height: container.clientHeight - CREDITS_BAND_PX };
     const boxes = placed.map((item) => {
       const at = !isOverTheHorizon(eye, item.position, radii) ? SceneTransforms.worldToWindowCoordinates(viewer.scene, item.position, onScreen) : undefined;
       if (!at) return null;
       const left = at.x - item.width / 2;
       const top = at.y - item.height - LIFT_PX;
-      const inView = left + item.width > 0 && left < view.width && top + item.height > 0 && top < view.height;
+      // Wholly on the map, and wholly above the credits: a label is never half off an edge.
+      const inView = left >= 0 && left + item.width <= view.width && top >= 0 && top + item.height <= view.height;
       return inView ? { left, top, width: item.width, height: item.height, priority: item.label.priority } : null;
     });
     const candidates = boxes.flatMap((box, index) => (box ? [{ box, index }] : []));
@@ -63,26 +73,49 @@ export function createMapLabels(viewer: Viewer, container: HTMLElement): MapLabe
     });
   });
 
+  const measure = () => {
+    for (const item of placed) {
+      // Measured while hidden would be zero: shown for the one reading, before the browser paints.
+      const wasHidden = item.node.hidden;
+      item.node.hidden = false;
+      item.width = item.node.offsetWidth;
+      item.height = item.node.offsetHeight;
+      item.node.hidden = wasHidden;
+    }
+  };
+  // The web font arrives after the first labels are made, and changes how wide each one is.
+  void document.fonts?.ready.then(measure);
+
   return {
     show(labels) {
       const mine = ++shown;
       placed = labels.map((label) => {
-        const node = label.onPick ? html("button", { type: "button", class: `map-label ${label.className}`, title: label.title, text: label.text }) : html("span", { class: `map-label ${label.className}`, title: label.title, text: label.text });
-        if (label.onPick) node.addEventListener("click", label.onPick);
+        const node = labelNode(label);
         node.hidden = true; // until the next frame says where it goes
-        return { label, node, position: Cartesian3.fromDegrees(label.lon, label.lat), width: 0, height: 0 };
+        const ground = groundHeights.get(placeKey(label)) ?? 0;
+        return { label, node, position: Cartesian3.fromDegrees(label.lon, label.lat, ground), width: 0, height: 0 };
       });
       container.replaceChildren(...placed.map((item) => item.node));
-      for (const item of placed) {
-        // Measured while hidden would be zero: show it off-screen for the one reading.
-        item.node.hidden = false;
-        item.width = item.node.offsetWidth;
-        item.height = item.node.offsetHeight;
-        item.node.hidden = true;
-      }
-      void liftOntoTheGround(viewer, placed, () => mine === shown);
+      measure();
+      void liftOntoTheGround(viewer, placed, groundHeights, () => mine === shown);
     },
   };
+}
+
+function labelNode(label: MapLabel): HTMLElement {
+  const look = label.look === "place" ? undefined : ENCODINGS[label.look];
+  const node = html(label.onPick ? "button" : "span", { class: `map-label ${look ? look.cssClass : "map-label-place"}`, title: label.note });
+  if (node instanceof HTMLButtonElement) node.type = "button";
+  // Not measured: struck through, with the words that say so left standing, as in the sentence.
+  node.append(label.look === "not-measured" ? html("s", { text: label.text }) : label.text);
+  if (look?.saidAfter) node.append(` ${look.saidAfter}`);
+  if (label.note) node.append(html("span", { class: "visually-hidden", text: ` ${label.note}` }));
+  if (label.onPick) node.addEventListener("click", label.onPick);
+  return node;
+}
+
+function placeKey(label: Pick<MapLabel, "lat" | "lon">): string {
+  return `${label.lat.toFixed(6)},${label.lon.toFixed(6)}`;
 }
 
 /**
@@ -90,16 +123,18 @@ export function createMapLabels(viewer: Viewer, container: HTMLElement): MapLabe
  * road. The open terrain says how high the ground is there; never the photoreal imagery, which is
  * for looking at only (PLAN.md D5). If the terrain can't say, the labels stay where they are.
  */
-async function liftOntoTheGround(viewer: Viewer, placed: Placed[], stillWanted: () => boolean): Promise<void> {
-  if (placed.length === 0) return;
+async function liftOntoTheGround(viewer: Viewer, placed: Placed[], known: Map<string, number>, stillWanted: () => boolean): Promise<void> {
+  const unknown = placed.filter((item) => !known.has(placeKey(item.label)));
+  if (unknown.length === 0) return;
   try {
     const ground = await sampleTerrainMostDetailed(
       viewer.terrainProvider,
-      placed.map((item) => Cartographic.fromDegrees(item.label.lon, item.label.lat)),
+      unknown.map((item) => Cartographic.fromDegrees(item.label.lon, item.label.lat)),
     );
-    if (!stillWanted()) return;
-    placed.forEach((item, i) => {
-      if (Number.isFinite(ground[i].height)) item.position = Cartesian3.fromDegrees(item.label.lon, item.label.lat, ground[i].height);
+    unknown.forEach((item, i) => {
+      if (!Number.isFinite(ground[i].height)) return;
+      known.set(placeKey(item.label), ground[i].height);
+      if (stillWanted()) item.position = Cartesian3.fromDegrees(item.label.lon, item.label.lat, ground[i].height);
     });
   } catch {
     // The terrain is best-effort (PLAN.md D16).

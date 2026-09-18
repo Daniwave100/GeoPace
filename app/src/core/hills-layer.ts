@@ -1,14 +1,14 @@
 // Hills, as a layer: the first one the layer system ships with (#6). Its rows on the strip are
 // the grade and the effort a grade costs; its marks on the map are the climbs and descents a
-// runner would call a hill; its clause says what the road is doing underfoot. The height profile
-// itself is the strip's own base row (`heightRow`), there whether or not Hills is on.
+// runner would call a hill; its clause says what the road is doing underfoot. The height itself is
+// the strip's own base row (`heightRow`), there whether or not Hills is on.
 //
 // All of it is measured (solid), except where the Course Bundle says the height is filled in:
 // those stretches come out as not measured here, on every surface.
 import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
 import { type HillBin, hillBins, hillsAt, type HillStretch, hillStretches } from "./hills";
-import type { Layer, LineMark, RowBin, StripRow } from "./layers";
-import { formatHeight, formatNearby, heightUnit, metersToFeet, type Units } from "./units";
+import type { Layer, LineMark, MarkLabel, RowBin, StripRow } from "./layers";
+import { formatHeight, formatNearby, heightNumber, heightUnit } from "./units";
 
 /** Below this, a runner calls the road flat. Half a percent is 5 m of height in a kilometre. */
 const FLAT_BELOW_PERCENT = 0.5;
@@ -34,7 +34,7 @@ export function hillsLayer(bundle: CourseBundle): Layer {
     stepped: false,
     valueAt(km) {
       const at = hillsAt(bundle, km);
-      return { text: `${signed(at.gradePercent)}%`, notMeasured: at.notMeasured !== null, note: at.notMeasured ?? undefined };
+      return { text: `${signed(at.gradePercent)}%`, notMeasured: at.notMeasured };
     },
   };
 
@@ -51,16 +51,27 @@ export function hillsLayer(bundle: CourseBundle): Layer {
     valueAt(km) {
       const at = hillsAt(bundle, km);
       // Outside the model's range there is no number to give, which is its own kind of "not known".
-      if (at.difficulty === null) return { text: "no number", notMeasured: true, note: bundle.measured.difficulty_model.description };
-      return { text: `${signed((at.difficulty - 1) * 100, 0)}%`, notMeasured: at.notMeasured !== null, note: at.notMeasured ?? undefined };
+      if (at.difficulty === null) return { text: "no number", notMeasured: `The grade here is outside the range the effort model was measured over. ${bundle.measured.difficulty_model.description}` };
+      return { text: `${signed((at.difficulty - 1) * 100, 0)}%`, notMeasured: at.notMeasured };
     },
   };
+
+  // Worked out once: the climbs and descents don't change while a course is on screen.
+  const hills = hillStretches(bundle);
+  // With Hills on, every stretch whose height is filled in is greyed on the course line, hill or
+  // not: the strip and the sentence grey all of them, and the map must not say less than they do.
+  const marks: LineMark[] = [
+    ...hills.flatMap((hill) => measuredPieces(hill, gaps)),
+    ...gaps.map((gap): LineMark => ({ fromKm: gap.km_start, toKm: gap.km_end, encoding: "not-measured" })),
+  ].sort((a, b) => a.fromKm - b.fromKm);
+  const labels = hills.map((hill) => hillLabel(hill, gaps));
 
   return {
     id: "hills",
     name: "Hills",
     rows: () => [gradeRow, effortRow],
-    lineMarks: () => hillStretches(bundle).flatMap((hill) => marksFor(hill, gaps)),
+    lineMarks: () => marks,
+    lineLabels: () => labels,
     clause(km) {
       const at = hillsAt(bundle, km);
       const percent = Math.round(Math.abs(at.gradePercent));
@@ -74,12 +85,11 @@ export function hillsLayer(bundle: CourseBundle): Layer {
 export function heightRow(bundle: CourseBundle): StripRow {
   const { min_m, max_m, gain_m, loss_m } = bundle.measured.elevation_summary;
   const binned = memoBins(bundle);
-  const shown = (meters: number, units: Units) => Math.round(units === "mi" ? metersToFeet(meters) : meters);
   return {
     id: "height",
     name: "Height",
     encoding: "measured",
-    scale: (units) => `${heightUnit(units)}, ${shown(min_m, units)} to ${shown(max_m, units)}`,
+    scale: (units) => `${heightUnit(units)}, ${heightNumber(min_m, units)} to ${heightNumber(max_m, units)}`,
     // Every rise and every drop along the course added up: what "a hilly course" means in one number.
     summary: (units) => `up ${formatHeight(gain_m, units)}, down ${formatHeight(loss_m, units)}`,
     bins: (count) => binned(count).map((bin) => rowBin(bin, bin.elevationM)),
@@ -90,7 +100,7 @@ export function heightRow(bundle: CourseBundle): StripRow {
     stepped: false,
     valueAt(km, units) {
       const at = hillsAt(bundle, km);
-      return { text: formatHeight(at.elevationM, units), notMeasured: at.notMeasured !== null, note: at.notMeasured ?? undefined };
+      return { text: formatHeight(at.elevationM, units), notMeasured: at.notMeasured };
     },
   };
 }
@@ -108,29 +118,32 @@ function memoBins(bundle: CourseBundle): (count: number) => HillBin[] {
   };
 }
 
-/**
- * One hill as pieces of course line: solid where its height is measured, not measured where it
- * is filled in. The hill's one label goes on its first measured piece (or its only piece).
- */
-function marksFor(hill: HillStretch, gaps: NotMeasuredSpan[]): LineMark[] {
-  const cuts = gaps.filter((gap) => gap.km_start < hill.toKm && gap.km_end > hill.fromKm);
+/** The parts of a hill whose height is measured: the hill, with every filled-in stretch cut out of it. */
+function measuredPieces(hill: HillStretch, gaps: NotMeasuredSpan[]): LineMark[] {
   const pieces: LineMark[] = [];
   let reached = hill.fromKm;
-  for (const gap of cuts) {
+  for (const gap of gaps.filter((candidate) => candidate.km_start < hill.toKm && candidate.km_end > hill.fromKm)) {
     if (gap.km_start > reached) pieces.push({ fromKm: reached, toKm: gap.km_start, encoding: "measured" });
-    pieces.push({ fromKm: Math.max(gap.km_start, reached), toKm: Math.min(gap.km_end, hill.toKm), encoding: "not-measured" });
-    reached = Math.min(gap.km_end, hill.toKm);
+    reached = Math.max(reached, Math.min(gap.km_end, hill.toKm));
   }
   if (reached < hill.toKm) pieces.push({ fromKm: reached, toKm: hill.toKm, encoding: "measured" });
+  return pieces;
+}
 
-  const labelled = pieces.find((piece) => piece.encoding === "measured") ?? pieces[0];
-  labelled.label = {
+/**
+ * One label for the whole hill. It says what kind of claim the hill is: not measured if most of
+ * its height is filled in, and otherwise measured, with a note if part of it is.
+ */
+function hillLabel(hill: HillStretch, gaps: NotMeasuredSpan[]): MarkLabel {
+  const filledIn = gaps.find((gap) => gap.km_start < hill.toKm && gap.km_end > hill.fromKm);
+  return {
+    encoding: hill.notMeasuredKm > (hill.toKm - hill.fromKm) / 2 ? "not-measured" : "measured",
+    note: filledIn ? `Part of this hill is not measured. ${filledIn.reason}` : undefined,
     atKm: (hill.fromKm + hill.toKm) / 2,
     startKm: hill.fromKm,
     text: (units) => `${hill.kind === "climb" ? "Up" : "Down"} ${Math.abs(hill.meanGradePercent).toFixed(1)}% · ${formatNearby(hill.toKm - hill.fromKm, units)}`,
     priority: Math.abs(hill.gainM),
   };
-  return pieces;
 }
 
 /** "+3.4", "−1.1", and a plain "0.0" for level ground: no sign on nothing. */

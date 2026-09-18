@@ -3,9 +3,8 @@ import "./style.css";
 import { browserStorage } from "./browser-storage";
 import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
-import { type Encoding, ENCODINGS } from "./core/encoding";
 import { heightRow, hillsLayer } from "./core/hills-layer";
-import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
+import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
 import { positionAtKm } from "./core/scrub";
@@ -15,19 +14,19 @@ import { distanceNumber, type Units, unitName } from "./core/units";
 import { COURSES, courseFromUrl, urlForCourse } from "./courses";
 import { html, link } from "./dom";
 import { createLayerBar } from "./explore/layer-bar";
-import { createMapControls } from "./explore/map-controls";
+import { createMapControls, MAP_HELP } from "./explore/map-controls";
 import { createPlanSummary } from "./explore/plan-summary";
 import { createReadout } from "./explore/readout";
 import { createSentence, sentenceInWords } from "./explore/sentence-view";
 import { renderSources } from "./explore/sources";
 import { createSwitches } from "./explore/switches";
 import { createPhotoreal, type Photoreal } from "./photoreal/photoreal";
-import { createPhotorealPanel } from "./photoreal/photoreal-panel";
+import { createPhotorealPanel, type PhotorealPanel } from "./photoreal/photoreal-panel";
 import { createPlanPanel } from "./plan/plan-panel";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showLineMarks } from "./scene/course-marks";
-import { createGlobe, frameCourse, goTo, showCourse, showRunner, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isStillFramed, showCourse, showRunner, watchCameraHeight } from "./scene/globe";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
@@ -40,10 +39,17 @@ interface Showing {
   course: PlannerCourse;
   planner: Planner;
   km: number;
-  /** The layers that exist for this course. Later tickets add theirs here (PLAN.md D35). */
+  /** The layers that exist for this course: the one list a later ticket adds its layer to (PLAN.md D35, D47). */
   layers: Layer[];
+  /** What those layers put on screen for the switches as they are now. Worked out when a switch is pressed, not on every scrub. */
+  screen: OnScreen;
   /** The strip's own row, there whatever the layers are doing. */
   baseRow: StripRow;
+}
+
+/** The layers a course has. Each later ticket adds its own here, and gets its switch, its rows, its marks and its clause. */
+function layersFor(bundle: CourseBundle): Layer[] {
+  return [hillsLayer(bundle)];
 }
 
 const storage = browserStorage();
@@ -56,6 +62,7 @@ let layerState: LayerState = NO_LAYERS;
 let viewer: Viewer | undefined;
 let mapLabels: MapLabels | undefined;
 let photoreal: Photoreal | undefined;
+let photorealPanel: PhotorealPanel | undefined;
 let showing: Showing | undefined;
 let loading = "";
 
@@ -67,7 +74,7 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
   scrubTo(km);
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
-const layerBar = createLayerBar(byId("layers"), [{ id: "hills", name: "Hills" }], (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
+const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
 const strip = createStrip(byId("strip"), scrubTo);
 const readoutView = createReadout(byId("readout"));
 const sentenceView = createSentence(byId("sentence"));
@@ -117,7 +124,8 @@ async function show(courseId: string): Promise<void> {
   photoreal ??= startPhotoreal(viewer);
 
   const course = plannerCourse(bundle);
-  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers: [hillsLayer(bundle)], baseRow: heightRow(bundle) };
+  const layers = layersFor(bundle);
+  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle) };
   showPlan();
   // Framed last: the strip has just taken its height, and the map is whatever is left.
   frameWholeCourse(0);
@@ -150,12 +158,17 @@ function showTheme(): void {
 
 function useLayers(next: LayerState): void {
   layerState = next;
+  const untouched = viewer !== undefined && isStillFramed(viewer);
   showLayers();
+  // The strip has just changed height, and the map with it. If the runner hasn't moved the map,
+  // fit the whole course into its new shape; if they have, it is theirs and stays where it is.
+  if (untouched) requestAnimationFrame(() => frameWholeCourse(0));
 }
 
 function showPlan(): void {
   if (!showing) return;
   switches.show(units, themeChoice);
+  photorealPanel?.showUnits(units);
   planSummary.show(showing.planner, units);
   planPanel.show(showing.course, showing.planner, units);
   splitsTable.show(showing.planner, units);
@@ -169,8 +182,8 @@ function showPlan(): void {
 function showLayers(): void {
   if (!showing || !viewer || !mapLabels) return;
   const { bundle, baseRow, layers } = showing;
-  const screen = onScreen(layerState, layers);
-  layerBar.show(layerState);
+  const screen = (showing.screen = onScreen(layerState, layers));
+  layerBar.show(layerState, layers);
   strip.show({
     lengthKm: showing.planner.lengthKm,
     landmarks: bundle.course.landmarks,
@@ -181,20 +194,20 @@ function showLayers(): void {
     units,
   });
   showLineMarks(viewer, bundle, screen.lineMarks);
-  mapLabels.show([...endLabels(bundle), ...screen.lineMarks.flatMap((mark) => (mark.label ? [markLabel(bundle, mark.encoding, mark.label)] : []))]);
+  mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))]);
   scrubTo(showing.km);
 }
 
 function endLabels(bundle: CourseBundle): MapLabel[] {
   const line = bundle.measured.course_line;
   const last = line.km.length - 1;
-  const place = (text: string, i: number): MapLabel => ({ lat: line.lat[i], lon: line.lon[i], text, className: "map-label-place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
+  const place = (text: string, i: number): MapLabel => ({ lat: line.lat[i], lon: line.lon[i], text, look: "place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
   return [place("Start", 0), place("Finish", last)];
 }
 
-function markLabel(bundle: CourseBundle, encoding: Encoding, label: MarkLabel): MapLabel {
+function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
   const at = positionAtKm(bundle.measured.course_line, label.atKm);
-  return { lat: at.lat, lon: at.lon, text: label.text(units), className: ENCODINGS[encoding].cssClass, priority: label.priority, onPick: () => scrubTo(label.startKm) };
+  return { lat: at.lat, lon: at.lon, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
 }
 
 /** Scrubbing: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */
@@ -204,7 +217,7 @@ function scrubTo(km: number): void {
   const readout = planner.at(km);
   showing.km = readout.km;
   const place = positionAtKm(bundle.measured.course_line, readout.km);
-  const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: onScreen(layerState, showing.layers).clause });
+  const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: showing.screen.clause });
 
   // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
   const carriedOver = planner.carriedOver ? `, from the ${planner.carriedOver.fromEdition} start time, carried over` : "";
@@ -238,7 +251,8 @@ function frameWholeCourse(seconds: number): void {
  */
 function startPhotoreal(globe: Viewer): Photoreal {
   const controller = createPhotoreal({ storage, loadTiles: (key) => loadPhotorealTiles(globe, key) });
-  const panel = createPhotorealPanel(byId("photoreal"), controller);
+  const panel = (photorealPanel = createPhotorealPanel(byId("photoreal"), controller));
+  panel.showUnits(units);
   // The camera's height is only wanted, and only asked of the terrain service, while photoreal is showing.
   let stopWatchingHeight: (() => void) | undefined;
   controller.onChange((state) => {
@@ -255,6 +269,7 @@ function startPhotoreal(globe: Viewer): Photoreal {
 }
 
 function renderAttributions(bundle: CourseBundle): void {
+  byId("map-help").textContent = `The map: ${MAP_HELP}`;
   const list = byId("attributions");
   list.replaceChildren();
   for (const { text, url } of [...bundle.attributions, ...PROVIDER_ATTRIBUTIONS]) {

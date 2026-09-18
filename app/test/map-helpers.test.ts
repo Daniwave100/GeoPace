@@ -24,7 +24,7 @@ describe("labels that would overprint each other", () => {
 });
 
 describe("framing the course beside the readout block", () => {
-  const view = { rangeM: 50_000, fovRad: Math.PI / 3, viewWidthPx: 1600 };
+  const view = { rangeM: 50_000, fovRad: Math.PI / 3, viewWidthPx: 1600, viewHeightPx: 600 };
 
   it("doesn't move the camera when nothing covers the map", () => {
     expect(sidewaysShiftM({ ...view, coveredLeftPx: 0 })).toBe(0);

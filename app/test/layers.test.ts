@@ -14,7 +14,7 @@ const nyc = bundleFor("nyc");
 const berlin = bundleFor("berlin");
 
 /** A stand-in for a layer a later ticket will add, to show the system isn't built around Hills. */
-const sun: Layer = { id: "sun", name: "Sun", rows: () => [], lineMarks: () => [], clause: () => ({ text: "In the sun for 55 to 80% of this stretch.", encoding: "measured" }) };
+const sun: Layer = { id: "sun", name: "Sun", rows: () => [], lineMarks: () => [], lineLabels: () => [], clause: () => ({ text: "In the sun for 55 to 80% of this stretch.", encoding: "measured" }) };
 
 describe("the layer switches", () => {
   it("start with nothing on: the first screen shows little", () => {
@@ -47,6 +47,7 @@ describe("what a layer puts on screen", () => {
     const screen = onScreen(NO_LAYERS, layers);
     expect(screen.rows).toEqual([]);
     expect(screen.lineMarks).toEqual([]);
+    expect(screen.lineLabels).toEqual([]);
     expect(screen.clause(24.5, "km")).toBeNull();
   });
 
@@ -55,13 +56,14 @@ describe("what a layer puts on screen", () => {
 
     expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort"]);
     expect(screen.lineMarks.length).toBeGreaterThan(10);
+    expect(screen.lineLabels.length).toBeGreaterThan(10);
     expect(screen.clause(24.5, "km")?.text).toBe("Climbing 4%.");
   });
 
   it("is none of the three again once Hills is switched off", () => {
     const off = pressLayer(pressLayer(NO_LAYERS, "hills"), "hills");
     const screen = onScreen(off, layers);
-    expect([screen.rows, screen.lineMarks, screen.clause(24.5, "km")]).toEqual([[], [], null]);
+    expect([screen.rows, screen.lineMarks, screen.lineLabels, screen.clause(24.5, "km")]).toEqual([[], [], [], null]);
   });
 
   it("shows only the layer that is on", () => {
@@ -90,33 +92,44 @@ describe("the Hills layer", () => {
     expect(grade.scale("km")).toMatch(/^%, −\d\.\d to \+\d\.\d$/);
   });
 
-  it("marks each climb and descent on the course line, solid where measured", () => {
-    const marks = hills.lineMarks();
-    const queensboro = marks.find((mark) => mark.label && mark.fromKm > 23 && mark.fromKm < 24);
+  it("marks each climb and descent on the course line, solid where measured, with one label per hill", () => {
+    const queensboroClimb = hills.lineMarks().find((mark) => mark.fromKm > 23 && mark.fromKm < 24);
+    const label = hills.lineLabels().find((candidate) => candidate.startKm > 23 && candidate.startKm < 24);
 
-    expect(queensboro?.encoding).toBe("measured");
-    expect(queensboro?.label?.text("km")).toBe("Up 3.0% · 1.3 km");
-    expect(queensboro?.label?.text("mi")).toBe("Up 3.0% · 0.8 mi");
+    expect(queensboroClimb?.encoding).toBe("measured");
+    expect(label?.encoding).toBe("measured");
+    expect(label?.text("km")).toBe("Up 3.0% · 1.3 km");
+    expect(label?.text("mi")).toBe("Up 3.0% · 0.8 mi");
     // The biggest hill wins the room when labels collide: down off the Verrazzano, 61 m.
-    const labelled = marks.filter((mark) => mark.label);
-    const first = labelled.reduce((best, mark) => ((mark.label?.priority ?? 0) > (best.label?.priority ?? 0) ? mark : best));
-    expect(first.label?.text("km")).toBe("Down 3.2% · 2.0 km");
-    expect(first.toKm).toBeLessThan(3);
-    // One label per hill, however many pieces the line is cut into.
-    expect(labelled).toHaveLength(28);
+    const first = hills.lineLabels().reduce((best, candidate) => (candidate.priority > best.priority ? candidate : best));
+    expect(first.text("km")).toBe("Down 3.2% · 2.0 km");
+    expect(first.startKm).toBeLessThan(1);
+    // One label per hill, however many pieces its line is cut into.
+    expect(hills.lineLabels()).toHaveLength(28);
   });
 
-  it("draws the part of a hill that rests on filled-in height as not measured, on the map as in the text", () => {
-    const marks = hills.lineMarks();
-    const overTheGap = marks.filter((mark) => mark.encoding === "not-measured" && mark.toKm < 2);
+  it("greys every stretch that is not measured on the map, whether or not a hill runs over it", () => {
+    // The map must not say less than the strip and the sentence do: they grey all of them.
+    for (const bundle of [nyc, berlin]) {
+      const greyed = hillsLayer(bundle).lineMarks().filter((mark) => mark.encoding === "not-measured");
+      expect(greyed.map((mark) => [mark.fromKm, mark.toKm])).toEqual(bundle.measured.elevation_not_measured.map((gap) => [gap.km_start, gap.km_end]));
+    }
+    // Berlin has two hills and ten short bridges; none of the bridges is on a hill.
+    expect(hillsLayer(berlin).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(10);
+  });
 
-    // The Verrazzano's unscanned main span (km 0.77-1.36) is cut out of the hills either side of it.
-    expect(overTheGap.length).toBeGreaterThan(0);
-    expect(Math.min(...overTheGap.map((mark) => mark.fromKm))).toBeGreaterThanOrEqual(0.77);
-    expect(Math.max(...overTheGap.map((mark) => mark.toKm))).toBeLessThanOrEqual(1.36);
+  it("never draws a filled-in stretch as measured: the solid pieces stop where the gaps begin", () => {
+    const gaps = nyc.measured.elevation_not_measured;
+    for (const solid of hills.lineMarks().filter((mark) => mark.encoding === "measured")) {
+      for (const gap of gaps) expect(Math.min(solid.toKm, gap.km_end) - Math.max(solid.fromKm, gap.km_start), `solid ${solid.fromKm}-${solid.toKm} over the gap at ${gap.km_start}`).toBeLessThanOrEqual(0);
+    }
+    // The hill down off the Verrazzano starts inside the unscanned span: its label says part of it isn't measured.
+    const verrazzanoDescent = hills.lineLabels().find((candidate) => candidate.text("km").startsWith("Down") && candidate.startKm < 1);
+    expect(verrazzanoDescent?.note).toMatch(/^Part of this hill is not measured\. Verrazzano/);
     expect(hills.clause(1.0, "km")).toMatchObject({ encoding: "not-measured" });
     expect(hills.clause(1.0, "km")?.note).toMatch(/Verrazzano/);
-    expect(hills.rows()[0].valueAt(1.0, "km").notMeasured).toBe(true);
+    expect(hills.rows()[0].valueAt(1.0, "km").notMeasured).toMatch(/Verrazzano.*straight line/);
+    expect(hills.rows()[0].valueAt(5.0, "km").notMeasured).toBeNull();
   });
 
   it("calls a road flat when a runner would, and puts no sign on a grade of nothing", () => {
@@ -139,9 +152,10 @@ describe("the strip's own row, the height", () => {
     expect(height.scale("mi")).toBe("ft, 8 to 256");
     expect(height.summary?.("km")).toBe("up 262 m, down 293 m");
     expect(height.summary?.("mi")).toBe("up 860 ft, down 962 ft");
-    expect(height.valueAt(0, "km")).toMatchObject({ text: "56 m", notMeasured: false });
-    // The crest of the Verrazzano is a straight line between measured heights: struck through.
-    expect(height.valueAt(1.0, "mi")).toMatchObject({ text: "250 ft", notMeasured: true }); // 76.2 m
+    expect(height.valueAt(0, "km")).toEqual({ text: "56 m", notMeasured: null });
+    // The crest of the Verrazzano is a straight line between measured heights: struck through, with the reason.
+    expect(height.valueAt(1.0, "mi").text).toBe("250 ft"); // 76.2 m
+    expect(height.valueAt(1.0, "mi").notMeasured).toMatch(/Verrazzano/);
   });
 });
 
@@ -158,11 +172,19 @@ describe("the four encodings", () => {
     expect(new Set(all.map((encoding) => ENCODINGS[encoding].mapLine)).size).toBe(4);
   });
 
-  it("are drawn by one class each, which the stylesheet defines for strip marks and for words", () => {
+  it("are drawn by one class each, which the stylesheet defines for every surface: words, strip marks and map labels", () => {
     for (const encoding of all) {
       const name = ENCODINGS[encoding].cssClass;
-      expect(css, `${name} on the strip`).toContain(`svg .${name}`);
-      expect(css, `${name} in text`).toContain(`.${name}`);
+      // Each its own rule, at the start of a line: `svg .enc-x` must not count as the rule for words.
+      expect(css, `${name} in words`).toMatch(new RegExp(`^\\.${name}[ ,{]`, "m"));
+      expect(css, `${name} on the strip`).toMatch(new RegExp(`^svg \\.${name}[ ,.{]`, "m"));
+      expect(css, `${name} on a map label`).toMatch(new RegExp(`^\\.map-label\\.${name}[ ,{]`, "m"));
     }
+  });
+
+  it("say in words what a reader who can't rely on the look needs to hear", () => {
+    expect(ENCODINGS["not-measured"].saidAfter).toBe("Not measured here.");
+    expect(ENCODINGS.sample.saidAfter).toBe("(sample)");
+    expect(ENCODINGS.measured.saidAfter).toBe("");
   });
 });

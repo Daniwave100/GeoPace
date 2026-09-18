@@ -11,6 +11,7 @@
 //   - when photoreal is showing, it says the imagery's shadows are illustrative (D4);
 //   - when the imagery can't be had, it says why in words a runner can act on, and says it to a
 //     screen reader too.
+import { formatHeight, type Units } from "../core/units";
 import { html, link, sourceLink } from "../dom";
 import { KEY_PROVIDERS, type KeyProvider, type OwnKey, recognizeKey } from "./key";
 import type { Photoreal, PhotorealProblem, PhotorealState } from "./photoreal";
@@ -20,6 +21,8 @@ export interface PhotorealPanel {
   show(state: PhotorealState): void;
   /** How high the camera is above the ground, for judging how low the imagery holds up (PLAN.md D33). Null when unknown. */
   showCameraHeight(meters: number | null): void;
+  /** Metres or feet for that height: whichever goes with the runner's kilometres or miles. */
+  showUnits(units: Units): void;
 }
 
 const NOT_A_KEY =
@@ -29,6 +32,8 @@ const CAMERA_HEIGHT_CAVEAT = "Measured from open terrain data, not from the imag
 
 export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Photoreal, "useKey" | "turnOn" | "turnOff" | "forgetKey">): PhotorealPanel {
   let state: PhotorealState | undefined;
+  let units: Units = "km";
+  let cameraMeters: number | null = null;
 
   // On the map. The main button is never truly disabled: a disabled button drops the keyboard's
   // focus on the floor. While photoreal loads it says so and ignores presses instead.
@@ -109,6 +114,10 @@ export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Pho
     void photoreal.useKey(pasted);
   });
 
+  function showHeight(): void {
+    cameraHeight.textContent = cameraMeters === null ? "" : `Camera: about ${formatHeight(Math.max(0, cameraMeters), units)} above the ground.`;
+  }
+
   function openPanel(): void {
     error.textContent = "";
     if (!dialog.open) dialog.showModal();
@@ -142,7 +151,12 @@ export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Pho
       forget.hidden = key === null;
     },
     showCameraHeight(meters) {
-      cameraHeight.textContent = meters === null ? "" : `Camera: about ${Math.max(0, Math.round(meters))} m above the ground.`;
+      cameraMeters = meters;
+      showHeight();
+    },
+    showUnits(next) {
+      units = next;
+      showHeight();
     },
   };
 }

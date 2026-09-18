@@ -8,6 +8,7 @@
 import {
   BoundingSphere,
   Cartesian3,
+  Cartesian4,
   Cartographic,
   CesiumTerrainProvider,
   Color,
@@ -20,11 +21,13 @@ import {
   Ion,
   JulianDate,
   Math as CesiumMath,
+  Matrix4,
   OpenStreetMapImageryProvider,
   PerspectiveFrustum,
   PolylineOutlineMaterialProperty,
   sampleTerrainMostDetailed,
   Terrain,
+  Transforms,
   Viewer,
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -44,8 +47,10 @@ const EARTH_RADIUS_M = 6_371_000;
 /** How far down the camera looks when it frames the course: from above, tilted enough that the city reads as 3D. */
 const CAMERA_TILT_RAD = CesiumMath.toRadians(60);
 
-/** What is drawn for the course on screen now, so the next course can take its place. */
-let courseEntities: Entity[] = [];
+/** What is drawn for the course on each map now, so the next course can take its place. */
+const courseEntities = new WeakMap<Viewer, Entity[]>();
+/** Where the camera was left by the last framing of the whole course, to tell whether the runner has moved the map since. */
+const framedFrom = new WeakMap<Viewer, Cartesian3>();
 
 /** The viewer is made once; switching course only swaps what is drawn on it. */
 export function createGlobe(container: HTMLElement): Viewer {
@@ -103,7 +108,7 @@ export function showRunner(viewer: Viewer, place: RoadPosition, instant: Date): 
       position,
       point: {
         pixelSize: 18,
-        color: Color.fromCssColorString("#1546ff"),
+        color: Color.fromCssColorString(COURSE_BLUE),
         outlineColor: Color.WHITE,
         outlineWidth: 3,
         heightReference: HeightReference.CLAMP_TO_GROUND,
@@ -117,9 +122,9 @@ export function showRunner(viewer: Viewer, place: RoadPosition, instant: Date): 
 /** Draw one course: the blue line on the ground, and a dot at its start and its finish. */
 export function showCourse(viewer: Viewer, bundle: CourseBundle): void {
   const line = bundle.measured.course_line;
-  for (const entity of courseEntities) viewer.entities.remove(entity);
+  for (const entity of courseEntities.get(viewer) ?? []) viewer.entities.remove(entity);
   const last = line.km.length - 1;
-  courseEntities = [
+  courseEntities.set(viewer, [
     viewer.entities.add({
       name: `${bundle.course.name} course`,
       polyline: {
@@ -133,7 +138,7 @@ export function showCourse(viewer: Viewer, bundle: CourseBundle): void {
     }),
     endDot(viewer, line.lat[0], line.lon[0]),
     endDot(viewer, line.lat[last], line.lon[last]),
-  ];
+  ]);
 }
 
 /** The course line's positions between two of its samples, for drawing a stretch of it. */
@@ -159,11 +164,26 @@ export function frameCourse(viewer: Viewer, line: CourseLine, coveredLeftPx: num
   const sphere = BoundingSphere.fromPoints(line.lat.map((lat, i) => Cartesian3.fromDegrees(line.lon[i], lat)));
   const view = { fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx };
   const rangeM = rangeToFitM({ ...view, radiusM: sphere.radius, tiltRad: CAMERA_TILT_RAD });
-  viewer.camera.flyToBoundingSphere(sphere, {
+  // The camera faces north, so the course's left is west: aim that far west of its middle, and the
+  // course lands in the clear part of the map. Aimed there from the start, a flight ends where it
+  // should, with no jump sideways at the end.
+  const east = Matrix4.getColumn(Transforms.eastNorthUpToFixedFrame(sphere.center), 0, new Cartesian4());
+  const west = Cartesian3.multiplyByScalar(new Cartesian3(east.x, east.y, east.z), -sidewaysShiftM({ ...view, rangeM }), new Cartesian3());
+  viewer.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.add(sphere.center, west, new Cartesian3()), sphere.radius), {
     offset: new HeadingPitchRange(0, -CAMERA_TILT_RAD, rangeM),
     duration: seconds,
-    complete: () => viewer.camera.moveLeft(sidewaysShiftM({ ...view, rangeM })),
+    complete: () => framedFrom.set(viewer, Cartesian3.clone(viewer.camera.positionWC)),
   });
+}
+
+/**
+ * Whether the map is still as the last framing of the whole course left it. If it is, a change in
+ * the map's size (the strip opening) can frame the course again; if the runner has moved the map,
+ * it is theirs, and is left alone.
+ */
+export function isStillFramed(viewer: Viewer): boolean {
+  const from = framedFrom.get(viewer);
+  return from !== undefined && Cartesian3.equalsEpsilon(from, viewer.camera.positionWC, 0, 0.5);
 }
 
 function horizontalFov(viewer: Viewer): number {

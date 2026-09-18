@@ -6,6 +6,7 @@ import type { Viewer } from "cesium";
 import { html } from "../dom";
 import { panMap, zoomMap } from "../scene/globe";
 
+/** Said by a screen reader on the map, and printed in the small print under the strip. */
 export const MAP_HELP = "Drag to move, scroll to zoom, Ctrl + drag to tilt. With the keyboard: arrow keys move, plus and minus zoom.";
 
 export function createMapControls(container: HTMLElement, map: HTMLElement, viewer: Viewer, onWholeCourse: () => void, onWhereIAm: () => void): void {
@@ -23,7 +24,6 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
   map.tabIndex = 0;
   map.setAttribute("role", "application");
   map.setAttribute("aria-label", `Map of the course. ${MAP_HELP}`);
-  map.title = MAP_HELP;
   map.addEventListener("keydown", (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.target !== map) return;
     const pan: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };

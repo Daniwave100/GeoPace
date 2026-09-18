@@ -56,16 +56,16 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   let km = 0;
   let moveCursor: (() => void) | undefined;
 
-  const chart = html("div", { class: "strip-chart" });
+  const rowsBox = html("div", { class: "strip-rows" });
   const heads = html("div", { class: "strip-heads", "aria-hidden": "true" });
-  const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-valuemin": 0 }, chart, heads);
+  const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-valuemin": 0 }, rowsBox, heads);
   const key = html("p", { class: "strip-key" });
   container.replaceChildren(slider, key);
 
-  /** How far along the chart's km axis the pointer is: the axis starts after the row headers. */
+  /** How far along the strip's km axis the pointer is: the axis starts after the row headers. */
   const scrubToPointer = (event: PointerEvent) => {
     if (!content) return;
-    const box = chart.getBoundingClientRect();
+    const box = rowsBox.getBoundingClientRect();
     const left = box.left + heads.clientWidth;
     onScrub(kmAtFraction((event.clientX - left) / (box.right - RIGHT_PAD - left), content.lengthKm));
   };
@@ -86,10 +86,10 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
     onScrub(target);
   });
 
-  const redraw = drawToFit(chart, (width) => {
+  const redraw = drawToFit(rowsBox, (width) => {
     if (!content) return;
     const { drawing, headCells, place } = draw(content, width, heads.clientWidth);
-    chart.replaceChildren(drawing);
+    rowsBox.replaceChildren(drawing);
     heads.replaceChildren(...headCells.map((cell) => cell.node));
     moveCursor = () => {
       if (!content) return;
@@ -104,12 +104,11 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   return {
     show(next) {
       content = next;
-      const rows = [next.baseRow, ...next.layerRows];
-      chart.style.height = `${LANDMARKS_HEIGHT + rows.reduce((sum, row) => sum + rowHeight(row, next), 0) + LINE_HEIGHT}px`;
+      rowsBox.style.height = `${stripHeight(next)}px`;
       slider.setAttribute("aria-label", `Where you are on the course, in ${unitName(next.units, "many")}`);
       slider.setAttribute("aria-valuemax", distanceNumber(next.lengthKm, next.units));
       key.hidden = !next.showKey;
-      key.replaceChildren(...keyEntries(rows, next.hasNotMeasured));
+      key.replaceChildren(...keyEntries([next.baseRow, ...next.layerRows], next.hasNotMeasured));
       redraw();
     },
     setKm(value, spoken) {
@@ -123,6 +122,11 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
 
 function rowHeight(row: StripRow, content: StripContent): number {
   return row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT;
+}
+
+/** The landmarks' lane, every row, and the blue line. */
+function stripHeight(content: StripContent): number {
+  return LANDMARKS_HEIGHT + [content.baseRow, ...content.layerRows].reduce((sum, row) => sum + rowHeight(row, content), 0) + LINE_HEIGHT;
 }
 
 interface HeadCell {
@@ -140,7 +144,7 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   const rows = [content.baseRow, ...content.layerRows];
   const x = linearScale([0, content.lengthKm], [headWidth, width - RIGHT_PAD]);
   const binCount = Math.max(60, Math.round((width - headWidth - RIGHT_PAD) / PIXELS_PER_BIN));
-  const height = LANDMARKS_HEIGHT + rows.reduce((sum, row) => sum + rowHeight(row, content), 0) + LINE_HEIGHT;
+  const height = stripHeight(content);
   const drawing = svg("svg", { width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" });
   drawing.append(
     svg(
@@ -204,7 +208,7 @@ function landmarkLane(content: StripContent, x: Scale): SVGGElement {
   const laneCount = Math.max(1, Math.floor((LANDMARKS_HEIGHT - 6) / LANDMARK_LANE));
   const names = content.landmarks.map((landmark) => shorten(plainName(landmark.name)));
   const widths = names.map((name) => 8 + name.length * LANDMARK_CHAR);
-  // Names near the finish are set to the left of their tick, so they stay on the chart.
+  // Names near the finish are set to the left of their tick, so they stay on the strip.
   const flipped = content.landmarks.map((landmark, i) => x(landmark.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
   const spans = content.landmarks.map((landmark, i) => (flipped[i] ? { start: x(landmark.km) - widths[i], end: x(landmark.km) } : { start: x(landmark.km), end: x(landmark.km) + widths[i] }));
   // Where names crowd (New York's last 2 km), the last one gets its room first: it is the finish.
@@ -249,9 +253,10 @@ function headCell(row: StripRow, top: number, height: number, units: Units): Hea
     node,
     update(km, shownIn) {
       const { text, notMeasured } = row.valueAt(km, shownIn);
-      // Not measured here: grey and struck through, the same as in the sentence.
-      value.replaceChildren(notMeasured ? html("s", { text }) : text);
-      value.className = `strip-head-value ${ENCODINGS[notMeasured ? "not-measured" : row.encoding].cssClass}${text.length > 9 ? " is-long" : ""}`;
+      // Not measured here: grey and struck through, the same as in the sentence, which also prints the reason.
+      value.replaceChildren(notMeasured !== null ? html("s", { text }) : text);
+      value.title = notMeasured ?? "";
+      value.className = `strip-head-value ${ENCODINGS[notMeasured !== null ? "not-measured" : row.encoding].cssClass}${text.length > 9 ? " is-long" : ""}`;
     },
   };
 }

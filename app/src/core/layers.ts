@@ -11,7 +11,7 @@
 import type { Encoding } from "./encoding";
 import type { Units } from "./units";
 
-/** Every layer GeoPace will have (PLAN.md D35). The ones that exist are in `explore/`'s list. */
+/** Every layer GeoPace will have (PLAN.md D35). The ones that exist are listed once, in `main.ts`. */
 export type LayerId = "hills" | "sun" | "wind" | "aid" | "crowds" | "bottlenecks" | "watch-trouble";
 
 export interface Layer {
@@ -20,8 +20,10 @@ export interface Layer {
   name: string;
   /** Its rows on the strip, top to bottom. */
   rows(): StripRow[];
-  /** How it marks the course line on the map. */
+  /** How it marks the course line on the map: stretches of the line, each drawn as the kind of claim it is. */
   lineMarks(): LineMark[];
+  /** The labels that go with those marks: one per thing marked, however many pieces its line is cut into. */
+  lineLabels(): MarkLabel[];
   /** Its clause in the sentence where the runner is, or null when it has nothing to say there. */
   clause(km: number, units: Units): Clause | null;
 }
@@ -70,10 +72,8 @@ export interface StripRow {
 
 export interface RowValue {
   text: string;
-  /** true where the value is filled in: printed grey and struck through. */
-  notMeasured: boolean;
-  /** Why, for whoever asks. */
-  note?: string;
+  /** Why the value is not measured here, for the runner; null where it is. Printed grey and struck through. */
+  notMeasured: string | null;
 }
 
 /** A stretch of the course line, marked on the map. */
@@ -81,11 +81,14 @@ export interface LineMark {
   fromKm: number;
   toKm: number;
   encoding: Encoding;
-  /** At most one per thing marked, however many pieces its line is cut into. */
-  label?: MarkLabel;
 }
 
+/** A label on the map for something a layer marks: a hill, later an aid station or a cheer zone. */
 export interface MarkLabel {
+  /** The kind of claim the label makes. */
+  encoding: Encoding;
+  /** More, for whoever asks: which part of it is not measured, and why. */
+  note?: string;
   /** Where on the course the label sits. */
   atKm: number;
   /** Where the thing it names begins: picking the label takes the runner there. */
@@ -118,6 +121,7 @@ export function pressEverything(state: LayerState): LayerState {
 export interface OnScreen {
   rows: StripRow[];
   lineMarks: LineMark[];
+  lineLabels: MarkLabel[];
   clause(km: number, units: Units): Clause | null;
 }
 
@@ -128,6 +132,7 @@ export function onScreen(state: LayerState, layers: Layer[]): OnScreen {
   return {
     rows: onStrip.flatMap((layer) => layer.rows()),
     lineMarks: active ? active.lineMarks() : [],
+    lineLabels: active ? active.lineLabels() : [],
     clause: (km, units) => active?.clause(km, units) ?? null,
   };
 }

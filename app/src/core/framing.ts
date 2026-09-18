@@ -1,34 +1,34 @@
 // Framing the course on the map. The poster's blocks are laid over the map (PLAN.md D32), so the
 // middle of the map is not the middle of what the runner can see: the readout block covers the
-// left of it. The camera slides sideways by half of what is covered, which puts the course in
-// the middle of the part that is clear.
+// left of it. The camera looks to the course's left by half of what is covered, which puts the
+// course in the middle of the part that is clear.
 
-export interface Framing {
-  /** Distance from the camera to the middle of the course, meters. */
-  rangeM: number;
+/** The map as the camera sees it, and how much of it is under a block. */
+export interface MapView {
   /** The camera's horizontal field of view, radians. */
   fovRad: number;
   viewWidthPx: number;
+  viewHeightPx: number;
   /** How much of the view's left side is under a block. */
   coveredLeftPx: number;
 }
 
-/** Meters to move the camera to its left, so the course moves right into the clear part of the view. */
-export function sidewaysShiftM({ rangeM, fovRad, viewWidthPx, coveredLeftPx }: Framing): number {
+/**
+ * How far to the course's left the camera should look, in meters, from `rangeM` away, so the
+ * course lands in the middle of the part of the map that is clear rather than the middle of the map.
+ */
+export function sidewaysShiftM(view: MapView & { rangeM: number }): number {
+  const { rangeM, fovRad, viewWidthPx, coveredLeftPx } = view;
   if (viewWidthPx <= 0 || coveredLeftPx <= 0) return 0;
   const visibleWidthM = 2 * rangeM * Math.tan(fovRad / 2);
   return (Math.min(coveredLeftPx, viewWidthPx) / 2 / viewWidthPx) * visibleWidthM;
 }
 
-export interface CourseInView {
+export interface CourseInView extends MapView {
   /** Radius of the sphere round the whole course, meters. */
   radiusM: number;
   /** How far down the camera looks, radians below the horizon: PI/2 is straight down. */
   tiltRad: number;
-  fovRad: number;
-  viewWidthPx: number;
-  viewHeightPx: number;
-  coveredLeftPx: number;
 }
 
 /** A little air round the course, so its ends aren't on the edge of the map. */
