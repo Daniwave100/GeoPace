@@ -1,0 +1,544 @@
+/* Direction C — Field instrument. Cool greys, hairlines, B612. One warm colour: the cursor.
+   Deliberately light: a dark instrument panel is the HUD this project refuses to be. */
+
+/* Light only, all the way out — see the note at the top of main.ts. */
+html:has(.fi) {
+  color-scheme: only light;
+  background: #e6eaed;
+}
+
+.fi {
+  --ground: #e6eaed;
+  --panel: #f6f8f9;
+  --ink: #17212a;
+  --ink-2: #53606b;
+  --rule: #aab5be;
+  --hair: #d6dde2;
+  --trace: #23607a;
+  --cursor: #e8590c;
+  --grey: #8b96a0;
+
+  color-scheme: only light;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 12px/1.4 "B612", "DejaVu Sans", Verdana, sans-serif;
+  min-height: calc(100vh - var(--review-bar-height, 36px));
+  padding: 10px 12px 28px;
+  display: grid;
+  gap: 10px;
+}
+
+/* :where() keeps this reset at the weight of a single class, so any rule further down the file
+   wins over it. Written as `.fi p` it silently cancelled later margins and paddings. */
+.fi :where(h1, h2, p, ul) {
+  margin: 0;
+  padding: 0;
+}
+
+.fi a {
+  color: var(--trace);
+}
+
+.fi a:focus-visible,
+.fi-tracks:focus-visible {
+  outline: 2px solid var(--cursor);
+  outline-offset: 1px;
+}
+
+/* ── Head ───────────────────────────────────────────────────────────────────── */
+
+.fi-head {
+  display: grid;
+  gap: 4px;
+}
+
+.fi-head__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 10px 24px;
+}
+
+.fi-identity {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.fi-identity h1 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.fi-identity p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+.fi-identity p > span + span::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 0.9em;
+  margin: 0 10px;
+  background: var(--rule);
+  vertical-align: -0.08em;
+}
+
+.fi-displays {
+  display: flex;
+  gap: 6px;
+}
+
+.fi-footnotes {
+  font-size: 10px;
+  color: var(--ink-2);
+  text-align: right;
+}
+
+.fi-display {
+  display: grid;
+  align-content: center;
+  min-width: 138px;
+  padding: 5px 12px 6px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.fi-display:first-child {
+  border-color: var(--cursor);
+  box-shadow: inset 0 -2px 0 var(--cursor);
+}
+
+.fi-display__value {
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+
+.fi-display__value small {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+.fi-display__label {
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+/* ── Body ───────────────────────────────────────────────────────────────────── */
+
+.fi-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  gap: 10px;
+  align-items: start;
+}
+
+/* The chart fills the screen and stays put; the side panels scroll past it if they need to. */
+.fi-tracks {
+  position: sticky;
+  top: calc(var(--review-bar-height, 36px) + 10px);
+  height: clamp(520px, calc(100vh - var(--review-bar-height, 36px) - 120px), 900px);
+  background: var(--panel);
+  /* A frame, but not a border: the scrub position is measured on this box, and a border would
+     put every kilometre a pixel out. */
+  box-shadow: inset 0 0 0 1px var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.fi-tracks__chart,
+.fi-tracks__heads {
+  position: absolute;
+  inset: 0;
+}
+
+/* Its width is set from main.ts, which owns the number the chart is drawn against. */
+.fi-tracks__heads {
+  right: auto;
+  pointer-events: none;
+}
+
+.fi-tracks__svg {
+  display: block;
+}
+
+.fi-trackhead {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  padding: 0 10px;
+  overflow: hidden;
+}
+
+.fi-trackhead__name {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.fi-trackhead__scale {
+  font-size: 10px;
+  color: var(--ink-2);
+}
+
+.fi-trackhead__value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cursor);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A fill-in is never shown in the live colour. */
+.fi-trackhead__value[data-unknown] {
+  color: var(--grey);
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+.fi-trackhead--subjective .fi-trackhead__name,
+.fi-trackhead--subjective .fi-trackhead__scale,
+.fi-trackhead--subjective .fi-trackhead__value {
+  font-style: italic;
+}
+
+.fi-trackhead--subjective .fi-trackhead__value {
+  font-weight: 400;
+  color: var(--ink);
+  white-space: normal;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.fi-axis {
+  font: 400 10.5px "B612", Verdana, sans-serif;
+  fill: var(--ink-2);
+}
+
+.fi-cursor__km {
+  font: 700 10.5px "B612", Verdana, sans-serif;
+  fill: #fff;
+}
+
+.fi-landmark {
+  font: 400 10px "B612", Verdana, sans-serif;
+  fill: var(--ink);
+}
+
+.fi-gap-label {
+  font: 400 9.5px "B612", Verdana, sans-serif;
+  fill: var(--grey);
+}
+
+.fi-report-mark {
+  fill: var(--panel);
+  stroke: var(--ink);
+  stroke-width: 1.1;
+  stroke-dasharray: 2.4 1.8;
+}
+
+.fi-report-label {
+  font: italic 400 10px "B612", Verdana, sans-serif;
+  fill: var(--ink);
+}
+
+/* ── Side panels ────────────────────────────────────────────────────────────── */
+
+.fi-side {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.fi-panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 7px 10px 9px;
+}
+
+.fi-panel h2 {
+  font-size: 11px;
+  font-weight: 700;
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.fi-panel__note {
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.fi-viewport__drawing .maquette {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 30vh;
+}
+
+.fi-sky {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fi-sky__dial {
+  display: block;
+}
+
+.fi-sky__cardinal {
+  font: 400 9.5px "B612", Verdana, sans-serif;
+  fill: var(--ink-2);
+}
+
+.fi-sky__wind {
+  fill: var(--panel);
+  stroke: var(--ink);
+  stroke-width: 1.1;
+}
+
+.fi-sky__legend {
+  list-style: none;
+  display: grid;
+  gap: 7px;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.fi-sky__legend li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: center;
+}
+
+.fi-sky__legend b,
+.fi-sky__legend .fi-tag {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.fi-sky__label {
+  color: var(--ink-2);
+}
+
+.fi-sky__mark {
+  width: 12px;
+  height: 12px;
+  grid-row: span 2;
+  align-self: start;
+  margin-top: 1px;
+}
+
+.fi-sky__mark--sun {
+  border-radius: 50%;
+  background: var(--cursor);
+}
+
+.fi-sky__mark--track {
+  height: 0;
+  margin-top: 7px;
+  border-top: 2px solid var(--trace);
+}
+
+.fi-sky__mark--heading {
+  height: 0;
+  margin-top: 7px;
+  border-top: 2px solid var(--ink);
+}
+
+.fi-sky__mark--wind {
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-top: 10px solid var(--ink);
+  border-bottom: 0;
+}
+
+.fi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.fi-table th,
+.fi-table td {
+  padding: 3px 0;
+  text-align: left;
+  vertical-align: baseline;
+  border-bottom: 1px solid var(--hair);
+}
+
+.fi-table tr:last-child th,
+.fi-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.fi-table th {
+  width: 6.2em;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.fi-table td {
+  font-weight: 700;
+}
+
+.fi-table td i {
+  font-weight: 400;
+}
+
+.fi-table tr[data-unknown] td {
+  color: var(--grey);
+  font-weight: 400;
+}
+
+.fi-table tr[data-unknown] td {
+  text-decoration: line-through;
+}
+
+/* The explanation is not struck: inline-block takes it out of the cell's decoration. */
+.fi-table tr[data-unknown] td i {
+  display: inline-block;
+  margin-left: 0.6em;
+  text-decoration: none;
+}
+
+.fi-nearby {
+  list-style: none;
+  display: grid;
+  gap: 5px;
+  font-size: 11.5px;
+}
+
+.fi-nearby__item {
+  display: grid;
+  grid-template-columns: 3.6em minmax(0, 1fr);
+  gap: 8px;
+}
+
+.fi-nearby__km {
+  color: var(--ink-2);
+  text-align: right;
+}
+
+/* Reports: italic, behind a dashed rule — a different channel from the measured entries. */
+.fi-nearby__item--subjective {
+  font-style: italic;
+  padding-left: 6px;
+  border-left: 1.5px dashed var(--ink);
+}
+
+.fi-tag {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px dotted var(--ink-2);
+  border-radius: 2px;
+  font-size: 9.5px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.35;
+  color: var(--ink-2);
+  vertical-align: 0.1em;
+}
+
+/* ── Key and credits ────────────────────────────────────────────────────────── */
+
+.fi-key {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 22px;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.fi-key__row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.fi-key__mark {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.fi-credits {
+  display: grid;
+  gap: 4px;
+  padding: 4px 2px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 120ch;
+}
+
+.fi-credits__unofficial {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.fi-credits__heading {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.fi-credits ul {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px 28px;
+}
+
+.fi-credits__layer b {
+  color: var(--ink);
+}
+
+.fi-credits__layer[data-provenance="subjective"] {
+  font-style: italic;
+}
+
+@media (max-width: 1080px) {
+  .fi-body,
+  .fi-key,
+  .fi-credits ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fi-tracks {
+    position: relative;
+    top: 0;
+  }
+
+  .fi-side {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+}

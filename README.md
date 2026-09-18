@@ -18,6 +18,26 @@ Then open http://localhost:5173 and pick a course: **Berlin** or **New York City
 The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
 app needs an internet connection.
 
+## Design mockups
+
+The app's look isn't chosen yet. Three clickable directions show the same course, race plan and
+layers three different ways; with the app running, open http://localhost:5173/mockups/ and try
+each one:
+
+- **A · Roadbook** — a survey sheet: the course runs down the page as a route card, and what
+  runners say is written in the margin in purple pencil.
+- **B · Race poster** — black, white and the blue line painted down a marathon course. Huge
+  numerals on a strict grid; solid is measured, hollow is hearsay.
+- **C · Field instrument** — a well log: stacked tracks, one crosshair, and the value under the
+  cursor in every track's header.
+
+Drag the kilometre strip (or focus it and use the arrow keys, Page Up/Down, Home/End): the
+readout, the clock, and the sun and shadows on the street model move together. Elevation, grade,
+difficulty and landmarks are real; sun exposure, wind, aid stations and runner reports are
+invented placeholders and are marked as samples wherever they appear. The street model's
+buildings are invented too, but its light is not: the sun is computed for that spot at the minute
+you would get there.
+
 ## Rebuild the course data (optional)
 
 The app reads prepared **Course Bundles** that are committed in `data/derived/`. You only need

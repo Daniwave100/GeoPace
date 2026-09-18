@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
@@ -21,6 +22,19 @@ export default defineConfig({
       })),
     }),
   ],
+  build: {
+    rollupOptions: {
+      // The app, plus the design mockups (#4): pages of their own, so none of their fonts or
+      // styles end up in the app's bundle.
+      input: {
+        main: resolve(import.meta.dirname, "index.html"),
+        mockups: resolve(import.meta.dirname, "mockups/index.html"),
+        roadbook: resolve(import.meta.dirname, "mockups/roadbook.html"),
+        poster: resolve(import.meta.dirname, "mockups/poster.html"),
+        instrument: resolve(import.meta.dirname, "mockups/instrument.html"),
+      },
+    },
+  },
   server: {
     // The shared Course Bundle schema lives at the repo root, outside app/.
     fs: { allow: [".."] },
