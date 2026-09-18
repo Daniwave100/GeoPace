@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from geopace import berlin_dgm1, nyc_dem, nyc_lidar
+from geopace import berlin_dgm1, berlin_dom1, nyc_dem, nyc_lidar
 from geopace.bundle import build_course_bundle, write_bundle
 from geopace.cache import cache_dir, download
 from geopace.course_facts import CourseFacts, load_course_facts
@@ -30,7 +30,7 @@ class CourseData:
 
 
 COURSE_DATA = {
-    "berlin": CourseData(elevation=berlin_dgm1.elevation_model),
+    "berlin": CourseData(elevation=berlin_dgm1.elevation_model, decks=berlin_dom1.deck_model),
     "nyc": CourseData(elevation=nyc_dem.elevation_model, decks=nyc_lidar.deck_model),
 }
 

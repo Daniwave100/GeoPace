@@ -104,6 +104,18 @@ _Avoid_: caption, subtitle, summary
 **Clause**:
 One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's.
 
+**Strip's top edge**:
+The rule between the map and the strip, which drags up and down to resize the strip.
+_Avoid_: splitter, divider, handle
+
+**Full map**:
+The map given the whole screen: the readout and the strip step aside, and the credits fold to one line.
+_Avoid_: fullscreen mode, map-only mode
+
+**Straight down**:
+The map seen from directly above with north up, like a paper map; the other way of looking at it is tilted.
+_Avoid_: bird's-eye mode, 2D mode, top view
+
 **Banner**:
 The black bar across the top: the course, the Race Plan in one line, the units and the theme.
 _Avoid_: header, toolbar, nav

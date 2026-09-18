@@ -29,6 +29,11 @@ says what the road is doing under you. Switch it off and all three go. **Show ev
 row. Where the survey has no height (the middle of the Verrazzano's main span, Berlin's short bridges),
 the map, the strip and the sentence all say **not measured here** instead of drawing a guess.
 
+Drag the strip's **top edge** to make its rows taller or to give the map the room. On the map,
+**Full map** (or F) gives it the whole screen and **Straight down** (or B) looks from directly above
+like a paper map. While the look of a hill is being chosen, a switch marked *on trial* beside Hills
+flips between two ways of showing steepness.
+
 **Your race plan** opens from the banner: the edition, your start wave, and a goal as a finish time
 or a pace, with a table of splits whose rows jump the runner there. The banner also switches between
 **km and miles** (everything follows: feet, pace per mile, splits per mile) and between **light and

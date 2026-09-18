@@ -93,7 +93,8 @@ landmarks:
 
 # Stretches where the course runs on a bridge deck. Berlin's ground model (DGM1) leaves most
 # bridge decks out and reports the water underneath (the Spree is ~6 m below the Moltkebrücke
-# deck), so the pipeline carries the course straight across each span instead.
+# deck), so on each span the pipeline reads the deck's height from the city's surface model
+# (DOM1) instead. Where that has no usable deck, the span is a straight line and is flagged.
 # km range = where the bridge's OpenStreetMap way overlaps the official 2025 course file.
 bridges:
   - name: Charlottenburger Brücke

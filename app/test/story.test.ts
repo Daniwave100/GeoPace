@@ -76,10 +76,10 @@ describe("mockup story", () => {
     // The gap travels with its reason, in words for the runner.
     expect(story.unmeasured[0].reason).toMatch(/Verrazzano.*straight line/i);
 
-    // Berlin's decks are spanned in a straight line (D18): measured between them, not on them.
+    // Berlin's bridge decks are read from the city's surface model, so they are measured too.
     const berlinStory = buildStory(berlin, { goalFinishSeconds: FOUR_HOURS });
     expect(berlinStory.at(1.1).elevationMeasured).toBe(true);
-    expect(berlinStory.at(6.62).elevationMeasured).toBe(false); // on the Moltkebrücke
+    expect(berlinStory.at(6.62).elevationMeasured).toBe(true); // on the Moltkebrücke
   });
 
   it("puts organizer kilometres onto the course line's own scale", () => {

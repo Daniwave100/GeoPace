@@ -58,8 +58,8 @@ describe("Hills at a kilometre", () => {
   it("flags the crest of the Verrazzano, the highest point of the New York course, as not measured", () => {
     expect(hillsAt(nyc, 1.0).notMeasured).toMatch(/Verrazzano/);
     expect(hillsAt(nyc, 5.0).notMeasured).toBeNull();
-    // Berlin's bridges are spanned in a straight line: not measured on them, measured between them.
-    expect(hillsAt(berlin, 6.62).notMeasured).toMatch(/Moltkebrücke/);
+    // Berlin's bridge decks are read from the city's surface model: nothing there is filled in.
+    expect(hillsAt(berlin, 6.62).notMeasured).toBeNull(); // on the Moltkebrücke
     expect(hillsAt(berlin, 10).notMeasured).toBeNull();
   });
 });

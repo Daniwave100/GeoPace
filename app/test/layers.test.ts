@@ -114,8 +114,9 @@ describe("the Hills layer", () => {
       const greyed = hillsLayer(bundle).lineMarks().filter((mark) => mark.encoding === "not-measured");
       expect(greyed.map((mark) => [mark.fromKm, mark.toKm])).toEqual(bundle.measured.elevation_not_measured.map((gap) => [gap.km_start, gap.km_end]));
     }
-    // Berlin has two hills and ten short bridges; none of the bridges is on a hill.
-    expect(hillsLayer(berlin).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(10);
+    // New York has five such stretches, only one of them on a hill. Berlin's decks are all measured.
+    expect(hillsLayer(nyc).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(5);
+    expect(hillsLayer(berlin).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(0);
   });
 
   it("never draws a filled-in stretch as measured: the solid pieces stop where the gaps begin", () => {
