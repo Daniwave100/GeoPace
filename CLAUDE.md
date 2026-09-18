@@ -46,7 +46,8 @@ ask before anything that changes scope or look.
 ## Adding a layer
 A layer is data (`app/src/core/layers.ts`, PLAN.md D47): its strip rows, its marks on the course line and its clause,
 each tagged with the kind of claim it is. Add it to the list in `app/src/main.ts`. Never give a layer its own colours
-or dash patterns: the encodings come from `core/encoding.ts`. Every distance, height and pace shown or typed goes
+or dash patterns: the encodings come from `core/encoding.ts`, and "how much" (a level from 1 to 3, like how steep a
+hill is) gets its warm colour ramp from `core/mark-look.ts`. Blue means only the course and where you are on it. Every distance, height and pace shown or typed goes
 through `core/units.ts`.
 
 ## Commands

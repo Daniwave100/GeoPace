@@ -1,12 +1,12 @@
-// Seam: how steep a stretch of hill is -> how it is drawn on the map and on the strip, in the two
-// looks the owner is choosing between (a trial, PLAN.md §10): A, the weight of the ink, and
-// B, a colour that also gets darker as it gets steeper.
+// Seam: how steep a stretch of hill is -> how it is drawn on the map and on the strip: a warm
+// colour that gets darker as well as redder, which the owner chose by eye over ink that got
+// heavier (PLAN.md D47).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { steepnessLevel } from "../src/core/hills";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
-import { HILL_LOOKS, hillLookFromUrl, markLook, relativeLuminance } from "../src/core/mark-look";
+import { LEVEL_COLORS, markLook } from "../src/core/mark-look";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -58,33 +58,40 @@ describe("the Hills layer's marks, by steepness", () => {
   });
 });
 
-describe("the two looks on trial", () => {
-  it("A is ink, and heavier the steeper it gets", () => {
-    const looks = [1, 2, 3].map((level) => markLook("measured", level as 1 | 2 | 3, "ink"));
-    expect(looks.map((look) => look.color)).toEqual(["#000000", "#000000", "#000000"]);
-    expect(looks[0].widthPx).toBeLessThan(looks[1].widthPx);
-    expect(looks[1].widthPx).toBeLessThan(looks[2].widthPx);
-  });
+/** How light a colour is, 0 black to 1 white, the way the eye weighs red, green and blue (WCAG). */
+function relativeLuminance(hex: string): number {
+  const channel = (at: number) => {
+    const value = parseInt(hex.slice(at, at + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
 
-  it("B is one width, in a colour that gets darker as well as redder, so it survives colour blindness and a grey screenshot", () => {
-    const looks = [1, 2, 3].map((level) => markLook("measured", level as 1 | 2 | 3, "colour"));
+describe("how a hill is drawn", () => {
+  const looks = ([1, 2, 3] as const).map((level) => markLook("measured", level));
+
+  it("is one width, in a colour that gets darker as well as redder, so it survives colour blindness and a grey screenshot", () => {
     expect(new Set(looks.map((look) => look.widthPx)).size).toBe(1);
     const light = looks.map((look) => relativeLuminance(look.color));
     expect(light[0]).toBeGreaterThan(light[1] * 1.5);
     expect(light[1]).toBeGreaterThan(light[2] * 1.5);
-    // No green anywhere: red against green is the pair one man in twelve can't tell apart.
-    for (const look of looks) expect(parseInt(look.color.slice(3, 5), 16)).toBeLessThanOrEqual(parseInt(look.color.slice(1, 3), 16));
   });
 
-  it("never changes how a stretch that is not measured looks: that is not part of the trial", () => {
-    expect(markLook("not-measured", undefined, "ink")).toEqual(markLook("not-measured", undefined, "colour"));
+  it("is never green, and never the blue that means the course", () => {
+    for (const look of looks) {
+      const [red, green, blue] = [1, 3, 5].map((at) => parseInt(look.color.slice(at, at + 2), 16));
+      expect(green, look.color).toBeLessThanOrEqual(red); // red against green is the pair one man in twelve can't tell apart
+      expect(blue, look.color).toBeLessThan(red);
+    }
   });
 
-  it("can be chosen in the page's address, so a look can be reloaded and shown to someone", () => {
-    expect(hillLookFromUrl("?course=nyc&hills=colour")).toBe("colour");
-    expect(hillLookFromUrl("?hills=ink")).toBe("ink");
-    expect(hillLookFromUrl("?hills=rainbow")).toBe("ink");
-    expect(hillLookFromUrl("")).toBe("ink");
-    expect(HILL_LOOKS.map((look) => look.id)).toEqual(["ink", "colour"]);
+  it("uses the same three colours on the strip as on the map", () => {
+    const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
+    for (const level of [1, 2, 3] as const) expect(css).toMatch(new RegExp(`svg \\.level-${level} \\{\\s*fill: ${LEVEL_COLORS[level]};`));
+  });
+
+  it("leaves a measured mark that says nothing about how much as plain ink, and a not-measured one as grey dashes", () => {
+    expect(markLook("measured")).toMatchObject({ color: "#000000", gap: null });
+    expect(markLook("not-measured")).toMatchObject({ color: "#8a8a86", gap: "#f4f4f0" });
   });
 });

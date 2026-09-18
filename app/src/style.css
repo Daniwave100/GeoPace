@@ -436,36 +436,23 @@ svg .enc-sample {
   stroke: none;
 }
 
-/* ── How steep, on the strip: ON TRIAL, two looks (core/mark-look.ts) ───────────────────── */
+/* ── How much, on the strip: the same warm steps as the marks on the map (core/mark-look.ts) ── */
 
-/* A, ink weight: the fill under the grade gets heavier the steeper it is. */
+/* Pale yellow, orange, deep red: gentle, a proper hill, steep. Darker as well as redder, never
+   green, and never blue, which stays the course and where you are on it. */
 svg .trace-level {
   stroke: none;
-  fill: var(--ink);
 }
 
-:root[data-hill-look="ink"] svg .level-1 {
-  fill-opacity: 0.14;
-}
-
-:root[data-hill-look="ink"] svg .level-2 {
-  fill-opacity: 0.42;
-}
-
-:root[data-hill-look="ink"] svg .level-3 {
-  fill-opacity: 0.85;
-}
-
-/* B, colour: the same warm ramp as the marks on the map, paler to darker. */
-:root[data-hill-look="colour"] svg .level-1 {
+svg .level-1 {
   fill: #ffd84d;
 }
 
-:root[data-hill-look="colour"] svg .level-2 {
+svg .level-2 {
   fill: #f07f1f;
 }
 
-:root[data-hill-look="colour"] svg .level-3 {
+svg .level-3 {
   fill: #a3150f;
 }
 
@@ -892,36 +879,6 @@ button.map-label {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-}
-
-/* On trial: set apart from the real switches, and wearing the sample tape so nobody takes it for a feature. */
-.layer-trial {
-  margin-left: 14px;
-  padding-left: 14px;
-  border-left: 1.5px solid var(--ink);
-  font-size: 12px;
-}
-
-.layer-bar-help {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--grey-text);
-}
-
-/* A layer's switch. Off is an outline; on is a solid block: pressed in, like a key on a machine. */
-.switch {
-  padding: 3px 12px;
-  font-weight: 800;
-  font-stretch: 88%;
-  color: var(--ink);
-  background: var(--paper);
-  border: 2px solid var(--ink);
-  cursor: pointer;
-}
-
-.switch[aria-pressed="true"] {
-  color: var(--paper);
-  background: var(--ink);
 }
 
 .strip {

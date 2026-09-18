@@ -6,7 +6,6 @@ import type { CourseBundle } from "./bundle/types";
 import { type Encoding, ENCODINGS } from "./core/encoding";
 import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
-import { HILL_LOOKS, type HillLook, hillLookFromUrl } from "./core/mark-look";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
 import { positionAtKm } from "./core/scrub";
@@ -65,8 +64,6 @@ let themeChoice: ThemeChoice = loadThemeChoice(storage);
 let layerState: LayerState = NO_LAYERS;
 let stripSize = loadStripSize(storage);
 let fullMap = false;
-// ON TRIAL: which of the two looks for a hill is showing (core/mark-look.ts). Goes when the owner has chosen.
-let hillLook: HillLook = hillLookFromUrl(window.location.search);
 let viewer: Viewer | undefined;
 let mapControls: MapControls | undefined;
 let mapLabels: MapLabels | undefined;
@@ -83,7 +80,7 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
   scrubTo(km);
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
-const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)), useHillLook);
+const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
 const strip = createStrip(byId("strip"), scrubTo);
 const stripEdge = createStripEdge(byId("strip-edge"), {
   rowsHeightAtSizeOne: () => rowsHeightAtSizeOne({ layerRows: showing?.screen.rows ?? [] }),
@@ -205,12 +202,6 @@ function reframeIfUntouched(untouched: boolean): void {
   if (untouched) requestAnimationFrame(() => frameWholeCourse(0));
 }
 
-/** ON TRIAL: flip between the two looks for a hill, on the map and on the strip at once. */
-function useHillLook(next: HillLook): void {
-  hillLook = next;
-  showLayers();
-}
-
 /** The runner dragged the strip's top edge: the rows follow at once; the map settles when the drag ends. */
 function useStripSize(size: number): void {
   if (stripSize === size) return;
@@ -248,10 +239,9 @@ function showLayers(): void {
   if (!showing || !viewer || !mapLabels) return;
   const { bundle, layers } = showing;
   const screen = (showing.screen = onScreen(layerState, layers));
-  layerBar.show(layerState, layers, hillLook);
-  document.documentElement.dataset.hillLook = hillLook;
+  layerBar.show(layerState, layers);
   showStrip();
-  showLineMarks(viewer, bundle, screen.lineMarks, hillLook);
+  showLineMarks(viewer, bundle, screen.lineMarks);
   mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))]);
   scrubTo(showing.km);
 }
@@ -274,8 +264,9 @@ function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
   if (layerState.active === null && !layerState.everything) return [];
   const used = new Set<Encoding>([...screen.rows.map((row) => row.encoding), ...screen.lineMarks.map((mark) => mark.encoding)]);
   if (bundle.measured.elevation_not_measured.length > 0) used.add("not-measured");
-  const hills = layerState.active === "hills" ? HILL_LOOKS.filter((look) => look.id === hillLook).map((look) => ({ name: "Hills.", meaning: `${look.key} A thin white edge is just the course.` })) : [];
-  return [...hills, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
+  const active = showing?.layers.find((layer) => layer.id === layerState.active);
+  const marks = active?.key ? [{ name: `${active.name}.`, meaning: `${active.key} A thin white edge is just the course.` }] : [];
+  return [...marks, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
 }
 
 function endLabels(bundle: CourseBundle): MapLabel[] {

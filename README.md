@@ -24,15 +24,15 @@ keys, and the runner on the map, the clock, the sentence and the sun all move to
 own time zone whatever zone your computer is in.
 
 Switch **Hills** on and three things happen at once: every climb and descent is marked on the course
-line with how steep and how long it is, the strip gains its Grade and Effort rows, and the sentence
+line (pale yellow where it is gentle, orange for a proper hill, dark red where it is steep) with a
+label saying how steep and how long it is, the strip gains its Grade and Effort rows, and the sentence
 says what the road is doing under you. Switch it off and all three go. **Show everything** opens every
 row. Where the survey has no height (the middle of the Verrazzano's main span, Berlin's short bridges),
 the map, the strip and the sentence all say **not measured here** instead of drawing a guess.
 
 Drag the strip's **top edge** to make its rows taller or to give the map the room. On the map,
 **Full map** (or F) gives it the whole screen and **Straight down** (or B) looks from directly above
-like a paper map. While the look of a hill is being chosen, a switch marked *on trial* beside Hills
-flips between two ways of showing steepness.
+like a paper map.
 
 **Your race plan** opens from the banner: the edition, your start wave, and a goal as a finish time
 or a pace, with a table of splits whose rows jump the runner there. The banner also switches between

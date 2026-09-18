@@ -72,6 +72,7 @@ export function hillsLayer(bundle: CourseBundle): Layer {
   return {
     id: "hills",
     name: "Hills",
+    key: "A coloured edge on the blue line is a hill, up or down: pale yellow is gentle, orange is a proper hill, dark red is steep.",
     rows: () => [gradeRow, effortRow],
     lineMarks: () => marks,
     lineLabels: () => labels,

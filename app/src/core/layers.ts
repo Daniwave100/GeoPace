@@ -18,6 +18,8 @@ export interface Layer {
   id: LayerId;
   /** The plain name on its switch: "Hills". */
   name: string;
+  /** What its marks on the course line mean, in a sentence, for the key under the strip. */
+  key?: string;
   /** Its rows on the strip, top to bottom. */
   rows(): StripRow[];
   /** How it marks the course line on the map: stretches of the line, each drawn as the kind of claim it is. */
