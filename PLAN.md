@@ -86,6 +86,7 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D27 | ✅ **Typefaces are open-licence and self-hosted** (npm `@fontsource` packages, bundled by Vite). ⛔ No font CDN. | The app runs locally (D2): it should render the same offline, and a design shouldn't make a third-party request per visit. Every candidate face was checked for tabular figures, because a readout that jiggles while you scrub is unusable. | 09-18 |
 | D28 | ✅ **Visual direction: B · Race poster.** Black, white and one blue on a strict grid with the rules showing; Archivo (one variable family: width 62% / weight 900 for numerals); solid = measured, hollow = hearsay, halftone dots = "depends on the trees", grey and struck = not measured, hazard stripes = sample; flat street model with solid black shadows; follows the system's light or dark theme. Tokens in §6. The blue refers to the line painted on the road at both races; the owner confirmed on 09-18 that this is fine under D12. No organizer palette, typeface or mark is used. | Owner's pick from the three mockups (#4): "the one that looked the coolest". | 09-18 |
 | D29 | ✅ **The mockup's screen is the *everything* view, not the first screen.** Owner on seeing it: love the look, but "there's a lot" — it has to be easy for a runner who isn't technical (principle 8). #6 applies the look with far less on screen by default; how (see §6 "Simplifying the screen") is 🟡 proposed, not yet agreed. | A design that wins on looks and loses the user on first contact doesn't earn stars. | 09-18 |
+| D30 | ✅ **Photoreal is the headline look; the white model is what opens with no set-up.** The app advertises photoreal (Google 3D Tiles with the runner's own key) as *the* way to see the ride, with a prominent "Make it photoreal" control and plain set-up help. With no key it opens straight into the **white model of the city's real buildings** — real footprints and heights from each city's open data (§5 "Buildings"), cut to the course corridor by the pipeline (#7) — never a blank or a nag screen. Refines D3/D4; does not change them: no key ships with the project. | Owner directive 09-18: people should know the key is what makes it look cool, and the fallback should still be the actual buildings, "a white 3D layout". A key can't be the literal default because none can ship in the repo (and it would bill the maintainer), and most non-technical runners will never create one (principle 8) — so the white city has to stand on its own. | 09-18 |
 
 ---
 
@@ -221,7 +222,8 @@ diagram with the sun's path over the whole race.
 | **Theme** | Light only (it is paper) | Follows the system, light or dark | Light only (a dark instrument is the HUD we're avoiding) |
 
 **Open questions:**
-- 🟡 Confirm (or change) "Simplifying the screen" above before #6 starts.
+- 🟡 Confirm (or change) "Simplifying the screen" above before #6 starts. A throwaway prototype with three takes
+  (Cinema · Poster, cut down · Guided tour) is on the branch `prototype/player-screen`, at `/mockups/prototype-player.html`.
 - 🟡 Whether the Roadbook's margin notes or the Field instrument's sky dial should be carried into B.
 
 ---
@@ -347,3 +349,5 @@ arrival times are approximate — state that in the UI.
 - **2026-09-18** — Owner picked **B · Race poster** (D28) and asked for a much simpler, non-technical first screen
   (principle 8, D29). §6 now holds B's tokens as *the* tokens, plus a proposed "video player for the course" layout
   that the owner has not yet confirmed.
+- **2026-09-18** — Owner confirmed the poster's blue (D28) and set the photoreal/white-model relationship (D30). A three-variant
+  prototype of the simplified first screen is on the throwaway branch `prototype/player-screen` for the owner to judge.
