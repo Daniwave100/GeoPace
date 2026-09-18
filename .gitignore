@@ -12,3 +12,7 @@ node_modules/
 app/dist/
 
 .DS_Store
+
+# Keys never belong in the repo. Photoreal takes the runner's own key in the browser (PLAN.md D3).
+.env
+.env.*
