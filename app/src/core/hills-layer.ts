@@ -40,9 +40,10 @@ export function hillsLayer(bundle: CourseBundle): Layer {
 
   const effortRow: StripRow = {
     id: "effort",
-    name: "Effort vs flat",
+    name: "Effort",
     encoding: "measured",
-    scale: () => `× flat ground, ${bundle.measured.difficulty_model.name}`,
+    // The model and its source are named under Sources; the header has room for what it means.
+    scale: () => "energy vs flat ground",
     bins: (count) => binned(count).map((bin) => rowBin(bin, bin.difficulty)),
     domain: [1 - effortReach, 1 + effortReach],
     baseline: 1,
@@ -50,8 +51,8 @@ export function hillsLayer(bundle: CourseBundle): Layer {
     valueAt(km) {
       const at = hillsAt(bundle, km);
       // Outside the model's range there is no number to give, which is its own kind of "not known".
-      if (at.difficulty === null) return { text: "outside the model's range", notMeasured: true, note: bundle.measured.difficulty_model.description };
-      return { text: `${at.difficulty.toFixed(2)}× · ${effortWords(at.difficulty)}`, notMeasured: at.notMeasured !== null, note: at.notMeasured ?? undefined };
+      if (at.difficulty === null) return { text: "no number", notMeasured: true, note: bundle.measured.difficulty_model.description };
+      return { text: `${signed((at.difficulty - 1) * 100, 0)}%`, notMeasured: at.notMeasured !== null, note: at.notMeasured ?? undefined };
     },
   };
 
@@ -123,18 +124,14 @@ function marksFor(hill: HillStretch, gaps: NotMeasuredSpan[]): LineMark[] {
   const labelled = pieces.find((piece) => piece.encoding === "measured") ?? pieces[0];
   labelled.label = {
     atKm: (hill.fromKm + hill.toKm) / 2,
+    startKm: hill.fromKm,
     text: (units) => `${hill.kind === "climb" ? "Up" : "Down"} ${Math.abs(hill.meanGradePercent).toFixed(1)}% · ${formatNearby(hill.toKm - hill.fromKm, units)}`,
     priority: Math.abs(hill.gainM),
   };
   return pieces;
 }
 
-function signed(percent: number): string {
-  return `${percent >= 0 ? "+" : MINUS}${Math.abs(percent).toFixed(1)}`;
-}
-
-function effortWords(cost: number): string {
-  const percent = Math.round((cost - 1) * 100);
-  if (percent === 0) return "the same energy as flat";
-  return `${Math.abs(percent)}% ${percent > 0 ? "more" : "less"} energy than flat`;
+function signed(percent: number, digits = 1): string {
+  const rounded = Math.abs(percent).toFixed(digits);
+  return `${percent >= 0 || Number(rounded) === 0 ? "+" : MINUS}${rounded}`;
 }

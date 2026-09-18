@@ -1,47 +1,82 @@
+import "@fontsource-variable/archivo/wdth.css";
 import "./style.css";
 import { browserStorage } from "./browser-storage";
 import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
+import { type Encoding, ENCODINGS } from "./core/encoding";
+import { heightRow, hillsLayer } from "./core/hills-layer";
+import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
 import { positionAtKm } from "./core/scrub";
-import { sunPosition } from "./core/solar";
+import { sentenceAt } from "./core/sentence";
+import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
+import { distanceNumber, type Units, unitName } from "./core/units";
 import { COURSES, courseFromUrl, urlForCourse } from "./courses";
-import { createPlanPanel } from "./plan/plan-panel";
-import { loadPlan, rememberedCourseId, savePlan } from "./plan/plan-store";
-import { createReadout } from "./plan/readout";
-import { createSentence } from "./plan/sentence";
-import { createSplitsTable } from "./plan/splits-table";
+import { html, link } from "./dom";
+import { createLayerBar } from "./explore/layer-bar";
+import { createMapControls } from "./explore/map-controls";
+import { createPlanSummary } from "./explore/plan-summary";
+import { createReadout } from "./explore/readout";
+import { createSentence, sentenceInWords } from "./explore/sentence-view";
+import { renderSources } from "./explore/sources";
+import { createSwitches } from "./explore/switches";
 import { createPhotoreal, type Photoreal } from "./photoreal/photoreal";
 import { createPhotorealPanel } from "./photoreal/photoreal-panel";
-import { KM_AXIS, renderProfile } from "./profile/profile";
-import { createGlobe, showCourse, showRunner, watchCameraHeight } from "./scene/globe";
-import { html, link } from "./dom";
+import { createPlanPanel } from "./plan/plan-panel";
+import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
+import { createSplitsTable } from "./plan/splits-table";
+import { showLineMarks } from "./scene/course-marks";
+import { createGlobe, frameCourse, goTo, showCourse, showRunner, watchCameraHeight } from "./scene/globe";
+import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
 import { createStrip } from "./strip/strip";
 import type { Viewer } from "cesium";
 
-/** What is on screen: one course, one runner's plan for it, and where on it the runner is. */
+/** What is on screen: one course, one runner's plan for it, where on it the runner is, and its layers. */
 interface Showing {
   bundle: CourseBundle;
   course: PlannerCourse;
   planner: Planner;
   km: number;
+  /** The layers that exist for this course. Later tickets add theirs here (PLAN.md D35). */
+  layers: Layer[];
+  /** The strip's own row, there whatever the layers are doing. */
+  baseRow: StripRow;
 }
 
 const storage = browserStorage();
-const planPanel = createPlanPanel(byId("plan"), usePlan);
-const strip = createStrip(insetToChart(byId("strip")), scrubTo);
-const readoutView = createReadout(byId("readout"));
-const sentence = createSentence(byId("sentence"));
-const splitsTable = createSplitsTable(byId("splits"), scrubTo);
+const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+let units: Units = loadUnits(storage);
+let themeChoice: ThemeChoice = loadThemeChoice(storage);
+let layerState: LayerState = NO_LAYERS;
 let viewer: Viewer | undefined;
+let mapLabels: MapLabels | undefined;
 let photoreal: Photoreal | undefined;
 let showing: Showing | undefined;
 let loading = "";
 
+const planDialog = byId("plan-dialog") as HTMLDialogElement;
+const planSummary = createPlanSummary(byId("plan-summary"), () => planDialog.showModal());
+const planPanel = createPlanPanel(byId("plan"), usePlan);
+const splitsTable = createSplitsTable(byId("splits"), (km) => {
+  planDialog.close(); // the runner picked a split to look at: get the plan out of the way of it
+  scrubTo(km);
+});
+const switches = createSwitches(byId("switches"), useUnits, useTheme);
+const layerBar = createLayerBar(byId("layers"), [{ id: "hills", name: "Hills" }], (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
+const strip = createStrip(byId("strip"), scrubTo);
+const readoutView = createReadout(byId("readout"));
+const sentenceView = createSentence(byId("sentence"));
+
 async function start(): Promise<void> {
+  showTheme();
+  systemDark.addEventListener("change", showTheme); // "Auto" keeps following the system while the app is open
+  switches.show(units, themeChoice);
+
   const picker = byId("course-picker") as HTMLSelectElement;
   for (const course of COURSES) {
     picker.append(new Option(course.label, course.id));
@@ -70,18 +105,22 @@ async function show(courseId: string): Promise<void> {
   if (loading !== courseId) return; // the runner picked another course while this one loaded
   hideError();
   document.title = `${bundle.course.name} · GeoPace`;
-  byId("course-name").textContent = `${bundle.course.name} · ${bundle.course.city}`;
   renderAttributions(bundle);
-  renderProfile(byId("profile"), bundle);
-  viewer ??= createGlobe(byId("globe"));
+  renderSources(byId("sources"), bundle);
+
+  if (!viewer) {
+    viewer = createGlobe(byId("globe"));
+    mapLabels = createMapLabels(viewer, byId("map-labels"));
+    createMapControls(byId("map-controls"), byId("globe"), viewer, () => frameWholeCourse(flightSeconds()), goToRunner);
+  }
   showCourse(viewer, bundle);
   photoreal ??= startPhotoreal(viewer);
 
   const course = plannerCourse(bundle);
-  const planner = createPlanner(course, loadPlan(storage, course));
-  showing = { bundle, course, planner, km: 0 };
-  strip.showCourse(planner.lengthKm);
+  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers: [hillsLayer(bundle)], baseRow: heightRow(bundle) };
   showPlan();
+  // Framed last: the strip has just taken its height, and the map is whatever is left.
+  frameWholeCourse(0);
 }
 
 /** The runner changed their Race Plan: remember it, and re-time everything where they stand. */
@@ -92,27 +131,105 @@ function usePlan(plan: RacePlan): void {
   showPlan();
 }
 
+/** Kilometres or miles: every distance on screen follows, and the plan itself is untouched (PLAN.md D42). */
+function useUnits(next: Units): void {
+  units = next;
+  saveUnits(storage, next);
+  showPlan();
+}
+
+function useTheme(next: ThemeChoice): void {
+  themeChoice = next;
+  saveThemeChoice(storage, next);
+  showTheme();
+}
+
+function showTheme(): void {
+  document.documentElement.dataset.theme = resolveTheme(themeChoice, { systemPrefersDark: systemDark.matches });
+}
+
+function useLayers(next: LayerState): void {
+  layerState = next;
+  showLayers();
+}
+
 function showPlan(): void {
-  if (!showing || !viewer) return;
-  planPanel.show(showing.course, showing.planner);
-  splitsTable.show(showing.planner);
+  if (!showing) return;
+  switches.show(units, themeChoice);
+  planSummary.show(showing.planner, units);
+  planPanel.show(showing.course, showing.planner, units);
+  splitsTable.show(showing.planner, units);
+  showLayers();
+}
+
+/**
+ * The layer that is on, put in all three places at once: its marks on the course line, its rows
+ * on the strip, and (through scrubTo) its clause in the sentence. Off, it leaves all three.
+ */
+function showLayers(): void {
+  if (!showing || !viewer || !mapLabels) return;
+  const { bundle, baseRow, layers } = showing;
+  const screen = onScreen(layerState, layers);
+  layerBar.show(layerState);
+  strip.show({
+    lengthKm: showing.planner.lengthKm,
+    landmarks: bundle.course.landmarks,
+    baseRow,
+    layerRows: screen.rows,
+    showKey: layerState.everything,
+    hasNotMeasured: bundle.measured.elevation_not_measured.length > 0,
+    units,
+  });
+  showLineMarks(viewer, bundle, screen.lineMarks);
+  mapLabels.show([...endLabels(bundle), ...screen.lineMarks.flatMap((mark) => (mark.label ? [markLabel(bundle, mark.encoding, mark.label)] : []))]);
   scrubTo(showing.km);
 }
 
-/** Scrubbing: the strip's marker, the readout, the sentence, the runner on the map and the sun, moved as one. */
+function endLabels(bundle: CourseBundle): MapLabel[] {
+  const line = bundle.measured.course_line;
+  const last = line.km.length - 1;
+  const place = (text: string, i: number): MapLabel => ({ lat: line.lat[i], lon: line.lon[i], text, className: "map-label-place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
+  return [place("Start", 0), place("Finish", last)];
+}
+
+function markLabel(bundle: CourseBundle, encoding: Encoding, label: MarkLabel): MapLabel {
+  const at = positionAtKm(bundle.measured.course_line, label.atKm);
+  return { lat: at.lat, lon: at.lon, text: label.text(units), className: ENCODINGS[encoding].cssClass, priority: label.priority, onPick: () => scrubTo(label.startKm) };
+}
+
+/** Scrubbing: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */
 function scrubTo(km: number): void {
   if (!showing || !viewer) return;
-  const { planner } = showing;
+  const { planner, bundle } = showing;
   const readout = planner.at(km);
   showing.km = readout.km;
-  const place = positionAtKm(showing.bundle.measured.course_line, readout.km);
+  const place = positionAtKm(bundle.measured.course_line, readout.km);
+  const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: onScreen(layerState, showing.layers).clause });
 
   // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
   const carriedOver = planner.carriedOver ? `, from the ${planner.carriedOver.fromEdition} start time, carried over` : "";
-  strip.setKm(readout.km, `kilometre ${readout.km.toFixed(1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed`);
-  readoutView.show(planner, readout);
-  sentence.show(sunPosition(readout.instant, place.lat, place.lon), place.bearingDeg, planner.carriedOver);
+  strip.setKm(readout.km, `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`);
+  readoutView.show(planner, readout, units);
+  sentenceView.show(sentence);
   showRunner(viewer, place, readout.instant);
+}
+
+/** How long the camera takes to get somewhere. With reduced motion asked for, it doesn't travel: it is there. */
+function flightSeconds(): number {
+  return reducedMotion.matches ? 0 : 0.8;
+}
+
+function goToRunner(): void {
+  if (!showing || !viewer) return;
+  goTo(viewer, positionAtKm(showing.bundle.measured.course_line, showing.km), flightSeconds());
+}
+
+/** The whole course, in the part of the map that the readout block leaves clear. */
+function frameWholeCourse(seconds: number): void {
+  if (!showing || !viewer) return;
+  const block = document.querySelector<HTMLElement>(".where");
+  const overTheMap = block && getComputedStyle(block).position === "absolute";
+  frameCourse(viewer, showing.bundle.measured.course_line, overTheMap ? block.offsetWidth : 0, seconds);
 }
 
 /**
@@ -135,13 +252,6 @@ function startPhotoreal(globe: Viewer): Photoreal {
   });
   void controller.start();
   return controller;
-}
-
-/** Line the strip up with the elevation chart's km axis, so a km on one sits above the same km on the other. */
-function insetToChart(stripBox: HTMLElement): HTMLElement {
-  stripBox.style.padding = `0 ${KM_AXIS.insetRightPx}px 0 ${KM_AXIS.insetLeftPx}px`;
-  stripBox.style.minWidth = `${KM_AXIS.minWidthPx}px`;
-  return stripBox;
 }
 
 function renderAttributions(bundle: CourseBundle): void {

@@ -84,7 +84,10 @@ export interface LineMark {
 }
 
 export interface MarkLabel {
+  /** Where on the course the label sits. */
   atKm: number;
+  /** Where the thing it names begins: picking the label takes the runner there. */
+  startKm: number;
   text(units: Units): string;
   /** When labels would overprint each other, the higher priority stays. */
   priority: number;

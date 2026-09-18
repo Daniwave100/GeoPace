@@ -6,11 +6,11 @@ export function compass(degrees: number): string {
 }
 
 /**
- * "Sunday 1 November 2026", from a bare calendar date. The date is pinned to noon UTC and
+ * "Sunday 1 November 2026" (or, short, "Sun 1 Nov 2026"), from a bare calendar date. The date is pinned to noon UTC and
  * formatted in UTC, so a browser west of Greenwich can't slide it back to Saturday.
  */
-export function raceDate(isoDate: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).formatToParts(
+export function raceDate(isoDate: string, names: "long" | "short" = "long"): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { weekday: names, day: "numeric", month: names, year: "numeric", timeZone: "UTC" }).formatToParts(
     new Date(`${isoDate}T12:00:00Z`),
   );
   const part = (type: string) => parts.find((candidate) => candidate.type === type)?.value ?? "";

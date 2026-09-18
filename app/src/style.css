@@ -1,315 +1,100 @@
-/* Placeholder styling only. The visual identity comes from the chosen design direction (PLAN.md §6). */
+/* GeoPace — the Race poster (PLAN.md D28, tokens in §6).
+   Black, white and one blue, laid over the map as opaque blocks: never glass, never beside the
+   map in a panel (D11, D32). No rounded corners, no shadows, no gradients. One giant numeral per
+   screen: the kilometre. Blue means exactly one thing: the course and where you are on it.
+
+   Encodings (D28), the same on the map, on the strip and in text (core/encoding.ts):
+     solid = measured · hollow = what runners say · grey and struck through = not measured here ·
+     hazard stripes and the word "sample" = a stand-in.
+   Light and dark are both first-class (D31). index.html sets data-theme before the first paint
+   and explore/theme-switch.ts keeps it in step with the runner's choice and the system. */
+
+:root {
+  --paper: #f4f4f0;
+  --ink: #000;
+  --blue: #1546ff;
+  --on-blue: #fff;
+  /* The token grey, for marks and fills. */
+  --grey: #8a8a86;
+  /* Grey words have to stay readable at small sizes, so they are darker than grey marks. */
+  --grey-text: #5c5c58;
+  --alarm: #b00000;
+  --rule: 3px;
+  --focus: var(--blue);
+  /* One column of the twelve. The blocks over the map are sized in columns. */
+  --col: calc(100vw / 12);
+  --head: max(168px, calc(var(--col) * 1.5));
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #000;
+  --ink: #f4f4f0;
+  --blue: #5a7dff;
+  --on-blue: #000;
+  --grey: #7c7c78;
+  --grey-text: #a9a9a4;
+  --alarm: #ff6b5e;
+  color-scheme: dark;
+}
+
+html,
 body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  color: #111;
-  background: #fff;
-}
-header,
-main > section,
-footer {
-  padding: 0 16px;
-}
-.picker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-/* The plan beside the map on a wide screen, above it on a narrow one. */
-.planning {
-  display: flex;
-  flex-wrap: wrap;
-}
-.plan-panel {
-  flex: 1 1 280px;
-  max-width: 360px;
-  padding: 0 16px;
-  font-size: 14px;
-}
-.map {
-  position: relative;
-  flex: 3 1 480px;
-  height: 60vh;
-  min-height: 360px;
-}
-#globe {
   height: 100%;
 }
 
-/* "Make it photoreal": solid blocks laid on the map's top right corner, never glass (PLAN.md D32).
-   The map's own credits run along its bottom edge, and nothing here may cover them. */
-#photoreal {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  max-width: min(340px, calc(100% - 16px));
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  font-size: 13px;
-}
-.photoreal-control {
-  display: flex;
-}
-.photoreal-control button {
-  font: inherit;
-  font-weight: 700;
-  padding: 8px 12px;
-  color: #fff;
-  background: #000;
-  border: 2px solid #000;
-  border-radius: 0;
-  cursor: pointer;
-}
-.photoreal-control .photoreal-main {
-  font-size: 15px;
-}
-.photoreal-control .photoreal-settings {
-  color: #000;
-  background: #fff;
-  border-left: 0;
-}
-.photoreal-control button[aria-disabled="true"] {
-  cursor: progress;
-  background: #444;
-  border-color: #444;
-}
-.photoreal-control button:focus-visible {
-  outline: 3px solid #1546ff;
-  outline-offset: 2px;
-}
-.photoreal-status {
+body {
   margin: 0;
-  padding: 6px 8px;
-  color: #000;
-  background: #fff;
-  border: 2px solid #000;
-}
-.photoreal-status:empty {
-  display: none;
-}
-.photoreal-trouble {
-  border-color: #b00;
-}
-.photoreal-camera {
-  font-variant-numeric: tabular-nums;
-}
-.photoreal-dialog {
-  box-sizing: border-box;
-  width: min(640px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
-  padding: 8px 20px 16px;
-  color: #111;
-  background: #fff;
-  border: 3px solid #000;
-  font-size: 14px;
-}
-.photoreal-dialog::backdrop {
-  background: rgb(0 0 0 / 55%);
-}
-.photoreal-dialog h3,
-.photoreal-dialog h4 {
-  margin: 16px 0 4px;
-}
-.photoreal-dialog p,
-.photoreal-dialog ol {
-  margin: 4px 0;
-}
-.photoreal-form label {
-  display: block;
-  margin: 12px 0 2px;
-  font-weight: 700;
-}
-.photoreal-form input {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 6px;
-  font: inherit;
-}
-/* The key is masked as it is typed, without making this a password box (see photoreal-panel.ts). */
-.photoreal-secret {
-  -webkit-text-security: disc;
-}
-.photoreal-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-.photoreal-buttons button {
-  font: inherit;
-}
-.photoreal-remembered {
-  font-weight: 600;
-}
-.photoreal-problem {
-  border-left: 4px solid #b00;
-  padding: 4px 8px;
-  background: #fbeaea;
-}
-.photoreal-help {
-  border-top: 1px solid #ccc;
-}
-.plan label {
-  display: block;
-  margin: 8px 0 2px;
-}
-.plan fieldset {
-  margin: 12px 0;
-  padding: 4px 10px 8px;
-}
-.plan fieldset label {
-  display: inline-block;
-  margin-right: 12px;
-}
-.plan input[type="text"] {
-  display: block;
-  margin-top: 6px;
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-}
-.plan input[type="time"] {
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-}
-.plan button {
-  font: inherit;
-  font-size: 13px;
-}
-/* The start time box with its "use the published time" button beside it, not inside its label. */
-.plan-start {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 4px 8px;
-}
-.plan p {
-  margin: 4px 0;
-}
-.plan-fact,
-.plan-note {
-  font-size: 13px;
-  color: #444;
-}
-.plan-summary {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-.plan-error {
-  color: #b00;
-}
-/* Carried over: details copied from an earlier edition. Flagged, never blended in. */
-.plan-flag {
-  border-left: 4px solid #8a8a86;
-  padding: 4px 8px;
-  background: #eee;
+  color: var(--ink);
+  background: var(--paper);
+  font: 500 14px/1.35 "Archivo Variable", "Arial Narrow", Arial, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums; /* numbers never jiggle while scrubbing */
 }
 
-#readout {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 32px;
-}
-.figure {
-  display: flex;
-  flex-direction: column;
-}
-.figure-label,
-.figure-note {
-  font-size: 12px;
-  color: #444;
-}
-.figure-value {
-  font-size: 28px;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums; /* so the numbers don't jiggle while scrubbing */
-}
-/* Rests on a carried-over start time, or isn't confirmed: greyed, never blended in with the rest.
-   Dark enough to stay readable at small sizes. */
-.carried-over {
-  color: #6b6b68;
-}
-#sentence {
-  margin: 8px 0;
+:where(h1, h2, h3, h4, p, ul, ol) {
+  margin: 0;
+  padding: 0;
 }
 
-/* The km strip. main.ts insets it to the elevation chart's km axis, so a km on the strip sits
-   above the same km on the chart. */
-#strip {
-  box-sizing: border-box;
+/* `hidden` means hidden, whatever display a class gives the element. */
+[hidden] {
+  display: none !important;
 }
-.strip {
-  padding: 10px 0 22px;
-  cursor: ew-resize;
-  touch-action: none; /* a finger drags the runner, not the page */
-  user-select: none;
+
+a {
+  color: inherit;
 }
-.strip:focus-visible {
-  outline: 2px solid #1546ff;
+
+/* Every control gets the same visible focus: a thick ring in the blue. On the black banner the
+   ring is paper-coloured instead, because blue on black is too faint to find. */
+:focus-visible {
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
-.strip-track {
-  position: relative;
-  height: 12px;
-  background: #ddd;
-  border: 1px solid #222;
-}
-.strip-tick {
-  position: absolute;
-  top: 100%;
-  width: 0;
-  height: 5px;
-  border-left: 1px solid #222;
-  font-size: 11px;
-  text-indent: -0.5ch;
-  line-height: 28px;
-  white-space: nowrap;
-}
-.strip-marker {
-  position: absolute;
-  top: -8px;
-  bottom: -8px;
-  width: 6px;
-  margin-left: -4px;
-  background: #1546ff;
-  border: 1px solid #fff;
-  pointer-events: none;
-}
-#splits {
-  margin: 12px 0;
-}
-#splits summary {
-  cursor: pointer;
-}
-.splits {
-  margin-top: 8px;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-.splits th,
-.splits td {
-  padding: 2px 16px 2px 0;
-  text-align: right;
-  font-weight: normal;
-}
-.splits thead th {
-  font-size: 12px;
-  color: #444;
-  border-bottom: 1px solid #222;
-}
-.splits button {
+
+button,
+select,
+input {
   font: inherit;
-  min-width: 3ch;
+  color: inherit;
+  border-radius: 0;
+}
+
+.button {
+  padding: 6px 12px;
+  font-weight: 700;
+  font-stretch: 88%;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
   cursor: pointer;
 }
-#profile svg {
-  display: block;
+
+.button:hover {
+  color: var(--paper);
+  background: var(--ink);
 }
-.map-help {
-  margin: 6px 16px 0;
-}
+
 /* On the page for screen readers, which need it there before its words change; not for the eye. */
 .visually-hidden {
   position: absolute;
@@ -319,24 +104,942 @@ footer {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ── The screen: banner, the map with blocks over it, the strip, the credits ─────────────── */
+
+.explore {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* ── Banner ─────────────────────────────────────────────────────────────────────────────── */
+
+.banner {
+  --focus: #f4f4f0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 28px;
+  padding: 8px 16px;
+  color: #f4f4f0;
+  background: #000;
+  border-bottom: var(--rule) solid var(--ink);
+  font-stretch: 88%;
+  font-weight: 600;
+}
+
+.banner-brand {
+  font-size: 22px;
+  font-weight: 900;
+  font-stretch: 75%;
+  letter-spacing: 0.005em;
+}
+
+.banner-course select {
+  padding: 2px 4px;
+  font-size: 22px;
+  font-weight: 900;
+  font-stretch: 75%;
+  color: #f4f4f0;
+  background: #000;
+  border: 2px solid #f4f4f0;
+  cursor: pointer;
+}
+
+.banner-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 18px;
+  margin-right: auto;
+  font-size: 15px;
+}
+
+.banner-plan .button {
+  color: #f4f4f0;
+  background: #000;
+  border-color: #f4f4f0;
+}
+
+.banner-plan .button:hover {
+  color: #000;
+  background: #f4f4f0;
+}
+
+/* Carried over or not confirmed: greyed wherever it appears, the banner included. */
+.banner .carried-over {
+  color: #a9a9a4;
+}
+
+.banner-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+/* A switch between a few choices: real radio buttons, drawn as one row of blocks. */
+.segmented {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 2px solid #f4f4f0;
+}
+
+.segmented label {
+  position: relative;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segmented label + label {
+  border-left: 2px solid #f4f4f0;
+}
+
+.segmented input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented label:has(input:checked) {
+  color: #000;
+  background: #f4f4f0;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+#error {
+  margin: 0;
+  padding: 12px 16px;
+  white-space: pre-wrap;
+  color: var(--ink);
+  background: var(--paper);
+  border-bottom: var(--rule) solid var(--alarm);
+  font: 500 13px/1.4 ui-monospace, monospace;
+}
+
+/* ── The map, and what is laid over it ──────────────────────────────────────────────────── */
+
+/* The map takes whatever height the banner, the strip and the credits leave. */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 340px;
+  overflow: hidden;
+}
+
+/* Full-bleed: the map fills the stage edge to edge. Its own credits run along its bottom edge,
+   and no block may cover them. */
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.map:focus-visible {
+  outline-offset: -3px;
+}
+
+.where {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: max(300px, calc(var(--col) * 3));
+  max-height: calc(100% - 36px); /* the map's credits stay clear underneath */
+  overflow: auto;
+  color: var(--ink);
+  background: var(--paper);
+  border-right: var(--rule) solid var(--ink);
+  border-bottom: var(--rule) solid var(--ink);
+}
+
+.readout-km {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 16px 0;
+  color: var(--blue);
+  font-weight: 900;
+  font-stretch: 62%;
+  font-size: clamp(84px, 9.5vw, 148px);
+  line-height: 0.82;
+  letter-spacing: -0.025em;
+}
+
+.readout-km-part {
+  margin-top: 0.04em;
+  font-size: 0.46em;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+}
+
+.readout-km-unit {
+  align-self: flex-end;
+  margin: 0 0 0.12em auto;
+  color: var(--ink);
+  font-size: 0.3em;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.readout-of {
+  padding: 8px 16px 10px;
+  font-size: 12px;
+  color: var(--grey-text);
+}
+
+.readout-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: var(--rule) solid var(--ink);
+}
+
+.readout-time {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 10px 16px;
+}
+
+.readout-time + .readout-time {
+  border-left: var(--rule) solid var(--ink);
+}
+
+.readout-value {
+  font-weight: 800;
+  font-stretch: 68%;
+  font-size: clamp(30px, 3vw, 44px);
+  line-height: 0.95;
+  white-space: nowrap;
+}
+
+.readout-value small {
+  font-size: 0.36em;
+  font-weight: 700;
+  font-stretch: 85%;
+}
+
+.readout-label {
+  font-weight: 800;
+  font-size: 13px;
+  font-stretch: 88%;
+}
+
+.readout-note {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--grey-text);
+}
+
+.sentence {
+  padding: 12px 16px 14px;
+  border-top: var(--rule) solid var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  font-stretch: 88%;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+
+/* Rests on a carried-over start time, or isn't confirmed: greyed, never blended in with the rest. */
+.carried-over {
+  color: var(--grey-text);
+}
+
+/* ── The four encodings, in words ───────────────────────────────────────────────────────── */
+
+/* Measured is solid: plain ink, nothing added. */
+.enc-measured {
+  color: inherit;
+}
+
+/* What runners say is hollow: an empty frame around the words. */
+.enc-runner-report {
+  padding: 0 4px;
+  border: 2px solid currentColor;
+}
+
+/* Not measured here: grey, the value struck through, and the words that say so left standing. */
+.enc-not-measured {
+  color: var(--grey-text);
+}
+
+.enc-not-measured s {
+  text-decoration-thickness: 2px;
+}
+
+/* A sample wears hazard-stripe tape and the word itself. */
+.enc-sample {
+  padding: 0 6px;
+  border: 1.5px solid currentColor;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, currentColor 26%, transparent) 4px 8px);
+}
+
+/* ── The four encodings, on the strip ───────────────────────────────────────────────────── */
+
+svg .enc-measured {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+svg .enc-measured.trace-fill {
+  fill: var(--ink);
+  fill-opacity: 0.13;
+  stroke: none;
+}
+
+svg .enc-runner-report {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+svg .enc-not-measured {
+  fill: none;
+  stroke: var(--grey);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2.5;
+}
+
+svg .enc-not-measured.trace-block {
+  fill: var(--grey);
+  fill-opacity: 0.3;
+  stroke: none;
+}
+
+svg .enc-sample {
+  fill: url(#strip-stripes);
+  stroke: none;
+}
+
+/* ── Labels and controls on the map ─────────────────────────────────────────────────────── */
+
+.map-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.map-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 2px 7px;
+  font-size: 13px;
+  font-weight: 800;
+  font-stretch: 80%;
+  white-space: nowrap;
+  color: #f4f4f0;
+  background: #000;
+  border: 2px solid #000;
+  pointer-events: auto;
+  will-change: transform;
+}
+
+button.map-label {
+  cursor: pointer;
+}
+
+/* The same encodings, on the map's labels. Solid is a solid block. */
+.map-label.enc-runner-report {
+  color: #000;
+  background: #f4f4f0;
+}
+
+.map-label.enc-not-measured {
+  color: #000;
+  background: #c9c9c5;
+  border-color: #8a8a86;
+  border-style: dashed;
+}
+
+.map-label-place {
+  color: #000;
+  background: #f4f4f0;
+}
+
+#photoreal {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  max-width: min(340px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.map-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 44px; /* above the map's own credits */
+  display: flex;
+  flex-direction: column;
+}
+
+.map-controls .button {
+  min-width: 38px;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.map-controls .button + .button {
+  border-top: 0;
+}
+
+.map-controls .map-whole {
+  font-size: 12px;
+}
+
+.photoreal-control {
+  display: flex;
+}
+
+.photoreal-control button {
+  padding: 8px 12px;
+  font-weight: 800;
+  font-stretch: 88%;
+  color: #f4f4f0;
+  background: #000;
+  border: 2px solid #000;
+  cursor: pointer;
+}
+
+.photoreal-control .photoreal-main {
+  font-size: 15px;
+}
+
+.photoreal-control .photoreal-settings {
+  color: #000;
+  background: #f4f4f0;
+  border-left: 0;
+}
+
+.photoreal-control button[aria-disabled="true"] {
+  cursor: progress;
+  background: #444;
+  border-color: #444;
+}
+
+.photoreal-status {
+  padding: 6px 8px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+.photoreal-status:empty {
+  display: none;
+}
+
+.photoreal-trouble {
+  border-color: var(--alarm);
+}
+
+/* ── Sheets: the race plan, and the photoreal key panel ─────────────────────────────────── */
+
+.sheet,
+.photoreal-dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 8px 20px 18px;
+  color: var(--ink);
+  background: var(--paper);
+  border: var(--rule) solid var(--ink);
+  font-size: 14px;
+}
+
+.sheet::backdrop,
+.photoreal-dialog::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px 0 4px;
+}
+
+.sheet h2,
+.photoreal-dialog h2 {
+  font-size: 26px;
+  font-weight: 900;
+  font-stretch: 75%;
+}
+
+.photoreal-dialog h3,
+.photoreal-dialog h4 {
+  margin: 16px 0 4px;
+  font-weight: 800;
+  font-stretch: 88%;
+}
+
+.photoreal-dialog p,
+.photoreal-dialog ol {
+  margin: 4px 0;
+}
+
+.photoreal-dialog ol {
+  padding-left: 20px;
+}
+
+.photoreal-form label {
+  display: block;
+  margin: 12px 0 2px;
+  font-weight: 700;
+}
+
+.photoreal-form input,
+.plan input[type="text"],
+.plan input[type="time"],
+.plan select {
+  box-sizing: border-box;
+  padding: 6px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+.photoreal-form input {
+  width: 100%;
+}
+
+/* The key is masked as it is typed, without making this a password box (see photoreal-panel.ts). */
+.photoreal-secret {
+  -webkit-text-security: disc;
+}
+
+.photoreal-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.photoreal-buttons button,
+.plan button {
+  padding: 6px 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  cursor: pointer;
+}
+
+.photoreal-buttons button[type="submit"] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.photoreal-remembered {
+  font-weight: 700;
+}
+
+.photoreal-problem {
+  padding: 4px 8px;
+  border-left: 4px solid var(--alarm);
+}
+
+.photoreal-help {
+  border-top: 2px solid var(--ink);
+}
+
+.plan label {
+  display: block;
+  margin: 10px 0 2px;
+  font-weight: 700;
+}
+
+.plan fieldset {
+  margin: 14px 0;
+  padding: 4px 10px 10px;
+  border: 2px solid var(--ink);
+}
+
+.plan legend {
+  padding: 0 6px;
+  font-weight: 800;
+}
+
+.plan fieldset label {
+  display: inline-block;
+  margin-right: 12px;
+  font-weight: 500;
+}
+
+.plan input[type="text"] {
+  display: block;
+  margin-top: 6px;
+}
+
+/* The start time box with its "use the published time" button beside it, not inside its label. */
+.plan-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 4px 8px;
+}
+
+.plan p {
+  margin: 4px 0;
+}
+
+.plan-fact,
+.plan-note,
 .note {
   font-size: 13px;
-  color: #444;
-  max-width: 80ch;
+  color: var(--grey-text);
 }
-#error {
-  white-space: pre-wrap;
-  border: 2px solid #b00;
-  padding: 12px;
-  margin: 16px;
-  font-family: ui-monospace, monospace;
+
+.plan-summary {
+  font-weight: 800;
+  font-stretch: 88%;
+  font-size: 16px;
 }
-footer {
+
+.plan-error {
+  color: var(--alarm);
+}
+
+/* Carried over: details copied from an earlier edition. Flagged, never blended in. */
+.plan-flag {
+  padding: 4px 8px;
+  border-left: 4px solid var(--grey);
+}
+
+#splits {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 2px solid var(--ink);
+}
+
+#splits summary {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.splits {
+  margin-top: 8px;
+  border-collapse: collapse;
+}
+
+.splits th,
+.splits td {
+  padding: 2px 16px 2px 0;
+  text-align: right;
+  font-weight: 500;
+}
+
+.splits thead th {
+  font-size: 12px;
+  font-weight: 800;
+  border-bottom: 2px solid var(--ink);
+}
+
+.splits button {
+  min-width: 3ch;
+  padding: 0 6px;
+  border-width: 1.5px;
+}
+
+/* ── The strip: the whole course as one line, and the control for where you are ─────────── */
+
+.strip-block {
+  color: var(--ink);
+  background: var(--paper);
+  border-top: var(--rule) solid var(--ink);
+}
+
+.layer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 16px;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.layer-bar-label {
+  font-weight: 800;
+  font-stretch: 88%;
+}
+
+.layer-bar-help {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--grey-text);
+}
+
+/* A layer's switch. Off is an outline; on is a solid block: pressed in, like a key on a machine. */
+.switch {
+  padding: 3px 12px;
+  font-weight: 800;
+  font-stretch: 88%;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  cursor: pointer;
+}
+
+.switch[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.strip {
+  position: relative;
+  cursor: ew-resize;
+  touch-action: none; /* a finger drags the runner, not the page */
+  user-select: none;
+}
+
+.strip:focus-visible {
+  outline-offset: -3px;
+}
+
+.strip-chart svg {
+  display: block;
+}
+
+.strip-heads {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--head);
+  pointer-events: none;
+}
+
+.strip-head {
+  position: absolute;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  gap: 0 8px;
+  padding: 0 10px 0 16px;
+}
+
+.strip-head-name {
+  font-weight: 800;
   font-size: 13px;
-  border-top: 1px solid #ccc;
-  margin-top: 16px;
-  padding-bottom: 16px;
+  font-stretch: 84%;
 }
-footer ul {
-  padding-left: 18px;
+
+.strip-head-scale {
+  grid-column: 1;
+  font-size: 10.5px;
+  font-stretch: 84%;
+  color: var(--grey-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The value under the cursor, printed in the row's header. */
+.strip-head-value {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  max-width: calc(var(--head) * 0.62);
+  text-align: right;
+  font-weight: 800;
+  font-stretch: 72%;
+  font-size: 17px;
+  line-height: 1.05;
+}
+
+.strip-head-value.is-long {
+  font-size: 12px;
+  font-stretch: 84%;
+}
+
+.strip-rule {
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.strip-grid {
+  stroke: var(--grey);
+  stroke-width: 0.5;
+  stroke-opacity: 0.6;
+}
+
+.strip-baseline {
+  stroke: var(--ink);
+  stroke-width: 0.6;
+  stroke-dasharray: 1 2;
+}
+
+.strip-landmark {
+  font: 700 11.5px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 78%;
+  fill: var(--ink);
+}
+
+.strip-landmark-tick {
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.strip-gap-label {
+  font: 600 10px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 80%;
+  fill: var(--grey-text);
+}
+
+/* The blue line: the course, with a notch and a number every five. */
+.strip-line {
+  fill: var(--blue);
+}
+
+.strip-notch {
+  fill: var(--paper);
+}
+
+.strip-mark {
+  font: 900 14px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 68%;
+  fill: var(--ink);
+}
+
+.strip-cursor-bar,
+.strip-cursor-flag {
+  fill: var(--blue);
+}
+
+.strip-cursor-text {
+  font: 900 14px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 68%;
+  fill: var(--on-blue);
+}
+
+.strip-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  padding: 6px 16px;
+  border-top: 1.5px solid var(--ink);
+  font-size: 12px;
+}
+
+.strip-key b {
+  font-weight: 800;
+}
+
+/* ── Credits: always on screen, never restyled away ─────────────────────────────────────── */
+
+.credits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 18px;
+  padding: 6px 16px 8px;
+  color: var(--ink);
+  background: var(--paper);
+  border-top: var(--rule) solid var(--ink);
+  font-size: 12px;
+}
+
+.credits-unofficial {
+  font-size: 13px;
+  font-stretch: 88%;
+}
+
+.credits-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  list-style: none;
+}
+
+.credits details {
+  flex-basis: 100%;
+}
+
+.credits summary {
+  width: fit-content;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 4px 28px;
+  max-height: 30vh;
+  margin-top: 6px;
+  padding-left: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.sources small {
+  color: var(--grey-text);
+}
+
+/* ── Narrow or short screens: the blocks stop overlapping the map and stack under it ────── */
+
+@media (max-width: 760px), (max-height: 620px) {
+  .stage {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .map {
+    position: relative;
+    inset: auto;
+    height: 56vh;
+    min-height: 300px;
+    order: 0;
+  }
+
+  .map-labels {
+    height: 56vh;
+    min-height: 300px;
+    inset: 0 0 auto 0;
+  }
+
+  .where {
+    position: static;
+    width: auto;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 0;
+    border-top: var(--rule) solid var(--ink);
+    order: 1;
+  }
+
+  .map-controls {
+    top: calc(56vh - 150px);
+    bottom: auto;
+  }
+}
+
+/* ── Motion: the OS can ask for less, and gets none ─────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
 }

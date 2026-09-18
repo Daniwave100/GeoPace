@@ -1,35 +1,73 @@
-// The km strip: the whole course as one line of kilometres, and the control for where the runner
-// is. Drag it, click it, or use the keyboard. Deliberately plain: the designed strip, with a row
-// per layer, arrives with Explore (#6). What is settled here is how it behaves.
+// The strip: the whole course as one line, with a row per layer, and the control for where the
+// runner is (PLAN.md D14). Drag it, click it, or use the keyboard.
 //
-// To a screen reader it is a slider, which is what it is: one value (the km) between two ends.
-// All the arithmetic lives in core/scrub.ts, where it is tested; this file only listens and draws.
+// It is the poster's band of rows on one axis, drawn the instrument's way (D31): each row is a
+// thin trace with a light fill and a labelled scale, and the value under the cursor is printed
+// in the row's header. Collapsed, it is the landmarks, the height and the blue line with where
+// you are on it. A layer that is switched on adds its rows; "Show everything" adds every row.
+//
+// To a screen reader it is a slider, which is what it is: one value between two ends. All the
+// arithmetic lives in core/ (scrub.ts, trace.ts, layout.ts, units.ts), where it is tested; this
+// file only listens and draws.
+import { ENCODINGS, type Encoding } from "../core/encoding";
+import type { StripRow } from "../core/layers";
+import { assignLanes, linearScale, type Scale } from "../core/layout";
 import { kmAfterKey, kmAtFraction } from "../core/scrub";
+import { plainName } from "../core/sentence";
+import { tracePaths } from "../core/trace";
+import { axisMarks, distanceNumber, unitKm, unitName, type Units } from "../core/units";
 import { html } from "../dom";
+import { drawToFit, svg } from "../svg";
 
-const TICK_EVERY_KM = 5;
+const RIGHT_PAD = 28;
+const LANDMARKS_HEIGHT = 58;
+const LANDMARK_LANE = 12.5;
+/** Archivo at 11.5px and 78% width: its average advance, for keeping names off each other. */
+const LANDMARK_CHAR = 6;
+const BASE_ROW_HEIGHT = 62;
+const LAYER_ROW_HEIGHT = 48;
+const LINE_HEIGHT = 40;
+/** One bin of a trace per this many pixels: finer than the eye needs, coarse enough to redraw on every resize. */
+const PIXELS_PER_BIN = 3;
+
+export interface StripContent {
+  lengthKm: number;
+  landmarks: { name: string; km: number }[];
+  /** The strip's own row, there whatever the layers are doing: the height of the course. */
+  baseRow: StripRow;
+  /** The rows of the layers that are on (or of all of them, with "Show everything"). */
+  layerRows: StripRow[];
+  /** Whether the key to the encodings is shown: only with "Show everything". */
+  showKey: boolean;
+  /** Whether any of this course's height is filled in, so the key should say what grey means. */
+  hasNotMeasured: boolean;
+  units: Units;
+}
 
 export interface Strip {
-  /** Lay the strip out for a course of this length. */
-  showCourse(lengthKm: number): void;
-  /** Put the marker at `km`. `spoken` is what a screen reader says: "km 21.1, 11:10, 2:00:00 elapsed". */
+  show(content: StripContent): void;
+  /** Put the cursor at `km`. `spoken` is what a screen reader says: "kilometre 21.1, 11:10, 2:00:00 elapsed". */
   setKm(km: number, spoken: string): void;
 }
 
 /** `onScrub` is called with the km the runner asked for; the caller decides and calls `setKm` back. */
 export function createStrip(container: HTMLElement, onScrub: (km: number) => void): Strip {
-  let lengthKm = 1;
+  let content: StripContent | undefined;
   let km = 0;
+  let moveCursor: (() => void) | undefined;
 
-  const ticks = html("div", { class: "strip-ticks" });
-  const marker = html("div", { class: "strip-marker" });
-  const track = html("div", { class: "strip-track" }, ticks, marker);
-  const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-label": "Where you are on the course, in kilometres", "aria-valuemin": 0 }, track);
-  container.replaceChildren(slider);
+  const chart = html("div", { class: "strip-chart" });
+  const heads = html("div", { class: "strip-heads", "aria-hidden": "true" });
+  const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-valuemin": 0 }, chart, heads);
+  const key = html("p", { class: "strip-key" });
+  container.replaceChildren(slider, key);
 
+  /** How far along the chart's km axis the pointer is: the axis starts after the row headers. */
   const scrubToPointer = (event: PointerEvent) => {
-    const box = track.getBoundingClientRect();
-    onScrub(kmAtFraction((event.clientX - box.left) / box.width, lengthKm));
+    if (!content) return;
+    const box = chart.getBoundingClientRect();
+    const left = box.left + heads.clientWidth;
+    onScrub(kmAtFraction((event.clientX - left) / (box.right - RIGHT_PAD - left), content.lengthKm));
   };
   slider.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
@@ -41,28 +79,196 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
     if (slider.hasPointerCapture(event.pointerId)) scrubToPointer(event);
   });
   slider.addEventListener("keydown", (event) => {
-    const target = kmAfterKey(event, km, lengthKm);
+    if (!content) return;
+    const target = kmAfterKey(event, km, content.lengthKm, unitKm(content.units));
     if (target === null) return;
     event.preventDefault(); // the arrows and Page Up/Down would otherwise scroll the page
     onScrub(target);
   });
 
+  const redraw = drawToFit(chart, (width) => {
+    if (!content) return;
+    const { drawing, headCells, place } = draw(content, width, heads.clientWidth);
+    chart.replaceChildren(drawing);
+    heads.replaceChildren(...headCells.map((cell) => cell.node));
+    moveCursor = () => {
+      if (!content) return;
+      place(km, content.units);
+      for (const cell of headCells) cell.update(km, content.units);
+    };
+    moveCursor();
+  });
+  // The web font arrives after the first drawing, and changes how wide every name is.
+  void document.fonts?.ready.then(redraw);
+
   return {
-    showCourse(length) {
-      lengthKm = length;
-      slider.setAttribute("aria-valuemax", length.toFixed(2));
-      ticks.replaceChildren();
-      for (let at = 0; at <= length; at += TICK_EVERY_KM) {
-        const tick = html("div", { class: "strip-tick", text: String(at) });
-        tick.style.left = `${(at / length) * 100}%`;
-        ticks.append(tick);
-      }
+    show(next) {
+      content = next;
+      const rows = [next.baseRow, ...next.layerRows];
+      chart.style.height = `${LANDMARKS_HEIGHT + rows.reduce((sum, row) => sum + rowHeight(row, next), 0) + LINE_HEIGHT}px`;
+      slider.setAttribute("aria-label", `Where you are on the course, in ${unitName(next.units, "many")}`);
+      slider.setAttribute("aria-valuemax", distanceNumber(next.lengthKm, next.units));
+      key.hidden = !next.showKey;
+      key.replaceChildren(...keyEntries(rows, next.hasNotMeasured));
+      redraw();
     },
     setKm(value, spoken) {
       km = value;
-      marker.style.left = `${(value / lengthKm) * 100}%`;
-      slider.setAttribute("aria-valuenow", value.toFixed(2));
+      if (content) slider.setAttribute("aria-valuenow", distanceNumber(value, content.units));
       slider.setAttribute("aria-valuetext", spoken);
+      moveCursor?.();
     },
   };
+}
+
+function rowHeight(row: StripRow, content: StripContent): number {
+  return row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT;
+}
+
+interface HeadCell {
+  node: HTMLElement;
+  update(km: number, units: Units): void;
+}
+
+interface Drawing {
+  drawing: SVGSVGElement;
+  headCells: HeadCell[];
+  place(km: number, units: Units): void;
+}
+
+function draw(content: StripContent, width: number, headWidth: number): Drawing {
+  const rows = [content.baseRow, ...content.layerRows];
+  const x = linearScale([0, content.lengthKm], [headWidth, width - RIGHT_PAD]);
+  const binCount = Math.max(60, Math.round((width - headWidth - RIGHT_PAD) / PIXELS_PER_BIN));
+  const height = LANDMARKS_HEIGHT + rows.reduce((sum, row) => sum + rowHeight(row, content), 0) + LINE_HEIGHT;
+  const drawing = svg("svg", { width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" });
+  drawing.append(
+    svg(
+      "defs",
+      {},
+      svg("pattern", { id: "strip-stripes", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, svg("rect", { width: 3, height: 6, fill: "var(--ink)" })),
+    ),
+  );
+
+  const marks = axisMarks(content.lengthKm, content.units);
+  const chartBottom = height - LINE_HEIGHT;
+  for (const mark of marks) drawing.append(svg("line", { x1: x(mark.km), x2: x(mark.km), y1: LANDMARKS_HEIGHT, y2: chartBottom, class: "strip-grid" }));
+
+  drawing.append(landmarkLane(content, x));
+
+  const headCells: HeadCell[] = [];
+  let top = LANDMARKS_HEIGHT;
+  for (const row of rows) {
+    const rowH = rowHeight(row, content);
+    drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }), traceGroup(row, row.bins(binCount), x, top, rowH));
+    headCells.push(headCell(row, top, rowH, content.units));
+    top += rowH;
+  }
+  drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }));
+
+  // The blue line: the course itself, with a notch and a number every five km or miles.
+  const lineY = top + 12;
+  drawing.append(svg("rect", { x: x(0), y: lineY - 4, width: x(content.lengthKm) - x(0), height: 8, class: "strip-line" }));
+  for (const mark of marks) {
+    drawing.append(
+      svg("rect", { x: x(mark.km) - 1, y: lineY - 4, width: 2, height: 8, class: "strip-notch" }),
+      svg("text", { x: x(mark.km), y: lineY + 22, "text-anchor": "middle", class: "strip-mark", text: mark.label }),
+    );
+  }
+  headCells.push(lineHead(top, content.units));
+
+  // Where you are: a blue bar through every row, and a flag on the blue line with the distance.
+  const flagText = svg("text", { x: 0, y: lineY + 22, "text-anchor": "middle", class: "strip-cursor-text" });
+  const cursor = svg(
+    "g",
+    {},
+    svg("rect", { x: -1.5, y: 0, width: 3, height: lineY + 6, class: "strip-cursor-bar" }),
+    svg("rect", { x: -25, y: lineY + 6, width: 50, height: 21, class: "strip-cursor-flag" }),
+    flagText,
+  );
+  drawing.append(cursor);
+
+  return {
+    drawing,
+    headCells,
+    place(km, units) {
+      cursor.setAttribute("transform", `translate(${x(km).toFixed(1)} 0)`);
+      flagText.textContent = distanceNumber(km, units);
+    },
+  };
+}
+
+/** Landmark names in stacked lanes over the rows, each tied to its place by a hairline. */
+function landmarkLane(content: StripContent, x: Scale): SVGGElement {
+  const group = svg("g", {});
+  const laneCount = Math.max(1, Math.floor((LANDMARKS_HEIGHT - 6) / LANDMARK_LANE));
+  const names = content.landmarks.map((landmark) => shorten(plainName(landmark.name)));
+  const widths = names.map((name) => 8 + name.length * LANDMARK_CHAR);
+  // Names near the finish are set to the left of their tick, so they stay on the chart.
+  const flipped = content.landmarks.map((landmark, i) => x(landmark.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
+  const lanes = assignLanes(
+    content.landmarks.map((landmark, i) => (flipped[i] ? { start: x(landmark.km) - widths[i], end: x(landmark.km) } : { start: x(landmark.km), end: x(landmark.km) + widths[i] })),
+    laneCount,
+    6,
+  );
+  content.landmarks.forEach((landmark, i) => {
+    const at = x(landmark.km);
+    const baseline = 12 + lanes[i] * LANDMARK_LANE;
+    group.append(
+      svg("line", { x1: at, x2: at, y1: baseline - 9, y2: LANDMARKS_HEIGHT, class: "strip-landmark-tick" }),
+      svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-landmark", text: names[i] }, svg("title", { text: landmark.name })),
+    );
+  });
+  return group;
+}
+
+/** One row's trace: solid with a light fill where measured, dashed grey where the value is filled in, a grey block where there is none. */
+function traceGroup(row: StripRow, bins: ReturnType<StripRow["bins"]>, x: Scale, top: number, height: number): SVGGElement {
+  const group = svg("g", {});
+  const paths = tracePaths(row, bins, { x, top, height });
+  const solid = ENCODINGS[row.encoding].cssClass;
+  const gap = ENCODINGS["not-measured"].cssClass;
+  if (row.baseline !== "bottom") group.append(svg("line", { x1: x(bins[0].startKm), x2: x(bins[bins.length - 1].endKm), y1: paths.baselineY, y2: paths.baselineY, class: "strip-baseline" }));
+  for (const block of paths.noValue) group.append(svg("rect", { x: block.x, y: top + 2, width: block.width, height: height - 4, class: `${gap} trace-block` }));
+  for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }), svg("path", { d: piece.line, class: solid }));
+  for (const line of paths.notMeasured) group.append(svg("path", { d: line, class: gap }));
+  return group;
+}
+
+/** A row's header: its name, its labelled scale, and the value under the cursor. */
+function headCell(row: StripRow, top: number, height: number, units: Units): HeadCell {
+  const value = html("span", { class: "strip-head-value" });
+  const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: row.name }), value, html("span", { class: "strip-head-scale", text: row.scale(units) }));
+  node.style.top = `${top}px`;
+  node.style.height = `${height}px`;
+  return {
+    node,
+    update(km, shownIn) {
+      const { text, notMeasured } = row.valueAt(km, shownIn);
+      // Not measured here: grey and struck through, the same as in the sentence.
+      value.replaceChildren(notMeasured ? html("s", { text }) : text);
+      value.className = `strip-head-value ${ENCODINGS[notMeasured ? "not-measured" : row.encoding].cssClass}${text.length > 9 ? " is-long" : ""}`;
+    },
+  };
+}
+
+function lineHead(top: number, units: Units): HeadCell {
+  const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: "The blue line" }), html("span", { class: "strip-head-scale", text: `${unitName(units, "many")} along the course line` }));
+  node.style.top = `${top}px`;
+  node.style.height = `${LINE_HEIGHT}px`;
+  return { node, update: () => undefined };
+}
+
+/** What the marks mean, for the encodings that are on screen. Only shown with "Show everything". */
+function keyEntries(rows: StripRow[], hasNotMeasured: boolean): HTMLElement[] {
+  const used = new Set<Encoding>(rows.map((row) => row.encoding));
+  if (hasNotMeasured) used.add("not-measured");
+  return (Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => html("span", {}, html("b", { text: `${ENCODINGS[encoding].name}. ` }), ENCODINGS[encoding].meaning));
+}
+
+/** A name short enough to set along the strip; the full one is in its tooltip. */
+function shorten(name: string, maxLength = 26): string {
+  if (name.length <= maxLength) return name;
+  const cut = name.slice(0, maxLength);
+  return `${(/\s/.test(name[maxLength]) ? cut : cut.replace(/\s+\S*$/, "")).trimEnd()}…`;
 }

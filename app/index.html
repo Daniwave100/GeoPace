@@ -3,48 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>GeoPace</title>
     <link rel="icon" href="data:," />
+    <script>
+      // The theme, set before the first paint so a dark screen never flashes white. The same rule
+      // as src/core/theme.ts: the runner's remembered choice, else whatever the system asks for.
+      (function () {
+        var choice = null;
+        try {
+          choice = JSON.parse(localStorage.getItem("geopace.theme"));
+        } catch (blockedOrNotJson) {}
+        var dark = choice === "dark" || (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
   </head>
   <body>
-    <header>
-      <h1 id="course-name">GeoPace</h1>
-      <p class="picker">
-        <label for="course-picker">Course</label>
-        <select id="course-picker"></select>
-      </p>
-    </header>
-    <pre id="error" role="alert" hidden></pre>
-    <main>
-      <div class="planning">
-        <section class="plan-panel" aria-labelledby="plan-heading">
-          <h2 id="plan-heading">Your race plan</h2>
-          <div id="plan"></div>
+    <!-- Explore: the map, full-bleed, with the poster laid over it as opaque blocks (PLAN.md D32, D34). -->
+    <div class="explore">
+      <header class="banner">
+        <h1 class="banner-brand">GeoPace</h1>
+        <p class="banner-course">
+          <label class="visually-hidden" for="course-picker">Course</label>
+          <select id="course-picker"></select>
+        </p>
+        <div id="plan-summary" class="banner-plan"></div>
+        <div id="switches" class="banner-switches"></div>
+      </header>
+      <pre id="error" role="alert" hidden></pre>
+      <main class="stage">
+        <div id="globe" class="map"></div>
+        <div id="map-labels" class="map-labels"></div>
+        <section class="where" aria-labelledby="where-heading">
+          <h2 id="where-heading" class="visually-hidden">Where you are</h2>
+          <div id="readout"></div>
+          <p id="sentence" class="sentence"></p>
+          <!-- "Ride the course" goes here: #8 builds it. -->
         </section>
-        <div class="map">
-          <div id="globe"></div>
-          <div id="photoreal"></div>
-        </div>
-      </div>
-      <p class="note map-help">On the map: drag to move, scroll to zoom. To tilt down towards road height, hold Ctrl and drag, or drag with the middle mouse button.</p>
-      <section aria-labelledby="scrub-heading">
-        <h2 id="scrub-heading">Where you are</h2>
-        <div id="readout"></div>
-        <p id="sentence"></p>
-        <p class="note">Drag along the course, click it, or use the arrow keys (Shift or Page Up/Down for a whole kilometre; Home and End for the start and finish).</p>
+        <div id="photoreal"></div>
+        <div id="map-controls" class="map-controls"></div>
+      </main>
+      <section class="strip-block" aria-labelledby="strip-heading">
+        <h2 id="strip-heading" class="visually-hidden">The course, from start to finish</h2>
+        <div id="layers" class="layer-bar"></div>
         <div id="strip"></div>
-        <div id="splits"></div>
       </section>
-      <section>
-        <h2>Elevation <small>(measured)</small> and difficulty <small>(model estimate)</small></h2>
-        <div id="profile"></div>
-      </section>
-    </main>
-    <footer>
-      <p><strong>Unofficial — not affiliated with any race organizer.</strong></p>
-      <p>Data and map credits:</p>
-      <ul id="attributions"></ul>
-    </footer>
+      <footer class="credits">
+        <p class="credits-unofficial"><strong>Unofficial. Not affiliated with any race organizer.</strong></p>
+        <ul id="attributions" class="credits-list" aria-label="Data and map credits"></ul>
+        <div id="sources"></div>
+      </footer>
+    </div>
+    <dialog id="plan-dialog" class="sheet" aria-labelledby="plan-heading">
+      <div class="sheet-head">
+        <h2 id="plan-heading">Your race plan</h2>
+        <form method="dialog"><button type="submit" class="button">Close</button></form>
+      </div>
+      <div id="plan"></div>
+      <div id="splits"></div>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

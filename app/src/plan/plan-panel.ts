@@ -1,6 +1,6 @@
 // The Race Plan form: edition, start wave, start time, and a goal as a finish time or a pace.
-// Plain on purpose; the look arrives with #6. What it must get right is honesty about the
-// edition facts:
+// It opens from the banner, so the first screen stays small (PLAN.md principle 8). What it must
+// get right is honesty about the edition facts:
 //   - every fact shown links to its source;
 //   - a race date the organizer hasn't confirmed says so, and how it is known;
 //   - a wave whose start time nobody has published has no time until the runner types their own
@@ -8,27 +8,33 @@
 //   - every time of day that rests on a carried-over start time is greyed, with the edition it
 //     came from and the reason; the runner's own start time is theirs, and is never greyed;
 //   - it says that every time assumes an even pace.
+// A pace is typed and shown per kilometre or per mile, whichever the runner thinks in (D42); the
+// plan itself keeps it per km, so switching units never changes the goal.
 // The form is built once and then only refreshed, so typing and pressing Tab never loses the
 // runner's place.
 import type { Edition, Wave } from "../bundle/types";
 import { type Goal, goalWrittenAs, hasStartTime, ownStartTimeFor, parseGoal, parseStartTime, type Planner, type PlannerCourse, type RacePlan, sanitizePlan } from "../core/planner";
 import { formatElapsed, formatPace } from "../core/race-clock";
+import { paceInUnits, type Units, unitName } from "../core/units";
 import { raceDate } from "../core/words";
 import { html, sourceLink } from "../dom";
 
 export interface PlanPanel {
-  show(course: PlannerCourse, planner: Planner): void;
+  show(course: PlannerCourse, planner: Planner, units: Units): void;
 }
 
-const GOAL_HELP: Record<Goal["kind"], string> = {
-  finish: "Hours and minutes, like 3:45 (or 3:45:30).",
-  pace: "Minutes and seconds per kilometre, like 5:20.",
-};
+/** A pace a runner might type, so the example reads right in either unit. */
+const EXAMPLE_PACE: Record<Units, string> = { km: "5:20", mi: "8:35" };
 
-const GOAL_ERROR: Record<Goal["kind"], string> = {
-  finish: "That doesn't read as a marathon finish time. Write it like 3:45 or 3:45:30.",
-  pace: "That doesn't read as a marathon pace. Write minutes and seconds per kilometre, like 5:20.",
-};
+function goalHelp(kind: Goal["kind"], units: Units): string {
+  return kind === "finish" ? "Hours and minutes, like 3:45 (or 3:45:30)." : `Minutes and seconds per ${unitName(units)}, like ${EXAMPLE_PACE[units]}.`;
+}
+
+function goalError(kind: Goal["kind"], units: Units): string {
+  return kind === "finish"
+    ? "That doesn't read as a marathon finish time. Write it like 3:45 or 3:45:30."
+    : `That doesn't read as a marathon pace. Write minutes and seconds per ${unitName(units)}, like ${EXAMPLE_PACE[units]}.`;
+}
 
 const START_TIME_ERROR = "That doesn't read as a time of day. Write it on the 24-hour clock, like 09:35.";
 const EVEN_PACE = "Every time here assumes an even pace from start to finish. Real races slow on hills and late on, so read them as approximate.";
@@ -37,6 +43,7 @@ const EVEN_PACE = "Every time here assumes an even pace from start to finish. Re
 export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePlan) => void): PlanPanel {
   let course: PlannerCourse | undefined;
   let planner: Planner | undefined;
+  let units: Units = "km";
   // A wave the runner has picked that has no published start time, while they type their own.
   // It isn't their plan yet: a plan always has a start time, so the times on screen never go blank.
   let awaitingStartTime: Wave | undefined;
@@ -53,9 +60,10 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
 
   const finishKind = html("input", { type: "radio", name: "goal-kind", value: "finish" });
   const paceKind = html("input", { type: "radio", name: "goal-kind", value: "pace" });
+  const paceLabel = html("span");
   const goal = html("input", { type: "text", inputmode: "numeric", autocomplete: "off", size: 8, "aria-label": "Goal", "aria-describedby": "goal-help goal-error" });
-  const goalHelp = html("small", { id: "goal-help" });
-  const goalError = html("p", { class: "plan-error", id: "goal-error", role: "alert" });
+  const goalHint = html("small", { id: "goal-help" });
+  const goalProblem = html("p", { class: "plan-error", id: "goal-error", role: "alert" });
   const summary = html("p", { class: "plan-summary" });
 
   const form = html(
@@ -69,7 +77,7 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
     startError,
     carriedOver,
     notPublished,
-    html("fieldset", {}, html("legend", { text: "Goal" }), html("label", {}, finishKind, " Finish time"), html("label", {}, paceKind, " Pace per km"), goal, goalHelp, goalError),
+    html("fieldset", {}, html("legend", { text: "Goal" }), html("label", {}, finishKind, " Finish time"), html("label", {}, paceKind, " ", paceLabel), goal, goalHint, goalProblem),
     summary,
     html("p", { class: "plan-note", text: EVEN_PACE }),
   );
@@ -115,8 +123,8 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   const commitGoal = () => {
     if (!course || !planner) return;
     const kind = planner.plan.goal.kind;
-    const parsed = parseGoal(kind, goal.value, course);
-    goalError.textContent = parsed ? "" : GOAL_ERROR[kind];
+    const parsed = parseGoal(kind, goal.value, course, units);
+    goalProblem.textContent = parsed ? "" : goalError(kind, units);
     goal.setAttribute("aria-invalid", String(!parsed));
     if (parsed) change({ goal: parsed });
   };
@@ -152,9 +160,10 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   }
 
   return {
-    show(nextCourse, nextPlanner) {
+    show(nextCourse, nextPlanner, nextUnits) {
       course = nextCourse;
       planner = nextPlanner;
+      units = nextUnits;
       awaitingStartTime = undefined;
       const chosen = planner.edition;
       const whose = planner.carriedOver ? ` (carried over from ${planner.carriedOver.fromEdition})` : planner.ownStartTime ? " (your own start time)" : "";
@@ -184,14 +193,16 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       const kind = planner.plan.goal.kind;
       finishKind.checked = kind === "finish";
       paceKind.checked = kind === "pace";
-      goal.value = kind === "finish" ? formatElapsed(planner.goalFinishSeconds) : formatPace(planner.goalPaceSecondsPerKm);
+      const pace = formatPace(paceInUnits(planner.goalPaceSecondsPerKm, units));
+      paceLabel.textContent = `Pace per ${unitName(units)}`;
+      goal.value = kind === "finish" ? formatElapsed(planner.goalFinishSeconds) : pace;
       goal.setAttribute("aria-invalid", "false");
-      goalHelp.textContent = GOAL_HELP[kind];
-      goalError.textContent = "";
+      goalHint.textContent = goalHelp(kind, units);
+      goalProblem.textContent = "";
 
       const finish = planner.at(planner.lengthKm);
       summary.replaceChildren(
-        `${formatElapsed(planner.goalFinishSeconds)} finish · ${formatPace(planner.goalPaceSecondsPerKm)} per km · `,
+        `${formatElapsed(planner.goalFinishSeconds)} finish · ${pace} per ${unitName(units)} · `,
         // A time of day: greyed when it rests on a carried-over start time.
         html("span", { class: planner.carriedOver ? "carried-over" : undefined, text: `start ${planner.at(0).localClock}, finish ${finish.localClock} ${finish.zoneLabel}` }),
         whose,

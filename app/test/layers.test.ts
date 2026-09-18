@@ -53,7 +53,7 @@ describe("what a layer puts on screen", () => {
   it("is all three with Hills on: marks on the course line, rows on the strip, a clause in the sentence", () => {
     const screen = onScreen(pressLayer(NO_LAYERS, "hills"), layers);
 
-    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort vs flat"]);
+    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort"]);
     expect(screen.lineMarks.length).toBeGreaterThan(10);
     expect(screen.clause(24.5, "km")?.text).toBe("Climbing 4%.");
   });
@@ -72,7 +72,7 @@ describe("what a layer puts on screen", () => {
 
   it("opens every layer's rows with Show everything, without marking the map or lengthening the sentence", () => {
     const screen = onScreen(pressEverything(NO_LAYERS), layers);
-    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort vs flat"]);
+    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort"]);
     expect(screen.lineMarks).toEqual([]);
     expect(screen.clause(24.5, "km")).toBeNull();
   });
@@ -84,7 +84,9 @@ describe("the Hills layer", () => {
   it("prints the value under the cursor for each row, in the runner's units", () => {
     const [grade, effort] = hills.rows();
     expect(grade.valueAt(24.5, "km").text).toMatch(/^\+3\.\d%$/);
-    expect(effort.valueAt(24.5, "km").text).toMatch(/^1\.\d\d× · \d+% more energy than flat$/);
+    // 20% more energy than the same distance on flat ground.
+    expect(effort.valueAt(24.5, "km").text).toMatch(/^\+\d\d%$/);
+    expect(effort.scale("km")).toBe("energy vs flat ground");
     expect(grade.scale("km")).toMatch(/^%, −\d\.\d to \+\d\.\d$/);
   });
 
