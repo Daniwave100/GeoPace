@@ -27,10 +27,125 @@ footer {
   padding: 0 16px;
   font-size: 14px;
 }
-#globe {
+.map {
+  position: relative;
   flex: 3 1 480px;
   height: 60vh;
   min-height: 360px;
+}
+#globe {
+  height: 100%;
+}
+
+/* "Make it photoreal": solid blocks laid on the map's top right corner, never glass (PLAN.md D32).
+   The map's own credits run along its bottom edge, and nothing here may cover them. */
+#photoreal {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  max-width: min(340px, calc(100% - 16px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 13px;
+}
+.photoreal-control {
+  display: flex;
+}
+.photoreal-control button {
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 12px;
+  color: #fff;
+  background: #000;
+  border: 2px solid #000;
+  border-radius: 0;
+  cursor: pointer;
+}
+.photoreal-control .photoreal-main {
+  font-size: 15px;
+}
+.photoreal-control .photoreal-settings {
+  color: #000;
+  background: #fff;
+  border-left: 0;
+}
+.photoreal-control button:disabled {
+  cursor: progress;
+  background: #444;
+}
+.photoreal-control button:focus-visible {
+  outline: 3px solid #1546ff;
+  outline-offset: 2px;
+}
+.photoreal-status {
+  margin: 0;
+  padding: 6px 8px;
+  color: #000;
+  background: #fff;
+  border: 2px solid #000;
+}
+.photoreal-status:empty {
+  display: none;
+}
+.photoreal-trouble {
+  border-color: #b00;
+}
+.photoreal-camera {
+  font-variant-numeric: tabular-nums;
+}
+.photoreal-dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 8px 20px 16px;
+  color: #111;
+  background: #fff;
+  border: 3px solid #000;
+  font-size: 14px;
+}
+.photoreal-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+.photoreal-dialog h3,
+.photoreal-dialog h4 {
+  margin: 16px 0 4px;
+}
+.photoreal-dialog p,
+.photoreal-dialog ol {
+  margin: 4px 0;
+}
+.photoreal-form label {
+  display: block;
+  margin: 12px 0 2px;
+  font-weight: 700;
+}
+.photoreal-form input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px;
+  font: inherit;
+}
+.photoreal-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.photoreal-buttons button {
+  font: inherit;
+}
+.photoreal-remembered {
+  font-weight: 600;
+}
+.photoreal-problem {
+  border-left: 4px solid #b00;
+  padding: 4px 8px;
+  background: #fbeaea;
+}
+.photoreal-help {
+  border-top: 1px solid #ccc;
 }
 .plan label {
   display: block;

@@ -6,6 +6,8 @@
 import {
   BoundingSphere,
   Cartesian3,
+  Cartographic,
+  type Cesium3DTileset,
   CesiumTerrainProvider,
   Color,
   ConstantPositionProperty,
@@ -13,10 +15,12 @@ import {
   HeadingPitchRange,
   HeightReference,
   ImageryLayer,
+  Ion,
   JulianDate,
   LabelStyle,
   Math as CesiumMath,
   OpenStreetMapImageryProvider,
+  sampleTerrainMostDetailed,
   Terrain,
   VerticalOrigin,
   Viewer,
@@ -24,12 +28,18 @@ import {
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { CourseBundle } from "../bundle/types";
 import type { RoadPosition } from "../core/scrub";
+import type { PhotorealTiles } from "../photoreal/photoreal";
 import { BASEMAP, TERRAIN } from "./providers";
 
 const RUNNER_ID = "runner";
 
 /** The viewer is made once; switching course only swaps what is drawn on it. */
 export function createGlobe(container: HTMLElement): Viewer {
+  // CesiumJS comes with a demo Cesium ion token of its own, for trying ion out. This app is keyless
+  // until a runner brings their own key (PLAN.md D3), so the demo token is switched off: nothing
+  // here can reach ion by accident, and a runner's token is only ever handed over explicitly.
+  Ion.defaultAccessToken = "";
+
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
       new OpenStreetMapImageryProvider({
@@ -132,4 +142,59 @@ function frameCourse(viewer: Viewer, lat: number[], lon: number[]): void {
     offset: new HeadingPitchRange(0, CesiumMath.toRadians(-45), sphere.radius * 2.6),
     duration: 0,
   });
+}
+
+/**
+ * Put photoreal imagery into the scene. The keyless map stays where it is until the imagery's
+ * first view has fully arrived, and comes straight back when the imagery is removed, so the view
+ * is never blank. The course and the runner are clamped to the ground, which CesiumJS takes to mean
+ * the imagery's surface once the plain ground is hidden, so nothing about them changes here.
+ */
+export function showPhotoreal(viewer: Viewer, tileset: Cesium3DTileset): PhotorealTiles {
+  const globe = viewer.scene.globe;
+  let removed = false;
+  viewer.scene.primitives.add(tileset);
+  // Google's imagery has its own ground. Left on, the plain ground pokes through it in patches.
+  tileset.initialTilesLoaded.addEventListener(() => {
+    if (!removed) globe.show = false;
+  });
+
+  return {
+    watch(onTile) {
+      // Deliberately deaf to what CesiumJS says about a failed tile: its address has the key in it.
+      tileset.tileLoad.addEventListener(() => onTile(true));
+      tileset.tileFailed.addEventListener(() => onTile(false));
+    },
+    remove() {
+      if (removed) return;
+      removed = true;
+      globe.show = true;
+      tileset.show = false;
+      // A tile can fail in the middle of drawing a frame. Taking the imagery apart waits until that frame is done.
+      setTimeout(() => viewer.scene.primitives.remove(tileset), 0);
+    },
+  };
+}
+
+/**
+ * Tell `onHeight` how far the camera is above the ground, each time the camera comes to rest.
+ * The ground is the keyless open terrain, never the photoreal imagery, which is for looking at
+ * only (PLAN.md D5). Null when the terrain can't say.
+ */
+export function watchCameraHeight(viewer: Viewer, onHeight: (meters: number | null) => void): void {
+  let asked = 0;
+  const measure = async (): Promise<void> => {
+    const mine = ++asked;
+    const eye = Cartographic.clone(viewer.camera.positionCartographic);
+    let meters: number | null = null;
+    try {
+      const [ground] = await sampleTerrainMostDetailed(viewer.terrainProvider, [Cartographic.clone(eye)]);
+      if (Number.isFinite(ground.height)) meters = eye.height - ground.height;
+    } catch {
+      // The terrain is best-effort (PLAN.md D16). No height is better than a wrong one.
+    }
+    if (mine === asked) onHeight(meters);
+  };
+  viewer.camera.moveEnd.addEventListener(() => void measure());
+  void measure();
 }
