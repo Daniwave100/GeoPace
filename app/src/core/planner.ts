@@ -9,6 +9,7 @@
 // one thing that outranks them: the runner's own start time, read off their start card.
 import type { CourseBundle, Edition, Wave } from "../bundle/types";
 import { raceClock } from "./race-clock";
+import { secondsPerKmFromPace, type Units } from "./units";
 
 /** How close to a whole number of steps still counts as on it: floating point, not distance. */
 const ON_THE_MARK = 1e-9;
@@ -228,12 +229,16 @@ export function parseStartTime(text: string): string | null {
   return match ? `${match[1].padStart(2, "0")}:${match[2]}` : null;
 }
 
-/** Reads "3:45" or "3:45:30" as a finish time, "5:20" as a pace per km. null if it isn't one. */
-export function parseGoal(kind: Goal["kind"], text: string, course: Pick<PlannerCourse, "certifiedDistanceM">): Goal | null {
+/**
+ * Reads "3:45" or "3:45:30" as a finish time, "5:20" as a pace. null if it isn't one. A pace is
+ * typed per the unit the runner is shown (per km, or per mile) and kept per km, like everything
+ * inside the app.
+ */
+export function parseGoal(kind: Goal["kind"], text: string, course: Pick<PlannerCourse, "certifiedDistanceM">, units: Units = "km"): Goal | null {
   const match = (kind === "finish" ? FINISH_TIME : PACE).exec(text.trim());
   if (!match) return null;
   const [first, second, third] = [match[1], match[2], match[3] ?? "0"].map(Number);
-  const goal: Goal = kind === "finish" ? { kind, seconds: first * 3600 + second * 60 + third } : { kind, secondsPerKm: first * 60 + second };
+  const goal: Goal = kind === "finish" ? { kind, seconds: first * 3600 + second * 60 + third } : { kind, secondsPerKm: secondsPerKmFromPace(first * 60 + second, units) };
   return isPlausible(goal, course) ? goal : null;
 }
 
