@@ -87,6 +87,9 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D28 | ✅ **Visual direction: B · Race poster.** Black, white and one blue on a strict grid with the rules showing; Archivo (one variable family: width 62% / weight 900 for numerals); solid = measured, hollow = hearsay, halftone dots = "depends on the trees", grey and struck = not measured, hazard stripes = sample; flat street model with solid black shadows; follows the system's light or dark theme. Tokens in §6. The blue refers to the line painted on the road at both races; the owner confirmed on 09-18 that this is fine under D12. No organizer palette, typeface or mark is used. | Owner's pick from the three mockups (#4): "the one that looked the coolest". | 09-18 |
 | D29 | ✅ **The mockup's screen is the *everything* view, not the first screen.** Owner on seeing it: love the look, but "there's a lot" — it has to be easy for a runner who isn't technical (principle 8). #6 applies the look with far less on screen by default; how (see §6 "Simplifying the screen") is 🟡 proposed, not yet agreed. | A design that wins on looks and loses the user on first contact doesn't earn stars. | 09-18 |
 | D30 | ✅ **Photoreal is the headline look; the white model is what opens with no set-up.** The app advertises photoreal (Google 3D Tiles with the runner's own key) as *the* way to see the ride, with a prominent "Make it photoreal" control and plain set-up help. With no key it opens straight into the **white model of the city's real buildings** — real footprints and heights from each city's open data (§5 "Buildings"), cut to the course corridor by the pipeline (#7) — never a blank or a nag screen. Refines D3/D4; does not change them: no key ships with the project. | Owner directive 09-18: people should know the key is what makes it look cool, and the fallback should still be the actual buildings, "a white 3D layout". A key can't be the literal default because none can ship in the repo (and it would bill the maintainer), and most non-technical runners will never create one (principle 8) — so the white city has to stand on its own. | 09-18 |
+| D31 | ✅ **B is refined with the Field instrument's charts, and ships with both light and dark.** The poster keeps its identity (Archivo, the blue, the grid, solid/hollow), but the km strip's layers are drawn as the instrument drew them: thin line traces with a light fill, a labelled scale, and the value under the cursor printed in the row's header. Light and dark are both first-class, with a switch in the app as well as following the system. | Owner on 09-18: the instrument's charts "are much easier to understand" than the poster's solid bars and wedges; and light mode matters as much as dark. D13 always allowed a mix. | 09-18 |
+| D32 | ✅ **The interface has to belong on top of photoreal imagery, not beside it.** The design is judged against Google's photoreal city, not only the white model. Not "a map inside a web page". | Owner directive 09-18. None of the mockups or prototypes has been seen against real imagery yet — that is the biggest unknown left in the look. | 09-18 |
+| D33 | ✅ **Two cameras, and the ride is a time-lapse.** A bird's-eye view and a runner's view of the same ride; nobody watches a three-hour video. *How low the runner's view can go is 🟡 open* — see §6 "The ride". | Owner's vision 09-18: "like a drive cam… you're on the actual ground", plus a bird's-eye view. | 09-18 |
 
 ---
 
@@ -185,6 +188,29 @@ they do in any player. Beside it: the kilometre, the time of day, and **one sent
 Runners say) are switched on one at a time; "show everything" opens the full poster for people who want it.
 The ride stops at **chapters** — the 8–12 places where something happens — instead of treating all 42 km alike.
 
+### The ride — 🟡 Claude's thinking 09-18, to be settled by building a slice, not by more mockups
+
+- **What can't be judged yet.** Everything the owner has seen uses invented blocks drawn in SVG: no real city, no
+  imagery, no moving camera. Most of how the product *feels* is the ride, and none of it exists. More mockups won't
+  answer that. **Recommended next step: one real vertical slice** — CesiumJS, the NYC course, a camera that rides it,
+  photoreal tiles on the owner's own key, and the poster UI laid over it — then decide with eyes.
+- **Composition over imagery (D32).** The 3D view goes full-bleed and the poster sits *on* it as opaque blocks — black
+  or white slabs, the blue, big numerals — the way a marathon TV broadcast lays graphics over the race. Opaque, never
+  glass (D11). This argues against a boxed 3D panel beside a column of UI, which is what prototype variants B and C do.
+- **Shape of the screen.** Owner is between prototype **C · Guided tour** and **B · Poster, cut down**. They combine:
+  C's stops with Back / Ride-to-next as the way through the course, B's numeral and list of places, the strip as seek bar.
+- **Runner's view, honestly.** Google's photoreal city is photographed from aircraft. From ~100 m it is superb; at eye
+  level facades smear, trees and cars are blobs, and a camera under a tree or *inside a bridge* (the Queensboro's lower
+  deck is the course) is inside the mesh. 🔍 To verify in the slice. Likely answer: the "runner's view" is a **lead-vehicle
+  camera** — a few metres up and behind, looking down the road, the way marathons are actually filmed — not a 1.7 m eye.
+  🔍 Street View is the true ground-level source, but it is billed per panorama and its terms restrict turning it into
+  video; verify before considering it.
+- **Speed.** 42 km in 3 minutes is ~230 m/s: fine from the air, unwatchable on the ground. So: bird's-eye between
+  stops, drop to the runner's view for the few hundred metres that matter at each stop, at a gentler time-lapse.
+- **Sun in photoreal.** Google's imagery has its own shadows baked in (D4), so the moving sun is only *true* in the
+  white model. In photoreal the sun is shown as overlay: where it is, glare when it's in your eyes, and the course
+  line itself drawn differently where the computed shade says sun vs. shade.
+
 ### How the direction was chosen
 
 The three mockups are still at
@@ -222,6 +248,7 @@ diagram with the sun's path over the whole race.
 | **Theme** | Light only (it is paper) | Follows the system, light or dark | Light only (a dark instrument is the HUD we're avoiding) |
 
 **Open questions:**
+- 🟡 Decide whether to build the vertical slice described in "The ride" next (it reorders #5–#8).
 - 🟡 Confirm (or change) "Simplifying the screen" above before #6 starts. A throwaway prototype with three takes
   (Cinema · Poster, cut down · Guided tour) is on the branch `prototype/player-screen`, at `/mockups/prototype-player.html`.
 - 🟡 Whether the Roadbook's margin notes or the Field instrument's sky dial should be carried into B.
@@ -351,3 +378,6 @@ arrival times are approximate — state that in the UI.
   that the owner has not yet confirmed.
 - **2026-09-18** — Owner confirmed the poster's blue (D28) and set the photoreal/white-model relationship (D30). A three-variant
   prototype of the simplified first screen is on the throwaway branch `prototype/player-screen` for the owner to judge.
+- **2026-09-18** — Owner feedback on the prototype: between Guided tour and Poster-cut-down; wants the instrument's clearer
+  charts and both themes (D31), a UI that belongs on photoreal imagery (D32), and two cameras with a time-lapse ride (D33).
+  §6 "The ride" records Claude's assessment and the recommendation to build one real slice next instead of more mockups.
