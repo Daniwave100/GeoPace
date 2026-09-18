@@ -80,3 +80,32 @@ export function spreadLabels(labels: LabelSlot[], bounds: { min: number; max: nu
   }
   return centres;
 }
+
+/**
+ * The height range a profile is drawn over: from just under the course's lowest point to its
+ * highest. Not from sea level — Berlin moves 23 m all day, and drawn from zero it is a slab — so
+ * every design prints both ends of the scale beside the profile.
+ */
+export function heightDomain(story: { elevation: { minM: number; maxM: number } }): [number, number] {
+  const { minM, maxM } = story.elevation;
+  return [minM - (maxM - minM) * 0.12, maxM];
+}
+
+/**
+ * Stacks horizontal labels into lanes so none overprints its neighbour. Each label goes in the
+ * first lane where it touches nothing already there; if every lane is taken, in the one where it
+ * overlaps least. Returns a lane index per label, in the order given.
+ */
+export function assignLanes(labels: { start: number; end: number }[], laneCount: number, gap = 0): number[] {
+  const placed: { start: number; end: number }[][] = Array.from({ length: laneCount }, () => []);
+  const overlap = (lane: { start: number; end: number }[], label: { start: number; end: number }) =>
+    lane.reduce((sum, other) => sum + Math.max(0, Math.min(other.end, label.end) + gap - Math.max(other.start, label.start)), 0);
+
+  return labels.map((label) => {
+    const overlaps = placed.map((lane) => overlap(lane, label));
+    let lane = overlaps.findIndex((amount) => amount <= 0);
+    if (lane < 0) lane = overlaps.indexOf(Math.min(...overlaps));
+    placed[lane].push(label);
+    return lane;
+  });
+}

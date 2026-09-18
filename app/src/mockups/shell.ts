@@ -66,6 +66,10 @@ export function startMockup(design: MockupDesign): void {
   const goal = GOAL_CHOICES.includes(params.get("goal") ?? "") ? (params.get("goal") as string) : DEFAULT_GOAL;
 
   chrome.append(reviewBar(design.id, courseId, goal));
+  // Designs that pin something under the bar need to know how tall it is; it wraps when narrow.
+  const publishHeight = () => document.documentElement.style.setProperty("--review-bar-height", `${chrome.offsetHeight}px`);
+  new ResizeObserver(publishHeight).observe(chrome);
+  publishHeight();
   void show(design, stage, courseId, goal, params.get("km"));
 }
 
