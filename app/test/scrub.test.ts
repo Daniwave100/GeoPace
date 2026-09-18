@@ -88,16 +88,22 @@ describe("scrubbing with the pointer", () => {
 });
 
 describe("the place on the road at a km", () => {
-  // Three samples, 10 m apart, heading north then turning east.
+  // Three samples, 10 m apart, heading north then turning east, climbing a ramp. Sea level is
+  // 39.5 m above the ellipsoid here, so the scene's heights are that much more than the runner's.
   const line = {
     km: [0, 0.01, 0.02],
     lat: [52.5, 52.50009, 52.50009],
     lon: [13.4, 13.4, 13.40015],
+    ellipsoid_height_m: [74.5, 75.0, 75.4],
     bearing_deg: [0, 0, 90],
   } as CourseLine;
 
   it("is the sample itself at a sampled km", () => {
-    expect(positionAtKm(line, 0.01)).toEqual({ lat: 52.50009, lon: 13.4, bearingDeg: 0 });
+    expect(positionAtKm(line, 0.01)).toEqual({ lat: 52.50009, lon: 13.4, roadHeightM: 75.0, bearingDeg: 0 });
+  });
+
+  it("has the road's height in the 3D scene, between the two samples around it like the rest", () => {
+    expect(positionAtKm(line, 0.015).roadHeightM).toBeCloseTo(75.2, 9);
   });
 
   it("is on the straight line between the two samples around it", () => {
@@ -110,7 +116,7 @@ describe("the place on the road at a km", () => {
   });
 
   it("stays on the course before the start and past the finish", () => {
-    expect(positionAtKm(line, -1)).toEqual({ lat: 52.5, lon: 13.4, bearingDeg: 0 });
-    expect(positionAtKm(line, 5)).toEqual({ lat: 52.50009, lon: 13.40015, bearingDeg: 90 });
+    expect(positionAtKm(line, -1)).toEqual({ lat: 52.5, lon: 13.4, roadHeightM: 74.5, bearingDeg: 0 });
+    expect(positionAtKm(line, 5)).toEqual({ lat: 52.50009, lon: 13.40015, roadHeightM: 75.4, bearingDeg: 90 });
   });
 });

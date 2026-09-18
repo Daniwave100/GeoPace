@@ -11,6 +11,14 @@
 //   - it fades: the colour runs smoothly between those three stops, with no sudden change;
 //   - both ways it gets darker as it gets deeper, never green against red (the pair one man in
 //     twelve can't tell apart), so the scale still reads in a grey screenshot.
+//
+// A dashed mark (not measured here; a sample) carries its own ground (issue #22). Dashes laid
+// straight onto the map are two different pictures: over dark imagery the grey dashes vanished and
+// the paper-coloured gaps stood out as a row of white squares, and over the pale keyless map it
+// was the other way round. So the colour between the dashes is a band with a hairline edge, and
+// the dashes are narrower than the band: it runs unbroken down both sides of them. A dash is then
+// always seen against the band, and the band shows on any ground, by itself where the ground is
+// dark and by its edge where it is pale.
 import type { Encoding } from "./encoding";
 import type { HowMuch } from "./layers";
 
@@ -23,6 +31,8 @@ export interface MarkLook {
   edgePx: number;
   /** Dashes, with this between them; null for a solid line. */
   gap: string | null;
+  /** For a dashed mark: how much of the colour between the dashes runs unbroken along each side of them, inside the edge. */
+  rimPx: number;
 }
 
 const INK = "#000000";
@@ -34,6 +44,9 @@ const WARM = ["#ffd84d", "#f07f1f", "#a3150f"];
 const COOL = ["#a5e8dc", "#1fa698", "#0a5a55"];
 /** Wide enough to show either side of the blue line. */
 const WIDTH_PX = 16;
+/** A dashed mark is wider: the rims take room, and the dashes still have to show either side of the blue line. */
+const DASHED_WIDTH_PX = 20;
+const RIM_PX = 2;
 
 /** The colour for how much: warm above 0, teal below, pale near 0 and deep at 1, fading between. */
 export function rampColor(howMuch: HowMuch): string {
@@ -56,13 +69,13 @@ export function markLook(encoding: Encoding, howMuch?: HowMuch): MarkLook {
   switch (encoding) {
     case "measured":
       return howMuch === undefined
-        ? { widthPx: WIDTH_PX, color: INK, edge: PAPER, edgePx: 1, gap: null }
-        : { widthPx: WIDTH_PX, color: rampColor(howMuch), edge: INK, edgePx: 1.5, gap: null };
+        ? { widthPx: WIDTH_PX, color: INK, edge: PAPER, edgePx: 1, gap: null, rimPx: 0 }
+        : { widthPx: WIDTH_PX, color: rampColor(howMuch), edge: INK, edgePx: 1.5, gap: null, rimPx: 0 };
     case "runner-report":
-      return { widthPx: WIDTH_PX, color: PAPER, edge: INK, edgePx: 3, gap: null };
+      return { widthPx: WIDTH_PX, color: PAPER, edge: INK, edgePx: 3, gap: null, rimPx: 0 };
     case "not-measured":
-      return { widthPx: WIDTH_PX, color: GREY, edge: GREY, edgePx: 0, gap: PAPER };
+      return { widthPx: DASHED_WIDTH_PX, color: GREY, edge: INK, edgePx: 1.5, gap: PAPER, rimPx: RIM_PX };
     case "sample":
-      return { widthPx: WIDTH_PX, color: INK, edge: INK, edgePx: 0, gap: PAPER };
+      return { widthPx: DASHED_WIDTH_PX, color: INK, edge: INK, edgePx: 1.5, gap: PAPER, rimPx: RIM_PX };
   }
 }

@@ -32,6 +32,7 @@ import { showLineMarks } from "./scene/course-marks";
 import { createGlobe, frameCourse, goTo, isStillFramed, showCourse, showMapTheme, showRunner, toggleStraightDown, watchCameraHeight } from "./scene/globe";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
+import type { Placement } from "./scene/placement";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
 import { createStrip, type KeyEntry, rowsHeightAtSizeOne } from "./strip/strip";
 import type { Viewer } from "cesium";
@@ -64,6 +65,8 @@ let themeChoice: ThemeChoice = loadThemeChoice(storage);
 let layerState: LayerState = NO_LAYERS;
 let stripSize = loadStripSize(storage);
 let fullMap = false;
+/** How the course is drawn on the map now: draped on the keyless map's ground, at the road's own height over photoreal imagery (issue #22). */
+let placement: Placement = "draped";
 let viewer: Viewer | undefined;
 let mapControls: MapControls | undefined;
 let mapLabels: MapLabels | undefined;
@@ -148,7 +151,7 @@ async function show(courseId: string): Promise<void> {
     });
     showTheme();
   }
-  showCourse(viewer, bundle);
+  showCourse(viewer, bundle, placement);
   photoreal ??= startPhotoreal(viewer);
 
   const course = plannerCourse(bundle);
@@ -241,9 +244,22 @@ function showLayers(): void {
   const screen = (showing.screen = onScreen(layerState, layers));
   layerBar.show(layerState, layers);
   showStrip();
-  showLineMarks(viewer, bundle, screen.lineMarks);
-  mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))]);
+  showLineMarks(viewer, bundle, screen.lineMarks, placement);
+  mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))], placement);
   scrubTo(showing.km);
+}
+
+/**
+ * The photoreal imagery has taken the plain ground's place, or given it back: everything drawn on
+ * the course moves with it. Over the imagery the line, its marks, the runner and the labels are at
+ * the road's own height, from the Course Bundle; on the keyless map they are draped on the ground.
+ */
+function usePlacement(next: Placement): void {
+  if (placement === next) return;
+  placement = next;
+  if (!showing || !viewer) return;
+  showCourse(viewer, showing.bundle, placement);
+  showLayers(); // the marks and the labels, and through scrubTo the runner
 }
 
 /** The strip as it should be now: its rows, its key, and the size the runner has made it. */
@@ -272,13 +288,13 @@ function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
 function endLabels(bundle: CourseBundle): MapLabel[] {
   const line = bundle.measured.course_line;
   const last = line.km.length - 1;
-  const place = (text: string, i: number): MapLabel => ({ lat: line.lat[i], lon: line.lon[i], text, look: "place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
+  const place = (text: string, i: number): MapLabel => ({ lat: line.lat[i], lon: line.lon[i], roadHeightM: line.ellipsoid_height_m[i], text, look: "place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
   return [place("Start", 0), place("Finish", last)];
 }
 
 function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
   const at = positionAtKm(bundle.measured.course_line, label.atKm);
-  return { lat: at.lat, lon: at.lon, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
+  return { lat: at.lat, lon: at.lon, roadHeightM: at.roadHeightM, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
 }
 
 /** Scrubbing: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */
@@ -295,7 +311,7 @@ function scrubTo(km: number): void {
   strip.setKm(readout.km, `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`);
   readoutView.show(planner, readout, units);
   sentenceView.show(sentence);
-  showRunner(viewer, place, readout.instant);
+  showRunner(viewer, place, readout.instant, placement);
 }
 
 /** How long the camera takes to get somewhere. With reduced motion asked for, it doesn't travel: it is there. */
@@ -321,7 +337,7 @@ function frameWholeCourse(seconds: number): void {
  * asks it anything, so whatever happens to the imagery, the course, the strip and the plan carry on.
  */
 function startPhotoreal(globe: Viewer): Photoreal {
-  const controller = createPhotoreal({ storage, loadTiles: (key) => loadPhotorealTiles(globe, key) });
+  const controller = createPhotoreal({ storage, loadTiles: (key) => loadPhotorealTiles(globe, key, (inPlace) => usePlacement(inPlace ? "road-height" : "draped")) });
   const panel = (photorealPanel = createPhotorealPanel(byId("photoreal"), controller));
   panel.showUnits(units);
   // The camera's height is only wanted, and only asked of the terrain service, while photoreal is showing.

@@ -86,6 +86,37 @@ describe("the colour of a hill", () => {
   });
 });
 
+describe("a dashed mark, over a pale map and over dark imagery", () => {
+  // The owner, looking at New York in photoreal: the grey dashes had vanished into the dark bridge
+  // and only the paper-coloured gaps showed, "checkered boxes". Over the pale keyless map it was the
+  // other way round. A dashed mark has to be the same picture on any ground (issue #22).
+  const contrast = (a: string, b: string) => {
+    const [dark, light] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => x - y);
+    return (light + 0.05) / (dark + 0.05);
+  };
+  const greys = Array.from({ length: 52 }, (_, i) => `#${(i * 5).toString(16).padStart(2, "0").repeat(3)}`);
+
+  for (const encoding of ["not-measured", "sample"] as const) {
+    it(`${encoding}: carries its own ground, so the dashes are always seen against the same thing`, () => {
+      const look = markLook(encoding);
+      if (look.gap === null) throw new Error("expected a dashed mark");
+      // The colour between the dashes is a band that also runs unbroken down both sides of them:
+      // a dash is never next to the map, whatever the map looks like there.
+      expect(look.rimPx).toBeGreaterThanOrEqual(1.5);
+      expect(contrast(look.color, look.gap)).toBeGreaterThanOrEqual(3); // what a mark needs to be told from its ground (WCAG 1.4.11)
+      // Enough of each dash still shows beside the blue course line (6 px) laid over its middle.
+      expect((look.widthPx - 2 * (look.edgePx + look.rimPx) - 6) / 2).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`${encoding}: the band shows on any ground: by itself where the ground is dark, by its edge where it is pale`, () => {
+      const look = markLook(encoding);
+      if (look.gap === null) throw new Error("expected a dashed mark");
+      expect(look.edgePx).toBeGreaterThan(0);
+      for (const ground of greys) expect(Math.max(contrast(ground, look.gap), contrast(ground, look.edge)), `over ${ground}`).toBeGreaterThanOrEqual(3);
+    });
+  }
+});
+
 describe("the Hills layer's marks, by steepness", () => {
   const solid = (bundle: typeof nyc) => hillsLayer(bundle).lineMarks().filter((mark) => mark.encoding === "measured");
 

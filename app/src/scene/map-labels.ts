@@ -6,15 +6,22 @@
 //
 // The map's own credits run along its bottom edge (OpenStreetMap's, and Google's in photoreal).
 // No label is ever put there: attributions stay visible (CLAUDE.md).
+//
+// A label stands where the course line is drawn: on the open terrain's ground while the line is
+// draped, at the road's own height while the line is (placement.ts). On a bridge the two are tens
+// of metres apart, and a label at the wrong one slides off the line as the camera tilts.
 import { Cartesian2, Cartesian3, Cartographic, sampleTerrainMostDetailed, SceneTransforms, type Viewer } from "cesium";
 import { keepLabels } from "../core/declutter";
 import { type Encoding, ENCODINGS } from "../core/encoding";
 import { isOverTheHorizon } from "../core/horizon";
 import { html } from "../dom";
+import { type Placement, scenePosition } from "./placement";
 
 export interface MapLabel {
   lat: number;
   lon: number;
+  /** The road's height there in the 3D scene, from the Course Bundle: where the label stands when the course is drawn at road height. */
+  roadHeightM: number;
   text: string;
   /** The kind of claim it makes, drawn as everywhere else; or "place" for the start and the finish, which are the course's own. */
   look: Encoding | "place";
@@ -26,7 +33,8 @@ export interface MapLabel {
 }
 
 export interface MapLabels {
-  show(labels: MapLabel[]): void;
+  /** `placement` is how the course line is drawn now: the labels stand where it is. */
+  show(labels: MapLabel[], placement: Placement): void;
 }
 
 interface Placed {
@@ -87,17 +95,19 @@ export function createMapLabels(viewer: Viewer, container: HTMLElement): MapLabe
   void document.fonts?.ready.then(measure);
 
   return {
-    show(labels) {
+    show(labels, placement) {
       const mine = ++shown;
       placed = labels.map((label) => {
         const node = labelNode(label);
         node.hidden = true; // until the next frame says where it goes
         const ground = groundHeights.get(placeKey(label)) ?? 0;
-        return { label, node, position: Cartesian3.fromDegrees(label.lon, label.lat, ground), width: 0, height: 0 };
+        const position = placement === "draped" ? Cartesian3.fromDegrees(label.lon, label.lat, ground) : scenePosition(label, placement);
+        return { label, node, position, width: 0, height: 0 };
       });
       container.replaceChildren(...placed.map((item) => item.node));
       measure();
-      void liftOntoTheGround(viewer, placed, groundHeights, () => mine === shown);
+      // At road height the Course Bundle has already said how high each label stands.
+      if (placement === "draped") void liftOntoTheGround(viewer, placed, groundHeights, () => mine === shown);
     },
   };
 }
