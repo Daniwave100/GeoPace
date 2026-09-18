@@ -177,6 +177,18 @@ _Avoid_: analysis mode, architectural model, maquette (the maquette was the mock
 Google's photographed 3D city, shown with the runner's own key. For looking at only: never stored, never used to work anything out.
 _Avoid_: satellite view, Google Maps mode
 
+**Own key**:
+The runner's own Google Maps key or Cesium ion token: what lets Photoreal be shown. Kept only in their browser, and sent only to the provider it belongs to.
+_Avoid_: API key (alone), credentials, BYOK
+
+**Keyless**:
+Said of whatever the app shows with no set-up: the map today, the White model once it exists. What Photoreal falls back to.
+_Avoid_: free mode, default mode, fallback view
+
+**Load** (of Photoreal):
+One start of Photoreal: opening the app with it on, or turning it on. It is what the providers count and bill; looking around afterwards is not.
+_Avoid_: session, request, hit
+
 ### Data
 
 **Course Bundle**:

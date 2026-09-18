@@ -99,6 +99,8 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D40 | ✅ **A runner can type their own start time, and it outranks everything else.** Under the wave there is always a start-time box: it shows the wave's published time, and the runner can overwrite it. It is the only way to plan with a wave whose time isn't published (Berlin 2026's waves 2–6). The runner's own time is never greyed, even on a carried-over wave, and typing a carried-over time back in counts as confirming it. Picking a wave with no published time doesn't blank the screen: until a time is typed, the plan is unchanged and the form says whose times are still showing. It is part of the Race Plan and is remembered with it. | Owner, 09-18: "type your own start time would be very good". Each runner's start card is a better source for that runner than any schedule, and it closes the gap the review found: a four-hour Berlin runner was shown wave 1's times with nothing to be done about it. | 09-18 |
 | D41 | ✅ **A splits table: the time of day and elapsed time at every kilometre, and at the finish.** Closed until asked for (principle 8); every kilometre in it is a button that moves the runner there. Same honesty as the readout: times of day resting on a carried-over start are greyed. Kilometres are course-line km, like the strip (D20), so where that shows at the second the table says why a kilometre takes less than the runner's pace (New York: 5:37 against a 5:41 pace, because the mapped line is 42.69 km). The Planner computes splits at any step, so a table in miles is the same call with 1.609344. | Owner, 09-18: "a splits table would be pretty nice". #5 asked for times "at every km"; scrubbing alone made a runner hunt for them. | 09-18 |
 | D42 | ✅ **The app will have an imperial / metric toggle (#19, not built yet).** It is the *units* choice the Race Plan already lists (`CONTEXT.md`), so it is remembered with the plan. Everything stays metric inside (CLAUDE.md conventions: meters, km from the start); only what is shown and typed converts: the readout and the strip's marks (miles), the goal as a pace per mile, the splits table per mile, heights in feet on the profile. Until it exists, nothing new should format a distance in a way that would be hard to switch. | Owner, 09-18: "we have to also account for a toggle for imperial and metric units". New York is the launch course and its runners think in miles. | 09-18 |
+| D43 | ✅ **The runner's own key: one box, told apart by shape, kept only in the browser, sent only to its own provider.** The panel has one box for either kind of key. A Google Maps key (`AIza…`) and a Cesium ion token (a JSON Web Token, `eyJ…`) are recognized by shape, the panel says which it found and the one host it will go to, and anything else is refused without being sent anywhere. A Google key goes only to `tile.googleapis.com`; an ion token goes only to `api.cesium.com`, and ion answers with a short-lived key of its own for the tiles, so Google never sees the runner's token. The key is handed to CesiumJS explicitly each time and is ⛔ never set as a CesiumJS default (`Ion.defaultAccessToken`, `GoogleMaps.defaultApiKey`); CesiumJS's own bundled demo ion token is switched off. It is stored in `localStorage` under `geopace.photoreal`, apart from the Race Plan, with whether photoreal was left on; typed into a hidden box, and afterwards shown only by its last four characters. ⛔ No key from the build's environment (`VITE_…`), the page address, or any file. | D3 made the key the runner's; this is how that promise is kept and tested. Guessing the provider could send one company's secret to another. A CesiumJS default is sent by any part of CesiumJS that reaches for it. The owner will record a launch clip with photoreal on, so the key must never be readable on screen. Keeping it out of the Race Plan means a plan can later be shared or exported safely. Tests: the real CesiumJS request code with the network replaced by a recorder, and a guard that reads every tracked file for key-shaped strings. | 09-18 |
+| D44 | ✅ **Photoreal can fail; the view can't.** The keyless map is left in place until the imagery's first view has fully arrived, and only then is the plain ground hidden (left on, it pokes through Google's mesh). If the provider refuses the key, says it is over its allowance, or can't be reached, or if the imagery stops arriving later (the very first tile fails, or eight tiles fail in a row with none arriving between), the imagery is removed, the keyless map is showing, and a message says what happened and what to do. The course, the strip and the planning layers never wait on photoreal. There is never more than one load under way, and a load that finishes after the runner changed their mind is thrown away. A reload opens the way the runner left it. | D30: never a blank view, never a nag. A provider counts and bills each *load* (one start of photoreal; looking around afterwards is free for about three hours), so a double click must not cost two. Google ends a session after about three hours, which looks like every tile failing at once: that should land the runner back on the map with a way to start again, not on a broken picture. | 09-18 |
 
 ---
 
@@ -158,7 +160,7 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 | Keyless basemap / terrain | ✅ [OpenStreetMap standard tiles](https://operations.osmfoundation.org/policies/tiles/) (attribution visible, no bulk/offline pre-fetching, Referer sent) + [Re:Earth Terrain](https://terrain.reearth.land/) quantized-mesh `cesium-mesh/ellipsoid` ("no signup, no API key", best-effort, may rate-limit heavy clients; attribution "Re:Earth Terrain · Mapterhorn (CC BY 4.0)"). ⛔ Esri (needs key) · ⛔ CARTO raster (watermarked without key). Candidate quieter basemap for Berlin: [basemap.de Web Raster](https://basemap.de/produkte-und-dienste/web-raster/) grayscale (CC BY 4.0, Germany only). | same | OSM: ODbL · Mapterhorn: CC BY 4.0 | ✅ (D16) |
 | Bridge locations | ✅ OpenStreetMap ways, listed per bridge in `data/courses/berlin/course.yaml` | ✅ same, in `data/courses/nyc/course.yaml` (9 spans, incl. the five famous bridges) | ODbL, attribution in bundle | ✅ both |
 | Bridge deck heights | n/a — decks spanned straight (D18) | ✅ [2017 NYC Topobathymetric LiDAR](https://www.fisheries.noaa.gov/inport/item/64728), class 17 (bridge deck), as COPC tiles on NOAA Digital Coast; only the corridor around each bridge is read (D23). ⚠️ No returns at all over the middle of the Verrazzano's main span (~km 0.85–1.45): that stretch is a straight line between measured deck heights, so the real crest is a few meters higher. | NYC Open Data / NOAA, as above | ✅ NYC |
-| Photoreal 3D | Google Photorealistic 3D Tiles via user's key or Cesium ion token | same | Google ToS: no caching, attribution required · ion Community = personal/non-commercial | ✅ |
+| Photoreal 3D | ✅ Google Photorealistic 3D Tiles with the runner's own key (D43), either way, checked 2026-09-18. **Google Maps key:** the project must have billing enabled ([usage and billing](https://developers.google.com/maps/documentation/tile/usage-and-billing)); what is counted is the *root tileset request* (one per start of photoreal, good for up to three hours of tiles); [1,000 a month free, then $6.00 per 1,000](https://developers.google.com/maps/billing-and-pricing/pricing); set-up in [Google's guide](https://developers.google.com/maps/documentation/tile/get-api-key). **Cesium ion token:** the free Community plan is for personal, non-commercial projects (also unfunded education and evaluation) and [includes 1,000 root tiles a month](https://cesium.com/platform/cesium-ion/pricing/); every account has a [default token](https://cesium.com/learn/ion/cesium-ion-access-tokens/) that works. ion's asset id for the tiles is 2275207 (from CesiumJS's own source). 🔍 Not confirmed: whether a new ion account already has the tiles among My Assets or must add them from the Asset Depot; the app's message covers both. | same | [Google's policies](https://developers.google.com/maps/documentation/tile/policies): no pre-fetching, storing or caching; no extracting geodata; our own objects may be laid over the tiles as long as they aren't derived from them; the Google logo and each tile's data credits shown on the map, along the bottom (the app sets `showCreditsOnScreen`) · ion Community = personal/non-commercial | ✅ |
 | Aid stations | 🔍 organizer site (paraphrase + source link) | 🔍 NYRR (2026 may publish late) | Facts, not copied layouts | 🔍 |
 | Race date / start waves | ✅ Sunday 2026-09-27; runners start "from 08.45 am … in 6 waves" after the handbike and wheelchair starts (8.20, 8.26, 8.29) — [race day page](https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners), accessed 2026-09-18. ⚠️ The organizer publishes **no clock time for waves 2–6** (checked in the page's HTML on 09-18; each runner's time is on their emailed start card), so they are listed without one (D38). Third-party sites print times; one credits the organizer's page, which doesn't contain them. | 🔍 Date 2026-11-01, **not confirmed**: it follows from NYRR's rule "first Sunday in November" ([2025 runner guide](https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf); [Abbott WMM](https://www.worldmarathonmajors.com/races/new-york-city) says the same). Waves 9:10 · 9:45 · 10:20 · 10:55 · 11:30 are **carried over from 2025** (same guide). nyrr.org was behind its waiting room again on 2026-09-18. Owner, 09-18: wave times aren't chased; runners type their own (D40). The date is still worth a look by a person. | Facts, paraphrased with a link | ✅ Berlin · 🔍 NYC |
 | GPS trouble reports | Forums (Reddit, LetsRun…) paraphrased + linked | same | Link + paraphrase only | ✅ approach |
@@ -220,6 +222,14 @@ photoreal imagery (D32) · two cameras and a time-lapse (D33). Words used here a
   camera** — a few metres up and behind, looking down the road, the way marathons are actually filmed — not a 1.7 m eye.
   🔍 Street View is the true ground-level source, but it is billed per panorama and its terms restrict turning it into
   video; verify before considering it.
+- **The owner's look at real imagery (#17) — 🟡 not done yet; it needs the owner's own key.** Photoreal is built (D43,
+  D44). With it on, the map shows **"Camera: about N m above the ground"** each time the camera comes to rest, so a
+  height can be written down. That number is read from the open terrain, never from Google's mesh (D5), so on a bridge
+  it counts from the water. To record here after looking at both courses from above and from road height:
+  - 🟡 the lowest camera height at which the imagery still holds up, per course, for the On the road camera (#8, D33);
+  - 🟡 where it falls apart first (trees, bridges, the Queensboro's lower deck, narrow streets);
+  - 🟡 anything the Explore design (#6) has to allow for (D32): how the black and white slabs, the blue course line and
+    the credits line along the bottom of the map read over real imagery, in light and dark.
 - **Speed.** 42 km in 3 minutes is ~230 m/s: fine from the air, unwatchable on the ground. So: bird's-eye between
   stops, drop to the runner's view for the few hundred metres that matter at each stop, at a gentler time-lapse.
 - **Sun in photoreal.** Google's imagery has its own shadows baked in (D4), so the moving sun is only *true* in the
@@ -280,8 +290,9 @@ Re-cut on 09-18 after the design pick and D28–D37. Issue numbers are GitHub's;
 2. ✅ **Design exploration** (#4): three mockups; owner picked B · Race poster.
 3. ✅ **Race plan, race clock, scrubbing** (#5): edition facts (D38), wave + goal, the runner marker, the clock and the real 3D
    sun moving together (D39). Tests: time zones incl. **US DST ending Nov 1 2026**, checked on both sides of the bundle.
-4. **Photoreal with your own Google key**: the headline look (D30), and where the design (D32) and the camera heights
-   (D33) get judged against real imagery. Needs the owner's key — a human step.
+4. 🟡 **Photoreal with your own key** (#17): the headline look (D30). Built: "Make it photoreal", the key panel with
+   sourced set-up help, the imagery, and the way back when it fails (D43, D44). **Still to do, by the owner with their
+   own key:** look at both courses and record the camera heights (D33) and the design constraints (D32) in §6.
 5. **Explore** (#6): the map home screen in the poster design, the layer system (D35) with its first layer (Hills),
    the strip drawn the instrument's way, light and dark.
 6. **Ride** (#8): the time-lapse with Stops, From above and On the road.
@@ -348,6 +359,14 @@ arrival times are approximate — state that in the UI.
   and the edition-facts loader refuses a number with advice. Tested.
 - **Cesium fades sun lighting out near the ground** → at city scale the scene's sun changes nothing you can see unless
   the fade distances are pulled in (D39).
+- **A photoreal tile's address has the runner's Google key in it.** CesiumJS prints a failed tile's address to the
+  console unless something listens for failed tiles, and hands that address to whatever listens. The app listens, and
+  never reads, shows or logs what it is handed (D43).
+- **`createGooglePhotorealistic3DTileset()` without a key uses CesiumJS's default ion token, and remembers a failed
+  ion lookup for the life of the page**, so a corrected token would keep failing until a reload. The app builds the
+  ion request itself, with the runner's token, each time.
+- **CesiumJS's library contains a demo Cesium ion token** (public, for evaluation). It is the one token-shaped string
+  in the built app; it is not ours, and the app switches it off at start-up (D43).
 - **Spectators can't cross the course; race-day transit is modified** (Tier 3 routing).
 
 ---
@@ -382,7 +401,10 @@ arrival times are approximate — state that in the UI.
   waits for #7 (D39); the splits table is built (D41).
 - ✅ Settled by the owner 09-18: a runner can type their own start time (D40), and the strip and readout stay on
   course-line km (D20).
-- 🔍 Verify: Open-Meteo archive limits · Cesium ion Community terms for end users.
+- 🟡 **The owner's look at photoreal (#17)**: needs the owner's own key (the panel in the app says how to get one;
+  a Cesium ion token is free and the quicker of the two). What to write down is listed in §6 "The ride".
+- 🔍 Verify: Open-Meteo archive limits. ✅ Cesium ion Community terms checked 09-18 (§5): personal, non-commercial use,
+  which is what a runner planning their own race is; each runner uses their own account, so the terms are theirs.
   ✅ Settled 09-17: there is no downloadable official NYC course file (D21); NYC Open Data has no usage restrictions.
 - ✅ **NYC start line** settled 09-17 from the USATF certification (D25), and pinned by a test. What remains is the
   finish line's exact position (taken as West Drive beside Tavern on the Green); the start moves ~1.5 m for every
@@ -432,3 +454,9 @@ arrival times are approximate — state that in the UI.
   not-published waves, the NYRR guide as NYC's source, the map dimming with the sun, and whether to add a per-km table (§10).
 - **2026-09-18** — Owner's second round on #5: don't chase wave start times, runners type their own (D38, D40); leave the
   map's dimming until #7 (D39); splits table built (D41); an imperial / metric toggle is required (D42, now #19). #5 closed; the map-dimming question is noted on #7.
+- **2026-09-18** — Photoreal with the runner's own key (#17): "Make it photoreal" on the map, a panel that says where to
+  get a key, how long it takes and what it costs (each fact sourced, §5), Google's tiles with the logo and data credits on
+  the map, a note that their shadows are illustrative, and the keyless map back with a reason whenever the imagery can't
+  be had. Added D43 (how the key is handled) and D44 (photoreal can fail, the view can't). Verified both providers' prices
+  and ion's Community terms. The owner's look at real imagery, which settles the On the road camera's height (D33) and
+  what #6 must allow for (D32), is still to do: it needs the owner's own key.
