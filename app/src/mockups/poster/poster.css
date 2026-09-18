@@ -1,0 +1,540 @@
+/* Direction B — Race poster. Black, white, and the blue line. A strict twelve-column grid with
+   the rules showing. Solid is measured; hollow is hearsay; stripes are stand-ins. */
+
+.ps {
+  --paper: #f4f4f0;
+  --ink: #000;
+  --blue: #1546ff;
+  --on-blue: #fff;
+  --grey: #8a8a86;
+  --rule: 3px;
+
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 14px/1.35 "Archivo Variable", "Arial Narrow", Arial, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  border-bottom: var(--rule) solid var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ps {
+    --paper: #000;
+    --ink: #f4f4f0;
+    --blue: #5a7dff;
+    --on-blue: #000;
+    --grey: #7c7c78;
+  }
+}
+
+.ps > * {
+  grid-column: 1 / -1;
+}
+
+.ps h1,
+.ps h2,
+.ps p,
+.ps ul {
+  margin: 0;
+  padding: 0;
+}
+
+.ps a {
+  color: inherit;
+}
+
+.ps a:focus-visible,
+.ps-strip:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: -3px;
+}
+
+.ps-cell {
+  border-right: var(--rule) solid var(--ink);
+  border-bottom: var(--rule) solid var(--ink);
+  padding: 12px 16px;
+  min-width: 0;
+}
+
+/* ── Banner ─────────────────────────────────────────────────────────────────── */
+
+.ps-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 34px;
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--paper);
+  font-stretch: 88%;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.ps-banner h1 {
+  font-size: 22px;
+  font-weight: 900;
+  font-stretch: 75%;
+  letter-spacing: 0.005em;
+  margin-right: auto;
+}
+
+.ps-banner small {
+  font-weight: 500;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ── Main block ─────────────────────────────────────────────────────────────── */
+
+.ps-main {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: auto auto;
+}
+
+.ps-km {
+  grid-column: 1 / span 5;
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px 0;
+  overflow: hidden;
+}
+
+.ps-km__number {
+  display: flex;
+  align-items: flex-start;
+  color: var(--blue);
+  font-weight: 900;
+  font-stretch: 62%;
+  font-size: clamp(120px, min(21vw, 31vh), 360px);
+  line-height: 0.82;
+  letter-spacing: -0.025em;
+}
+
+.ps-km__part {
+  font-size: 0.46em;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  margin-top: 0.04em;
+}
+
+.ps-km__unit {
+  align-self: flex-end;
+  margin: 0 0 14px auto;
+  font-weight: 900;
+  font-stretch: 62%;
+  font-size: 44px;
+  line-height: 1;
+}
+
+.ps-clock,
+.ps-elapsed {
+  grid-column: 6 / span 2;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.ps-big__value {
+  font-weight: 800;
+  font-stretch: 68%;
+  font-size: clamp(40px, 4vw, 60px);
+  line-height: 0.95;
+  white-space: nowrap;
+}
+
+.ps-big__value small {
+  font-size: 0.3em;
+  font-weight: 700;
+  font-stretch: 85%;
+}
+
+.ps-big__label {
+  font-weight: 800;
+  font-size: 15px;
+  font-stretch: 88%;
+}
+
+.ps-big__assumption {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--grey);
+}
+
+.ps-next {
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.ps .ps-next h2 {
+  padding: 12px 16px;
+  grid-column: 1 / span 2;
+  font-size: 22px;
+  font-weight: 900;
+  font-stretch: 75%;
+  line-height: 1.05;
+}
+
+.ps-next__list {
+  grid-column: 3 / -1;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: var(--rule) solid var(--ink);
+  align-items: start;
+}
+
+.ps-next__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+/* Measured entries are solid blocks… */
+.ps-next__item--measured {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* …and hearsay is an empty frame. */
+.ps-next__item--subjective {
+  border: 2px solid var(--ink);
+  padding: 3px 6px;
+}
+
+.ps-next__head {
+  display: flex;
+  flex: 1 1 100%;
+  justify-content: space-between;
+  gap: 10px;
+  font-stretch: 82%;
+}
+
+.ps-next__head b {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.ps-next__source {
+  font-size: 11.5px;
+}
+
+.ps-model {
+  grid-column: 8 / -1;
+  grid-row: 1 / span 2;
+  height: clamp(200px, 33vh, 420px);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 0;
+  border-right: 0;
+}
+
+.ps-model__drawing {
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.ps-model__drawing .maquette {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ps .ps-model__caption {
+  padding: 8px 16px;
+  border-top: var(--rule) solid var(--ink);
+  font-weight: 600;
+  font-stretch: 88%;
+  font-size: 13px;
+}
+
+/* ── Facts row ──────────────────────────────────────────────────────────────── */
+
+.ps-facts {
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.ps-fact {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 9px 12px 10px;
+}
+
+.ps-fact:last-child {
+  border-right: 0;
+}
+
+.ps-fact__label {
+  font-weight: 800;
+  font-size: 13px;
+  font-stretch: 88%;
+}
+
+.ps-fact__value {
+  font-weight: 800;
+  font-stretch: 70%;
+  font-size: 24px;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.ps-fact__small {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--grey);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ps-fact[data-unknown] .ps-fact__label,
+.ps-fact[data-unknown] .ps-fact__value {
+  color: var(--grey);
+}
+
+.ps-fact[data-unknown] .ps-fact__value,
+.ps-legend__struck {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+/* ── Strip ──────────────────────────────────────────────────────────────────── */
+
+.ps-strip {
+  height: clamp(270px, 39vh, 400px);
+  border-bottom: var(--rule) solid var(--ink);
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.ps-strip__svg {
+  display: block;
+}
+
+.ps-solid {
+  fill: var(--ink);
+}
+
+.ps-hollow {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.ps-gap {
+  fill: url(#ps-hatch);
+  opacity: 0.45;
+}
+
+.ps-blue,
+.ps-cursor__bar,
+.ps-cursor__flag {
+  fill: var(--blue);
+}
+
+.ps-notch {
+  fill: var(--paper);
+}
+
+.ps-rule {
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.ps-tick {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.ps-row {
+  font: 800 13px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 84%;
+  fill: var(--ink);
+}
+
+.ps-row--hollow {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1;
+  paint-order: stroke;
+  font-size: 15.5px;
+  font-weight: 900;
+  font-stretch: 100%;
+  letter-spacing: 0.03em;
+}
+
+.ps-row--blue {
+  fill: var(--blue);
+}
+
+.ps-scale {
+  font: 600 10.5px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 80%;
+  fill: var(--grey);
+}
+
+.ps-landmark {
+  font: 700 11.5px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 72%;
+  fill: var(--ink);
+}
+
+.ps-km-tick {
+  font: 900 15px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 68%;
+  font-variant-numeric: tabular-nums;
+  fill: var(--ink);
+}
+
+.ps-cursor__km {
+  font: 900 15px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 68%;
+  font-variant-numeric: tabular-nums;
+  fill: var(--on-blue);
+}
+
+/* ── Sample tape, legend, credits ───────────────────────────────────────────── */
+
+.ps-tape {
+  display: inline-block;
+  padding: 0 7px;
+  font-weight: 800;
+  font-size: 10.5px;
+  font-stretch: 80%;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--ink) 26%, transparent) 4px 8px);
+  border: 1.5px solid var(--ink);
+  vertical-align: 0.12em;
+}
+
+.ps-banner .ps-tape,
+.ps-next__item--measured .ps-tape {
+  color: var(--paper);
+  border-color: var(--paper);
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--paper) 30%, transparent) 4px 8px);
+}
+
+.ps-legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ps-legend__cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  font-size: 12.5px;
+}
+
+.ps-legend__cell:last-child {
+  border-right: 0;
+}
+
+.ps-legend__cell b {
+  font-weight: 800;
+}
+
+.ps-legend__struck {
+  font-weight: 800;
+  font-stretch: 70%;
+  font-size: 17px;
+  color: var(--grey);
+}
+
+.ps-credits {
+  display: grid;
+  grid-template-columns: subgrid;
+  gap: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 18px 0 28px;
+}
+
+.ps .ps-credits > * {
+  padding: 0 16px;
+}
+
+.ps-credits__unofficial {
+  grid-column: 1 / span 4;
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.ps-credits__sample {
+  grid-column: 5 / -1;
+  max-width: 78ch;
+}
+
+.ps-credits__heading {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ps-credits ul {
+  grid-column: 1 / -1;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 32px;
+}
+
+.ps-credits__layer[data-sample] b::after {
+  content: " (sample)";
+  font-weight: 500;
+}
+
+.ps-credits__commitment {
+  grid-column: 1 / -1;
+  margin-top: 14px;
+  color: var(--grey);
+}
+
+@media (max-width: 1000px) {
+  .ps-km,
+  .ps-model,
+  .ps-next h2,
+  .ps-next__list {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .ps-clock {
+    grid-column: 1 / span 6;
+  }
+
+  .ps-elapsed {
+    grid-column: 7 / -1;
+  }
+
+  .ps-fact {
+    grid-column: span 6 !important;
+  }
+
+  .ps-legend,
+  .ps-credits ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
