@@ -13,6 +13,7 @@ from geopace.bundle import build_course_bundle, validate_bundle
 from geopace.cache import cache_dir
 from geopace.cli import load_route
 from geopace.course_facts import load_course_facts
+from geopace.edition_facts import load_editions
 
 WGS84 = Geod(ellps="WGS84")
 # The course's USATF certification (NY22001JHP, 2022): the straight line between start and finish
@@ -68,6 +69,7 @@ def test_real_nyc_course_rebuilds_from_the_cached_inputs():
             load_route(facts, allow_download=False),
             nyc_dem.elevation_model(allow_download=False),
             decks=nyc_lidar.deck_model(allow_download=False),
+            editions=load_editions(FACTS.parent, facts.timezone),
         )
     except FileNotFoundError as missing:  # streets, DEM blocks or LiDAR points not cached
         pytest.skip(str(missing))

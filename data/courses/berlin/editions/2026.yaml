@@ -1,0 +1,67 @@
+# Hand-maintained facts about the 2026 edition of the Berlin Marathon: its date and its waves.
+# Rule: every fact about the world has a `source` URL and the date we `accessed` it.
+#
+# Wave times are wall-clock times in the course's time zone (Europe/Berlin, from course.yaml).
+# ALWAYS put them in quotes ("08:45"): YAML reads an unquoted 10:20 as the number 620.
+#
+# Only runner waves are listed. The handbike and wheelchair starts (08:20 to 08:29) are on the
+# same organizer page, but the app plans a runner's race.
+
+edition: 2026
+
+date:
+  day: 2026-09-27
+  source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+  accessed: 2026-09-18
+
+# What the organizer's race day page says, in our words: runners start "from 08:45" in six waves.
+# That is the only runner start time on the page (checked in the page's own HTML, and on the
+# "race day for participants" page, which says the same). Each runner's own start details go out
+# by email with their start card. So wave 1 is confirmed, and waves 2 to 6 are listed without a
+# time rather than with a guess.
+#
+# Not used, on purpose:
+#   - Third-party sites print times for waves 2 to 6. None of them is the organizer, and the one
+#     that names a source names the page above, which doesn't contain them.
+#   - Last year's times are not carried over. The organizer's 2025 schedule could not be
+#     retrieved on 2026-09-18, and the 2026 page hints that the layout changed: its schedule says
+#     six waves, while its paragraph on pacers still says "all four start waves".
+# Owner's decision, 2026-09-18 (PLAN.md D40): we don't chase these. A runner picks their wave and
+# types the start time from their start card. If the organizer does publish the times, fill in
+# `start_local` and delete the `note`.
+waves:
+  - id: wave-1
+    name: Wave 1
+    start_local: "08:45"
+    source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+    accessed: 2026-09-18
+  - id: wave-2
+    name: Wave 2
+    start_local: null
+    note: The organizer has published a start time only for the first wave. Yours is on your start card.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+    accessed: 2026-09-18
+  - id: wave-3
+    name: Wave 3
+    start_local: null
+    note: The organizer has published a start time only for the first wave. Yours is on your start card.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+    accessed: 2026-09-18
+  - id: wave-4
+    name: Wave 4
+    start_local: null
+    note: The organizer has published a start time only for the first wave. Yours is on your start card.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+    accessed: 2026-09-18
+  - id: wave-5
+    name: Wave 5
+    start_local: null
+    note: The organizer has published a start time only for the first wave. Yours is on your start card.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+    accessed: 2026-09-18
+  - id: wave-6
+    name: Wave 6
+    start_local: null
+    note: The organizer has published a start time only for the first wave. Yours is on your start card.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
+    accessed: 2026-09-18

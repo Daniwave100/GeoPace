@@ -13,9 +13,12 @@ export const COURSES: Course[] = [
 
 export const DEFAULT_COURSE_ID = COURSES[0].id;
 
-export function courseFromUrl(search: string): string {
+/** The course named in the URL; failing that the one the runner planned last; failing that the default. */
+export function courseFromUrl(search: string, plannedLast: string | null = null): string {
+  const known = (id: string | null): id is string => COURSES.some((course) => course.id === id);
   const asked = new URLSearchParams(search).get("course");
-  return COURSES.some((course) => course.id === asked) ? (asked as string) : DEFAULT_COURSE_ID;
+  if (known(asked)) return asked;
+  return known(plannedLast) ? plannedLast : DEFAULT_COURSE_ID;
 }
 
 export function urlForCourse(courseId: string): string {

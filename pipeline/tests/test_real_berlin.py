@@ -11,6 +11,7 @@ from geopace import berlin_dgm1
 from geopace.bundle import build_course_bundle, validate_bundle
 from geopace.cache import cache_dir
 from geopace.course_facts import load_course_facts
+from geopace.edition_facts import load_editions
 from geopace.route import parse_gpx
 
 REPO = Path(__file__).parents[2]
@@ -28,7 +29,10 @@ def test_real_berlin_course_is_marathon_length_with_no_absurd_grades():
     facts = load_course_facts(REPO / "data" / "courses" / "berlin" / "course.yaml")
     try:
         bundle = build_course_bundle(
-            facts, parse_gpx(ROUTE.read_text()), berlin_dgm1.elevation_model(allow_download=False)
+            facts,
+            parse_gpx(ROUTE.read_text()),
+            berlin_dgm1.elevation_model(allow_download=False),
+            editions=load_editions(REPO / "data" / "courses" / "berlin", facts.timezone),
         )
     except berlin_dgm1.TilesNotCached as missing:
         pytest.skip(str(missing))

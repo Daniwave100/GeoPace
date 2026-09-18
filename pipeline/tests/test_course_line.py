@@ -6,7 +6,7 @@ import pytest
 from geopace.bundle import build_course_bundle
 from geopace.course_facts import CourseFactsInvalid, parse_course_facts
 
-from conftest import meters_north_of, straight_north_route, synthetic_decks, synthetic_elevation
+from conftest import meters_north_of, straight_north_route, synthetic_decks, parsed_synthetic_editions, synthetic_elevation
 
 START_LAT = 52.5
 
@@ -34,6 +34,7 @@ def test_noisy_elevation_yields_smoothed_grades_within_realistic_bounds(syntheti
         parse_course_facts(synthetic_facts),
         route=straight_north_route(5000),
         elevation=hill_with_noise(),
+        editions=parsed_synthetic_editions(),
     )
     line = course_line(bundle)
     grade = np.array(line["grade"])
@@ -63,6 +64,7 @@ def test_listed_bridges_carry_the_course_over_the_water_not_down_to_it(synthetic
             parse_course_facts(synthetic_facts),
             route=straight_north_route(5000),
             elevation=synthetic_elevation(river_without_bridge_deck),
+            editions=parsed_synthetic_editions(),
         )
     )
     km = np.array(line["km"])
@@ -120,6 +122,7 @@ def build_with_decks(synthetic_facts, bridge, decks_at):
         route=straight_north_route(5000),
         elevation=synthetic_elevation(bay_without_bridge_deck),
         decks=synthetic_decks(deck_returns(decks_at)),
+        editions=parsed_synthetic_editions(),
     )
 
 
@@ -165,6 +168,7 @@ def test_water_with_no_ground_data_is_fine_where_a_bridge_carries_the_course(syn
             route=straight_north_route(5000),
             elevation=synthetic_elevation(bay_with_no_ground_at_all),
             decks=synthetic_decks(deck_returns(lambda d: [high_arched_deck(d)])),
+            editions=parsed_synthetic_editions(),
         )
     )
 
@@ -178,6 +182,7 @@ def test_missing_ground_where_no_bridge_carries_the_course_is_refused(synthetic_
             parse_course_facts(synthetic_facts),
             route=straight_north_route(5000),
             elevation=synthetic_elevation(bay_with_no_ground_at_all),
+            editions=parsed_synthetic_editions(),
         )
 
 
@@ -201,6 +206,7 @@ def test_a_structure_passing_overhead_is_not_mistaken_for_a_second_deck(syntheti
             route=straight_north_route(5000),
             elevation=synthetic_elevation(bay_without_bridge_deck),
             decks=synthetic_decks(returns),
+            editions=parsed_synthetic_editions(),
         )
     )
 
@@ -230,6 +236,7 @@ def test_a_bridge_passing_under_another_structure_keeps_its_own_deck(synthetic_f
             route=straight_north_route(5000),
             elevation=synthetic_elevation(bay_without_bridge_deck),
             decks=synthetic_decks(returns),
+            editions=parsed_synthetic_editions(),
         )
     )
     km = np.array(line["km"])

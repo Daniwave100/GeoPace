@@ -25,6 +25,14 @@ _Avoid_: year, event
 Said of edition details copied from an earlier edition because this year's aren't published yet. Always flagged to the runner.
 _Avoid_: assumed, default, estimated
 
+**Not published**:
+Said of a wave whose start time the organizer hasn't given. It is listed without a time, and can be planned with only once the runner gives their own start time. Never filled in with a guess.
+_Avoid_: TBD, unknown, estimated
+
+**Not confirmed**:
+Said of a race date the organizer hasn't stated for this edition, known another way (a standing rule, say). Always flagged to the runner, with how it is known.
+_Avoid_: believed, provisional, tentative
+
 **Landmark**:
 A named, sourced place on the course.
 _Avoid_: point of interest, marker
@@ -36,16 +44,24 @@ _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 ### The runner's plan
 
 **Race Plan**:
-The runner's own choices: course, edition, wave, goal time or pace, units, and fueling plan.
+The runner's own choices: course, edition, wave, own start time if they have typed one, goal time or pace, units, and fueling plan.
 _Avoid_: settings, profile
 
 **Wave**:
 A group of runners with its own start time.
 _Avoid_: corral, start block (those are positions inside a wave)
 
+**Own start time**:
+The start time a runner types in themselves, from their start card. It outranks the wave's published or carried-over time, and is never greyed.
+_Avoid_: custom time, override, manual time
+
 **Race clock**:
 For one Race Plan, the link between where the runner is and what time it is there.
 _Avoid_: timer, timeline
+
+**Splits**:
+The time of day and the elapsed time at every kilometre (later, every mile) of a Race Plan, and at the finish.
+_Avoid_: pace chart, pace band, schedule
 
 **Scrubbing**:
 Moving the runner along the course by hand, so that position, time of day, sun and camera move together.

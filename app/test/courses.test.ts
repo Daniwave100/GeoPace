@@ -19,6 +19,15 @@ describe("course picker", () => {
     expect(courseFromUrl("?course=")).toBe(DEFAULT_COURSE_ID);
   });
 
+  it("opens the course the runner planned last when the URL names none, but a link still wins", () => {
+    expect(courseFromUrl("", "nyc")).toBe("nyc");
+    expect(courseFromUrl("?course=paris", "nyc")).toBe("nyc");
+    expect(courseFromUrl("?course=berlin", "nyc")).toBe("berlin");
+    // A remembered course the app no longer has is no better than none.
+    expect(courseFromUrl("", "paris")).toBe(DEFAULT_COURSE_ID);
+    expect(courseFromUrl("", null)).toBe(DEFAULT_COURSE_ID);
+  });
+
   it("makes a shareable link for a course", () => {
     expect(urlForCourse("nyc")).toBe("?course=nyc");
   });

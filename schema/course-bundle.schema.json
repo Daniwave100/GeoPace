@@ -4,10 +4,10 @@
   "title": "GeoPace Course Bundle",
   "description": "Everything the app needs about one course, prepared by the Python pipeline. The single contract between pipeline and app. Bump schema_version on any breaking change.",
   "type": "object",
-  "required": ["schema_version", "course_id", "generated_at", "pipeline_version", "course", "measured", "sources", "attributions"],
+  "required": ["schema_version", "course_id", "generated_at", "pipeline_version", "course", "editions", "measured", "sources", "attributions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "course_id": { "$ref": "#/$defs/id" },
     "generated_at": {
       "description": "When the pipeline wrote this bundle, ISO-8601 with an explicit UTC offset.",
@@ -44,6 +44,12 @@
           }
         }
       }
+    },
+    "editions": {
+      "description": "Hand-maintained edition facts, copied from data/courses/<id>/editions/<year>.yaml, oldest first. Sourced facts: what an organizer states. Neither measured nor subjective, and every one carries its source.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/edition" }
     },
     "measured": {
       "description": "Measured data, and values computed from it with published models (e.g. difficulty). Subjective data (forum reports etc.) never goes in here.",
@@ -115,6 +121,83 @@
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "url": { "type": "string", "pattern": "^https?://\\S+$" },
     "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "edition": {
+      "description": "One year's running of the course: its date and its waves.",
+      "type": "object",
+      "required": ["edition", "date", "waves"],
+      "additionalProperties": false,
+      "if": {
+        "description": "A carried-over wave needs the edition to say from which edition, and why.",
+        "properties": { "waves": { "contains": { "type": "object", "properties": { "carried_over": { "const": true } }, "required": ["carried_over"] } } },
+        "required": ["waves"]
+      },
+      "then": { "required": ["carried_over"] },
+      "properties": {
+        "edition": { "description": "Which edition: the calendar year it is run in.", "type": "integer", "minimum": 1900 },
+        "date": {
+          "type": "object",
+          "required": ["day", "confirmed", "source", "accessed"],
+          "additionalProperties": false,
+          "if": { "properties": { "confirmed": { "const": false } }, "required": ["confirmed"] },
+          "then": { "required": ["note"] },
+          "properties": {
+            "day": { "description": "Local calendar date of the race in course.timezone.", "$ref": "#/$defs/date" },
+            "confirmed": { "description": "false when the organizer hasn't stated this edition's date and it is known another way; the note then says how, and the app says so next to the date.", "type": "boolean" },
+            "source": { "$ref": "#/$defs/url" },
+            "accessed": { "$ref": "#/$defs/date" },
+            "note": { "description": "Shown to the runner, e.g. how the date is known.", "type": "string", "minLength": 1 }
+          }
+        },
+        "carried_over": {
+          "description": "Present when some details are copied from an earlier edition because this year's aren't published yet. The app must flag every carried-over detail to the runner, with the reason.",
+          "type": "object",
+          "required": ["from_edition", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "from_edition": { "type": "integer", "minimum": 1900 },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        },
+        "waves": {
+          "description": "At least one wave has a start time: without one there is no race clock to run.",
+          "type": "array",
+          "minItems": 1,
+          "contains": { "type": "object", "properties": { "start_local": { "type": "string" } }, "required": ["start_local"] },
+          "items": { "$ref": "#/$defs/wave" }
+        }
+      }
+    },
+    "wave": {
+      "description": "A group of runners with its own start time.",
+      "type": "object",
+      "required": ["id", "name", "start_local", "start", "carried_over", "source", "accessed"],
+      "additionalProperties": false,
+      "if": {
+        "description": "A wave has both its wall-clock time and the instant it means, or neither; and with neither, a note saying why and nothing to carry over.",
+        "properties": { "start_local": { "type": "null" } },
+        "required": ["start_local"]
+      },
+      "then": { "properties": { "start": { "type": "null" }, "carried_over": { "const": false } }, "required": ["note"] },
+      "else": { "properties": { "start": { "type": "string" } } },
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "start_local": {
+          "description": "Wall-clock start time in course.timezone, HH:MM, as the organizer prints it. null when the organizer hasn't published this wave's time: never a guess.",
+          "type": ["string", "null"],
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "start": {
+          "description": "The same moment as ISO-8601 with its UTC offset, worked out by the pipeline in course.timezone (so a daylight-saving change is already applied). null exactly when start_local is.",
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$"
+        },
+        "carried_over": { "description": "true when this wave's time is copied from the edition named in the edition's carried_over.", "type": "boolean" },
+        "note": { "description": "Shown to the runner. Always present when there is no start time, to say why.", "type": "string", "minLength": 1 },
+        "source": { "$ref": "#/$defs/url" },
+        "accessed": { "$ref": "#/$defs/date" }
+      }
+    },
     "position": {
       "type": "object",
       "required": ["lat", "lon"],

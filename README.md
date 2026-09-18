@@ -15,6 +15,19 @@ cd app && npm install && npm run dev
 
 Then open http://localhost:5173 and pick a course: **Berlin** or **New York City**.
 
+Set **your race plan** (the edition, your start wave, and a goal as a finish time or a pace per
+km), then drag the **kilometre strip** under the map, click it, or use the arrow keys. The runner
+on the map, the time of day, the elapsed time and the sun all move together, in the race's own
+time zone whatever zone your computer is in (the map dims as the sun gets low). Open **Every
+kilometre** under the strip for a table of splits; click a kilometre in it to jump there. Your plan is remembered in your browser and goes
+nowhere else.
+
+Times assume an even pace, and the app says so. Where a start time is the last edition's because
+this one's isn't published, every time that rests on it is greyed and marked **carried over**, with
+the reason; a race date the organizer hasn't stated yet is marked **not confirmed**. A wave whose
+start time nobody has published is never filled with a guess: pick it and type in **your own start
+time**, from your start card. You can do the same on any wave, and your own time always wins.
+
 The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
 app needs an internet connection.
 
@@ -65,13 +78,15 @@ cd app && npm run typecheck
 
 ```
 data/courses/<course>/course.yaml   hand-maintained course facts, each with a source URL
+data/courses/<course>/editions/     one file per edition: the race date and the start waves
         │
 pipeline/ (Python)                  route → evenly spaced samples → official terrain heights
         │                            → bridge decks → smoothed → grade → difficulty
         ▼
 data/derived/<course>/course-bundle.json   committed; must match schema/course-bundle.schema.json
         │
-app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and the profile
+app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and the profile,
+                                    and times your race along it
 ```
 
 - **The route** is the organizer's own course file where there is one (Berlin). New York publishes
@@ -86,6 +101,10 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
   bridges are carried straight across. New York's are measured from the 2017 city LiDAR, using the
   returns classified as bridge deck — including which of the two decks runners actually use: the
   Verrazzano's upper level, the Queensboro's lower level.
+- **Race dates and start waves** are written down per edition from the organizer's own pages. Wave
+  times are local wall-clock times; the pipeline turns each into an exact instant in the course's
+  time zone, and the app works it out again independently, so the two check each other. That
+  matters in New York, where the 2026 race falls on the morning the clocks go back.
 - **Difficulty** is the energy cost of running at that grade compared with flat ground, from
   [Minetti et al. 2002](https://doi.org/10.1152/japplphysiol.00103.2002). It isn't shown for
   grades outside that model's valid range.
@@ -97,6 +116,8 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
 | Berlin course route | [BMW BERLIN-MARATHON course file (2025)](https://www.bmw-berlin-marathon.com/en/your-race/course/) | Course geometry only; file not redistributed |
 | Berlin elevation | [Geoportal Berlin, ATKIS® DGM1](https://gdi.berlin.de/data/dgm1/atom/) | [dl-de/zero-2.0](https://www.govdata.de/dl-de/zero-2-0) |
 | NYC course streets | [City of New York course street closures (2025)](https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf) · [NYRR](https://www.nyrr.org/tcsnycmarathon/race-day/the-course) | Facts about which streets the course uses |
+| Berlin race date and first start | [BMW BERLIN-MARATHON race day page](https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners) | Facts, paraphrased |
+| NYC race-date rule and 2025 wave times (carried over) | [NYRR 2025 runner guide](https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf) | Facts, paraphrased |
 | NYC start line | [USATF course certification NY22001JHP](https://certifiedroadraces.com/certificate/?type=l&id=NY22001JHP) | Published measurement of the certified course |
 | NYC elevation | [2017 NYC 1-ft bare-earth DEM](https://www.fisheries.noaa.gov/inport/item/64732) (City of New York, via NOAA Digital Coast) | [NYC Open Data: no usage restrictions](https://opendata.cityofnewyork.us/faq/) |
 | NYC bridge decks | [2017 NYC Topobathymetric LiDAR](https://www.fisheries.noaa.gov/inport/item/64728) (City of New York, via NOAA Digital Coast) | as above |

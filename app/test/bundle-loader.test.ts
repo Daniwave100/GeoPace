@@ -34,6 +34,7 @@ describe("Course Bundle loader", () => {
       const bundle = parseCourseBundle(JSON.parse(committed(course)), course);
 
       expect(bundle.course_id).toBe(course);
+      expect(bundle.editions.length).toBeGreaterThan(0);
       expect(bundle.course.landmarks.length).toBeGreaterThan(0);
       expect(bundle.measured.course_line.km.length).toBeGreaterThan(4000);
     }
@@ -50,12 +51,22 @@ describe("Course Bundle loader", () => {
     expect(message).toContain('course is missing "timezone"');
   });
 
+  it("rejects edition facts that would hide a carried-over time or run a clock from nothing", () => {
+    const unflagged = pipelineBundle();
+    unflagged.editions[0].waves[0].carried_over = true; // ...with no edition.carried_over to say from when, or why
+    expect(rejectionOf(unflagged)).toContain('editions[0] is missing "carried_over"');
+
+    const noInstant = pipelineBundle();
+    noInstant.editions[0].waves[0].start = null; // a wall-clock time without the instant it means
+    expect(rejectionOf(noInstant)).toContain("editions[0].waves[0].start must be a string");
+  });
+
   it("rejects a bundle from a different format version with advice instead of a list of errors", () => {
-    const newer = { ...pipelineBundle(), schema_version: 2 };
+    const newer = { ...pipelineBundle(), schema_version: 3 };
 
     const message = rejectionOf(newer);
-    expect(message).toContain("format version 2");
-    expect(message).toContain("version 1");
+    expect(message).toContain("format version 3");
+    expect(message).toContain("version 2");
     expect(message).not.toContain("must be");
   });
 

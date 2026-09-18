@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pytest
 
+from geopace.edition_facts import EditionFacts, parse_edition_facts
 from geopace.provenance import Attribution, Source
 from geopace.elevation import BridgeDeckModel, ElevationModel
 
@@ -53,6 +54,24 @@ def synthetic_decks(returns):
     )
 
 
+def raw_synthetic_edition() -> dict:
+    """One made-up edition, as it would be read from editions/2026.yaml."""
+    source = {"source": "https://example.org/race-day", "accessed": "2026-09-18"}
+    return {
+        "edition": 2026,
+        "date": {"day": "2026-11-01", **source},
+        "waves": [
+            {"id": "wave-1", "name": "Wave 1", "start_local": "09:10", **source},
+            {"id": "wave-2", "name": "Wave 2", "start_local": "09:45", **source},
+        ],
+    }
+
+
+def parsed_synthetic_editions() -> list[EditionFacts]:
+    """The same edition, parsed: for tests that need a complete bundle but aren't about editions."""
+    return [parse_edition_facts(raw_synthetic_edition(), timezone="America/New_York")]
+
+
 @pytest.fixture
 def synthetic_facts():
     source = {"source": "https://example.org/synthetic", "accessed": "2026-09-16"}
@@ -67,3 +86,8 @@ def synthetic_facts():
         "start": {"lat": 52.5, "lon": 13.4, **source},
         "landmarks": [{"name": "Turnaround", "km": 2.5, **source}],
     }
+
+
+@pytest.fixture
+def synthetic_edition():
+    return raw_synthetic_edition()

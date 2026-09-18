@@ -1,32 +1,15 @@
-// The smallest possible DOM helpers. The mockups build their own markup rather than pulling in a
-// UI framework, because the framework question is still open (PLAN.md §4.1) and nothing here
-// should decide it.
+// SVG helpers for the mockups, next to the HTML ones they share with the app (../dom.ts).
+import { applyAttrs, type Attrs } from "../dom";
+
+export { html, link } from "../dom";
 
 export const SVG_NS = "http://www.w3.org/2000/svg";
 
-type Attrs = Record<string, string | number | boolean | undefined>;
-
 export function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Attrs = {}, ...children: (Node | string)[]): SVGElementTagNameMap[K] {
   const node = document.createElementNS(SVG_NS, tag);
-  apply(node, attrs);
+  applyAttrs(node, attrs);
   node.append(...children);
   return node;
-}
-
-export function html<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  apply(node, attrs);
-  node.append(...children);
-  return node;
-}
-
-function apply(node: Element, attrs: Attrs): void {
-  for (const [name, value] of Object.entries(attrs)) {
-    if (value === undefined || value === false) continue;
-    if (name === "class") node.setAttribute("class", String(value));
-    else if (name === "text") node.textContent = String(value);
-    else node.setAttribute(name, value === true ? "" : String(value));
-  }
 }
 
 /** An SVG polygon's `points` attribute from a list of coordinates. */
@@ -64,6 +47,3 @@ export function perFrame(fn: () => void): () => void {
 }
 
 /** A link that opens in a new tab without handing the opener over. */
-export function link(href: string, text: string, className?: string): HTMLAnchorElement {
-  return html("a", { href, target: "_blank", rel: "noopener", class: className, text });
-}

@@ -53,7 +53,9 @@ export function headlineFields(story: CourseStory, readout: Readout): Field[] {
       value: `${readout.clock}`,
       provenance: "measured",
       sample: false,
-      assumption: `${story.edition.waveLabel} start time is a placeholder until #5 adds sourced edition facts`,
+      assumption: story.edition.carriedOver
+        ? `${story.edition.waveLabel} start time is carried over from ${story.edition.carriedOver.fromEdition}: ${story.edition.carriedOver.reason}`
+        : undefined,
       detail: readout.zoneLabel,
     },
     {
@@ -97,7 +99,7 @@ export function layerFields(story: CourseStory, readout: Readout): Field[] {
       value: show.sunWords(readout),
       provenance: "measured",
       sample: false,
-      assumption: "computed for the placeholder wave time above",
+      assumption: story.edition.carriedOver ? `computed for a start time carried over from ${story.edition.carriedOver.fromEdition}` : undefined,
     },
     {
       key: "exposure",

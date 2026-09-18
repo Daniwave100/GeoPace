@@ -5,13 +5,13 @@ Every fact about the world must say where it came from: a `source` URL and the d
 reach a Course Bundle.
 """
 
-import datetime as dt
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
+
+from geopace.provenance import check_sourced
 
 
 class CourseFactsInvalid(ValueError):
@@ -74,12 +74,12 @@ def load_course_facts(path: Path) -> CourseFacts:
 
 def parse_course_facts(raw: dict) -> CourseFacts:
     problems: list[str] = []
-    _check_sourced("the course", raw, problems)
+    check_sourced("the course", raw, problems)
     for key in ("certified_distance", "route", "start"):
         if key not in raw:
             problems.append(f"{key} is missing")
         else:
-            _check_sourced(key, raw[key], problems)
+            check_sourced(key, raw[key], problems)
     route = raw.get("route", {})
     if ("url" in route) == ("waypoints" in route):
         problems.append("route needs either a course file `url` or `waypoints` (not both)")
@@ -87,10 +87,10 @@ def parse_course_facts(raw: dict) -> CourseFacts:
         if not {"at", "lat", "lon"} <= set(waypoint):
             problems.append(f"route.waypoints[{i}] needs `at` (where it is, in words), `lat` and `lon`")
     for i, landmark in enumerate(raw.get("landmarks", [])):
-        _check_sourced(f"landmarks[{i}] ({landmark.get('name', '?')})", landmark, problems)
+        check_sourced(f"landmarks[{i}] ({landmark.get('name', '?')})", landmark, problems)
     for i, bridge in enumerate(raw.get("bridges", [])):
         label = f"bridges[{i}] ({bridge.get('name', '?')})"
-        _check_sourced(label, bridge, problems)
+        check_sourced(label, bridge, problems)
         if not bridge.get("km_start", 0) < bridge.get("km_end", 0):
             problems.append(f"{label} km_start must be before km_end")
         if bridge.get("deck") not in (None, "upper", "lower"):
@@ -131,23 +131,6 @@ def parse_course_facts(raw: dict) -> CourseFacts:
             for bridge in raw.get("bridges", [])
         ],
     )
-
-
-def _check_sourced(label: str, fact: dict, problems: list[str]) -> None:
-    source = fact.get("source")
-    if source is None:
-        problems.append(f"{label} has no source")
-    elif not re.match(r"^https?://\S+$", str(source)):
-        problems.append(f"{label} source {source!r} is not a URL")
-
-    accessed = fact.get("accessed")
-    if accessed is None:
-        problems.append(f"{label} has no accessed date")
-    elif not isinstance(accessed, dt.date):  # YAML reads 2026-09-16 as a date
-        try:
-            dt.date.fromisoformat(str(accessed))
-        except ValueError:
-            problems.append(f"{label} accessed {accessed!r} is not a YYYY-MM-DD date")
 
 
 def _is_iana_timezone(name) -> bool:

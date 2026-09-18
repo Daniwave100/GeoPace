@@ -5,7 +5,7 @@ import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
 import schema from "../../../schema/course-bundle.schema.json";
 import type { CourseBundle } from "./types";
 
-export const SUPPORTED_SCHEMA_VERSION = 1;
+export const SUPPORTED_SCHEMA_VERSION = 2;
 const MAX_LISTED_PROBLEMS = 8;
 
 export class BundleError extends Error {
