@@ -101,6 +101,10 @@ const sentenceView = createSentence(byId("sentence"));
 
 async function start(): Promise<void> {
   showTheme();
+  // Esc is the way out of anything that has taken over the screen. (A dialog takes Esc for itself first.)
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && fullMap && !document.querySelector("dialog[open]")) useFullMap(false);
+  });
   systemDark.addEventListener("change", showTheme); // "Auto" keeps following the system while the app is open
   switches.show(units, themeChoice);
 
@@ -212,7 +216,7 @@ function useStripSize(size: number): void {
   if (stripSize === size) return;
   mapWasUntouched ||= viewer !== undefined && isStillFramed(viewer);
   stripSize = size;
-  showLayers();
+  showStrip(); // only the strip: the marks and labels on the map don't change with its size
 }
 
 /** The map on the full screen: the readout, the strip and all but one line of the credits step aside. */
@@ -242,15 +246,22 @@ function showPlan(): void {
  */
 function showLayers(): void {
   if (!showing || !viewer || !mapLabels) return;
-  const { bundle, baseRow, layers } = showing;
+  const { bundle, layers } = showing;
   const screen = (showing.screen = onScreen(layerState, layers));
   layerBar.show(layerState, layers, hillLook);
   document.documentElement.dataset.hillLook = hillLook;
-  strip.show({ lengthKm: showing.planner.lengthKm, landmarks: bundle.course.landmarks, baseRow, layerRows: screen.rows, key: keyFor(bundle, screen), size: stripSize, units });
-  stripEdge.show(stripSize);
+  showStrip();
   showLineMarks(viewer, bundle, screen.lineMarks, hillLook);
   mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))]);
   scrubTo(showing.km);
+}
+
+/** The strip as it should be now: its rows, its key, and the size the runner has made it. */
+function showStrip(): void {
+  if (!showing) return;
+  const { bundle, baseRow, screen } = showing;
+  strip.show({ lengthKm: showing.planner.lengthKm, landmarks: bundle.course.landmarks, baseRow, layerRows: screen.rows, key: keyFor(bundle, screen), size: stripSize, units });
+  stripEdge.show(stripSize);
 }
 
 /**
