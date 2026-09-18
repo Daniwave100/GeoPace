@@ -36,10 +36,18 @@ ask before anything that changes scope or look.
 - Elevation re-derived from terrain models and smoothed before any grade (raw GPS is garbage).
 - NYC bridges: bare-earth DEMs drop bridge decks — the Verrazzano start must not read as sea level.
   Decks come from LiDAR; on a double-deck bridge the course facts say which deck runners use.
+- A height that was filled in (a bridge spanned in a straight line, a gap in a LiDAR scan) must never look
+  measured: the bundle lists those stretches, and the map, the strip and the sentence grey them out (D45, D47).
 - Wind "from" direction convention (a headwind must not come out as a tailwind).
 - Timezone/DST: **US DST ends Sun 2026-11-01**, likely NYC race day.
 - Course length stays within tolerance of the certified 42.195 km (a route traced along street
   centre lines gets a wider tolerance than an organizer's course file — see D21/D22).
+
+## Adding a layer
+A layer is data (`app/src/core/layers.ts`, PLAN.md D47): its strip rows, its marks on the course line and its clause,
+each tagged with the kind of claim it is. Add it to the list in `app/src/main.ts`. Never give a layer its own colours
+or dash patterns: the encodings come from `core/encoding.ts`. Every distance, height and pace shown or typed goes
+through `core/units.ts`.
 
 ## Commands
 - Run the app: `cd app && npm install && npm run dev` → http://localhost:5173

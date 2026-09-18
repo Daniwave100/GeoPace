@@ -15,12 +15,24 @@ cd app && npm install && npm run dev
 
 Then open http://localhost:5173 and pick a course: **Berlin** or **New York City**.
 
-Set **your race plan** (the edition, your start wave, and a goal as a finish time or a pace per
-km), then drag the **kilometre strip** under the map, click it, or use the arrow keys. The runner
-on the map, the time of day, the elapsed time and the sun all move together, in the race's own
-time zone whatever zone your computer is in (the map dims as the sun gets low). Open **Every
-kilometre** under the strip for a table of splits; click a kilometre in it to jump there. Your plan is remembered in your browser and goes
-nowhere else.
+The app opens on **Explore**: the city from above with the course on it as a blue line, moved like any
+maps app (drag, scroll, Ctrl + drag to tilt; or focus the map and use the arrow keys and + / −). Laid
+over the map: the distance as one giant numeral, the time of day, the elapsed time, and **one
+sentence** about where you are ("Climbing 4%. Ed Koch Queensboro Bridge in 600 m. Sun on your left.").
+Along the bottom is the **strip**, the whole course as one line: drag it, click it, or use the arrow
+keys, and the runner on the map, the clock, the sentence and the sun all move together, in the race's
+own time zone whatever zone your computer is in.
+
+Switch **Hills** on and three things happen at once: every climb and descent is marked on the course
+line with how steep and how long it is, the strip gains its Grade and Effort rows, and the sentence
+says what the road is doing under you. Switch it off and all three go. **Show everything** opens every
+row. Where the survey has no height (the middle of the Verrazzano's main span, Berlin's short bridges),
+the map, the strip and the sentence all say **not measured here** instead of drawing a guess.
+
+**Your race plan** opens from the banner: the edition, your start wave, and a goal as a finish time
+or a pace, with a table of splits whose rows jump the runner there. The banner also switches between
+**km and miles** (everything follows: feet, pace per mile, splits per mile) and between **light and
+dark**. Your plan and your choices are remembered in your browser and go nowhere else.
 
 Times assume an even pace, and the app says so. Where a start time is the last edition's because
 this one's isn't published, every time that rests on it is greyed and marked **carried over**, with
@@ -50,9 +62,9 @@ city was photographed, so GeoPace's numbers never come from it.
 
 ## Design mockups
 
-The app's look isn't chosen yet. Three clickable directions show the same course, race plan and
-layers three different ways; with the app running, open http://localhost:5173/mockups/ and try
-each one:
+The app's look was chosen from three clickable directions that show the same course, race plan and
+layers three different ways. **B · Race poster** won, with the Field instrument's charts. They are
+still there to look at; with the app running, open http://localhost:5173/mockups/:
 
 - **A · Roadbook** — a survey sheet: the course runs down the page as a route card, and what
   runners say is written in the margin in purple pencil.

@@ -44,8 +44,12 @@ _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 ### The runner's plan
 
 **Race Plan**:
-The runner's own choices: course, edition, wave, own start time if they have typed one, goal time or pace, units, and fueling plan.
+The runner's own choices for one course: edition, wave, own start time if they have typed one, goal time or pace, and fueling plan.
 _Avoid_: settings, profile
+
+**Units**:
+Kilometres or miles, with metres or feet to match: what the runner reads and types. They belong to the runner, not to a course, so they are remembered beside the Race Plans rather than inside one, and changing them never changes a plan. Everything inside the app stays metric.
+_Avoid_: imperial mode, locale
 
 **Wave**:
 A group of runners with its own start time.
@@ -60,7 +64,7 @@ For one Race Plan, the link between where the runner is and what time it is ther
 _Avoid_: timer, timeline
 
 **Splits**:
-The time of day and the elapsed time at every kilometre (later, every mile) of a Race Plan, and at the finish.
+The time of day and the elapsed time at every kilometre, or every mile, of a Race Plan, and at the finish.
 _Avoid_: pace chart, pace band, schedule
 
 **Scrubbing**:
@@ -94,8 +98,15 @@ The three numbers that say where and when the runner is: kilometre, time of day,
 _Avoid_: HUD, stats
 
 **Sentence**:
-The one plain-language line saying what the course is doing where the runner is now.
+The one plain-language line saying what the course is doing where the runner is now, made of clauses.
 _Avoid_: caption, subtitle, summary
+
+**Clause**:
+One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's.
+
+**Banner**:
+The black bar across the top: the course, the Race Plan in one line, the units and the theme.
+_Avoid_: header, toolbar, nav
 
 ### Layers
 
@@ -141,7 +152,19 @@ _Avoid_: crowd, crowding, busyness
 **Bottleneck**:
 A place where congestion is known to happen.
 
+**Line mark**:
+A stretch of the course line that a layer marks on the map, drawn wider under the blue line.
+_Avoid_: highlight, segment, overlay
+
+**Hill**:
+A sustained climb or descent that a runner would call one: what the Hills layer marks on the course line.
+_Avoid_: segment, ramp
+
 ### Kinds of claim
+
+**Encoding**:
+How a kind of claim is drawn, the same on the map, on the strip and in words: solid, hollow, grey and struck through, or hazard stripes.
+_Avoid_: style, theme, legend (the key is what explains the encodings on screen)
 
 **Measured**:
 Taken from a survey or instrument, or computed from such data by a published model.
