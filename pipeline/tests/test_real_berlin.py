@@ -24,6 +24,20 @@ def test_committed_berlin_bundle_matches_the_schema():
     validate_bundle(bundle)
 
 
+def test_every_berlin_bridge_is_flagged_as_not_measured():
+    """Berlin's ground model leaves the bridge decks out, so each listed bridge is spanned in a
+    straight line (PLAN.md D18). None of those heights is a measurement, and the bundle says so."""
+    bundle = json.loads((REPO / "data" / "derived" / "berlin" / "course-bundle.json").read_text())
+    facts = load_course_facts(REPO / "data" / "courses" / "berlin" / "course.yaml")
+    spans = bundle["measured"]["elevation_not_measured"]
+
+    assert len(spans) == len(facts.bridges) > 0
+    for bridge, span in zip(facts.bridges, spans):
+        assert bridge.name in span["reason"]
+        assert span["km_start"] == pytest.approx(bridge.km_start, abs=0.011)
+        assert span["km_end"] == pytest.approx(bridge.km_end, abs=0.011)
+
+
 @pytest.mark.skipif(not (ROUTE.exists() and any(TILES.glob("*.zip"))), reason="real Berlin inputs not cached")
 def test_real_berlin_course_is_marathon_length_with_no_absurd_grades():
     facts = load_course_facts(REPO / "data" / "courses" / "berlin" / "course.yaml")

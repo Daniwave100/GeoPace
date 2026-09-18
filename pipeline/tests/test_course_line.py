@@ -273,3 +273,102 @@ def test_a_bridge_without_a_source_is_rejected(synthetic_facts):
 
     with pytest.raises(CourseFactsInvalid, match=r"bridges\[0\] \(Test bridge\).*source"):
         parse_course_facts(synthetic_facts)
+
+
+# ---- Where the height is not measured: the bundle has to say so, or the app draws a guess as a fact.
+
+
+def not_measured(bundle):
+    return bundle["measured"]["elevation_not_measured"]
+
+
+def test_a_course_measured_all_the_way_has_nothing_to_flag(synthetic_facts):
+    bundle = build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=hill_with_noise(),
+        editions=parsed_synthetic_editions(),
+    )
+
+    assert not_measured(bundle) == []
+
+
+def test_a_bridge_spanned_in_a_straight_line_is_flagged_as_not_measured(synthetic_facts):
+    source = {"source": "https://example.org/bridge", "accessed": "2026-09-16"}
+    synthetic_facts["bridges"] = [{"name": "Test bridge", "km_start": 2.0, "km_end": 2.08, **source}]
+
+    bundle = build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=synthetic_elevation(river_without_bridge_deck),
+        editions=parsed_synthetic_editions(),
+    )
+
+    [span] = not_measured(bundle)
+    assert span["km_start"] == pytest.approx(2.0, abs=0.011)
+    assert span["km_end"] == pytest.approx(2.08, abs=0.011)
+    # Said for the runner: which bridge, and that the height is a straight line, not a survey.
+    assert "Test bridge" in span["reason"]
+    assert "straight line" in span["reason"]
+
+
+def deck_returns_with_a_hole(hole_from_m, hole_to_m):
+    """A deck the scan covers everywhere except one stretch, like the Verrazzano's main span."""
+    complete = deck_returns(lambda d: [high_arched_deck(d)])
+
+    def returns(lat, lon):
+        d = meters_north_of(lat, START_LAT)
+        return [np.empty(0) if hole_from_m <= di <= hole_to_m else found for di, found in zip(d, complete(lat, lon))]
+
+    return returns
+
+
+def build_with_a_hole(synthetic_facts, hole_from_m, hole_to_m):
+    with_test_bridge(synthetic_facts)
+    return build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=synthetic_elevation(bay_without_bridge_deck),
+        decks=synthetic_decks(deck_returns_with_a_hole(hole_from_m, hole_to_m)),
+        editions=parsed_synthetic_editions(),
+    )
+
+
+def test_a_gap_in_the_scan_of_a_bridge_deck_is_flagged_and_the_measured_deck_is_not(synthetic_facts):
+    bundle = build_with_a_hole(synthetic_facts, 2200, 2800)
+
+    # Only the hole: the rest of the 2.6 km bridge has measured deck heights and stays unflagged.
+    [span] = not_measured(bundle)
+    assert span["km_start"] == pytest.approx(2.2, abs=0.011)
+    assert span["km_end"] == pytest.approx(2.8, abs=0.011)
+    assert "Test Narrows Bridge" in span["reason"]
+    assert "straight line" in span["reason"]
+
+
+def test_a_gap_too_short_to_change_the_smoothed_height_is_not_flagged(synthetic_facts):
+    # Two samples without returns (20 m) vanish inside the 50 m smoothing; flagging them would
+    # pepper every bridge with specks nobody can act on.
+    bundle = build_with_a_hole(synthetic_facts, 2495, 2515)
+
+    assert not_measured(bundle) == []
+
+
+def test_flagged_stretches_lie_on_the_course_in_order_and_never_overlap(synthetic_facts):
+    source = {"source": "https://example.org/bridge", "accessed": "2026-09-16"}
+    synthetic_facts["bridges"] = [
+        {"name": "First bridge", "km_start": 1.0, "km_end": 1.1, **source},
+        {"name": "Second bridge", "km_start": 3.0, "km_end": 3.2, **source},
+    ]
+
+    spans = not_measured(
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=hill_with_noise(),
+            editions=parsed_synthetic_editions(),
+        )
+    )
+
+    assert [span["reason"].count("bridge") > 0 for span in spans] == [True, True]
+    assert all(0 <= span["km_start"] < span["km_end"] <= 5.0 for span in spans)
+    assert spans[0]["km_end"] <= spans[1]["km_start"]

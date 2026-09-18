@@ -66,19 +66,20 @@ describe("mockup story", () => {
   });
 
   it("refuses to present the Verrazzano's filled-in elevation as measured", () => {
-    // PLAN.md §10, still open: the bridge's main span has no LiDAR return at all, so its height is
-    // a straight line drawn between the last real measurements either side. The Course Bundle has
-    // no field that can say so, which means the app would happily draw it as fact.
+    // The bridge's main span has no LiDAR return at all, so its height is a straight line drawn
+    // between the last real measurements either side. The Course Bundle lists such stretches
+    // (`measured.elevation_not_measured`), so the app never draws one as fact.
     const story = buildStory(nyc, { goalFinishSeconds: FOUR_HOURS });
 
     expect(story.at(1.1).elevationMeasured).toBe(false);
     expect(story.at(5).elevationMeasured).toBe(true);
-    // The gap travels with a reason and a source, like any other claim about the world.
-    expect(story.unmeasured[0].reason).toMatch(/LiDAR/i);
-    expect(story.sources.some((source) => source.id === story.unmeasured[0].sourceId)).toBe(true);
+    // The gap travels with its reason, in words for the runner.
+    expect(story.unmeasured[0].reason).toMatch(/Verrazzano.*straight line/i);
 
-    // Berlin's decks are spanned deliberately (D18) and its terrain is measured throughout.
-    expect(buildStory(berlin, { goalFinishSeconds: FOUR_HOURS }).at(1.1).elevationMeasured).toBe(true);
+    // Berlin's decks are spanned in a straight line (D18): measured between them, not on them.
+    const berlinStory = buildStory(berlin, { goalFinishSeconds: FOUR_HOURS });
+    expect(berlinStory.at(1.1).elevationMeasured).toBe(true);
+    expect(berlinStory.at(6.62).elevationMeasured).toBe(false); // on the Moltkebrücke
   });
 
   it("puts organizer kilometres onto the course line's own scale", () => {

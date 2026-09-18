@@ -123,7 +123,7 @@ def test_edition_facts_reach_the_bundle_with_their_sources_and_flags(synthetic_f
     bundle = build(synthetic_facts, gentle_hill, editions=[edition])
 
     jsonschema.Draft202012Validator(SCHEMA).validate(bundle)
-    assert bundle["schema_version"] == 2
+    assert bundle["schema_version"] == 3
     source = {"source": "https://example.org/race-day", "accessed": "2026-09-18"}
     assert bundle["editions"] == [
         {

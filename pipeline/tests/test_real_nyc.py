@@ -50,12 +50,26 @@ def check_nyc_course_line(line: dict) -> None:
     assert all(d is not None for d in line["difficulty"])
 
 
+def check_nyc_not_measured(spans: list[dict]) -> None:
+    """The 2017 scan has no returns at all over the middle of the Verrazzano's main span, so the
+    crest of the course's biggest hill is a straight line, not a measurement. The bundle has to
+    say so, or the app draws the highest point of the race as if it had been surveyed."""
+    on_the_verrazzano = [span for span in spans if span["km_end"] <= 1.94]
+    assert len(on_the_verrazzano) == 1
+    [main_span] = on_the_verrazzano
+    assert main_span["km_end"] - main_span["km_start"] > 0.4
+    assert "Verrazzano" in main_span["reason"]
+    # Flagged stretches are the exception: almost all of the course is measured.
+    assert sum(span["km_end"] - span["km_start"] for span in spans) < 2.0
+
+
 def test_committed_nyc_bundle_matches_the_schema_and_the_real_course():
     bundle = json.loads(BUNDLE.read_text())
 
     validate_bundle(bundle)
     assert bundle["course"]["timezone"] == "America/New_York"
     check_nyc_course_line(bundle["measured"]["course_line"])
+    check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])
     # The data it was built from is named, with a licence and the date it was fetched.
     assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "openstreetmap"} == {s["id"] for s in bundle["sources"]}
 
@@ -75,3 +89,4 @@ def test_real_nyc_course_rebuilds_from_the_cached_inputs():
         pytest.skip(str(missing))
 
     check_nyc_course_line(bundle["measured"]["course_line"])
+    check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])

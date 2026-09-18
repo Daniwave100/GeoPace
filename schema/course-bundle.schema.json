@@ -7,7 +7,7 @@
   "required": ["schema_version", "course_id", "generated_at", "pipeline_version", "course", "editions", "measured", "sources", "attributions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "course_id": { "$ref": "#/$defs/id" },
     "generated_at": {
       "description": "When the pipeline wrote this bundle, ISO-8601 with an explicit UTC offset.",
@@ -54,7 +54,7 @@
     "measured": {
       "description": "Measured data, and values computed from it with published models (e.g. difficulty). Subjective data (forum reports etc.) never goes in here.",
       "type": "object",
-      "required": ["course_line", "elevation_summary", "difficulty_model"],
+      "required": ["course_line", "elevation_summary", "elevation_not_measured", "difficulty_model"],
       "additionalProperties": false,
       "properties": {
         "course_line": { "$ref": "#/$defs/course_line" },
@@ -67,6 +67,20 @@
             "loss_m": { "type": "number", "minimum": 0 },
             "min_m": { "type": "number" },
             "max_m": { "type": "number" }
+          }
+        },
+        "elevation_not_measured": {
+          "description": "Stretches where course_line.elevation_m (and so grade and difficulty) is not a measurement but a straight line between measured heights: a bridge deck the ground model leaves out, or a gap in the scan of one. In course order, never overlapping; empty when every height is measured. The app greys these stretches out instead of drawing them as measured.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["km_start", "km_end", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "km_start": { "description": "km from the start, same scale as course_line.km.", "type": "number", "minimum": 0 },
+              "km_end": { "type": "number", "exclusiveMinimum": 0 },
+              "reason": { "description": "Shown to the runner: what stands there, and how the height was filled in.", "type": "string", "minLength": 1 }
+            }
           }
         },
         "difficulty_model": {

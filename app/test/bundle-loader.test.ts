@@ -61,12 +61,18 @@ describe("Course Bundle loader", () => {
     expect(rejectionOf(noInstant)).toContain("editions[0].waves[0].start must be a string");
   });
 
+  it("rejects a bundle that doesn't say where its heights are filled in, rather than reading it as all measured", () => {
+    const silent = pipelineBundle();
+    delete silent.measured.elevation_not_measured;
+    expect(rejectionOf(silent)).toContain('measured is missing "elevation_not_measured"');
+  });
+
   it("rejects a bundle from a different format version with advice instead of a list of errors", () => {
-    const newer = { ...pipelineBundle(), schema_version: 3 };
+    const newer = { ...pipelineBundle(), schema_version: 4 };
 
     const message = rejectionOf(newer);
-    expect(message).toContain("format version 3");
-    expect(message).toContain("version 2");
+    expect(message).toContain("format version 4");
+    expect(message).toContain("version 3");
     expect(message).not.toContain("must be");
   });
 

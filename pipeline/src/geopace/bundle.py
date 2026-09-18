@@ -18,7 +18,7 @@ from geopace.elevation import BridgeDeckModel, ElevationModel
 from geopace.provenance import Attribution, Source
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schema" / "course-bundle.schema.json"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Certified courses are measured along the shortest legal line a runner may take. A route file
 # drawn along the streets runs a little long: more than 1% off (about 420 m on a marathon) means
@@ -83,6 +83,10 @@ def build_course_bundle(
         "measured": {
             "course_line": _course_line_json(line),
             "elevation_summary": _elevation_summary(line),
+            "elevation_not_measured": [
+                {"km_start": round(span.km_start, 2), "km_end": round(span.km_end, 2), "reason": span.reason}
+                for span in line.not_measured
+            ],
             "difficulty_model": difficulty.model_json(),
         },
         "sources": [route_source.to_json(), elevation.source.to_json()],
