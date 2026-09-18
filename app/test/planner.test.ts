@@ -1,0 +1,216 @@
+// Seam: a Race Plan (edition, wave, goal) + a course's edition facts -> the Planner, which says
+// what time it is wherever the runner is, and where the runner is at any time.
+//
+// Expected values are wall-clock arithmetic anyone can redo by hand. The course here is made up,
+// so a change to the real edition facts (NYRR publishing its 2026 waves, say) can't break a test
+// of the logic; the committed bundles get their own checks at the bottom.
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { parseCourseBundle } from "../src/bundle/loader";
+import type { Edition } from "../src/bundle/types";
+import { createPlanner, defaultPlan, hasStartTime, parseGoal, plannerCourse, type PlannerCourse, type RacePlan, sanitizePlan } from "../src/core/planner";
+import { formatElapsed } from "../src/core/race-clock";
+
+const SOURCE = { source: "https://example.org/race-day", accessed: "2026-09-18" };
+
+const NYC_2026: Edition = {
+  edition: 2026,
+  date: { day: "2026-11-01", ...SOURCE },
+  carried_over: { from_edition: 2025, reason: "The 2026 wave times aren't published yet." },
+  waves: [
+    { id: "wave-1", name: "Wave 1", start_local: "09:10", start: "2026-11-01T09:10:00-05:00", carried_over: false, ...SOURCE },
+    { id: "wave-2", name: "Wave 2", start_local: "09:45", start: "2026-11-01T09:45:00-05:00", carried_over: true, ...SOURCE },
+    { id: "wave-3", name: "Wave 3", start_local: null, start: null, carried_over: false, note: "Not published yet.", ...SOURCE },
+  ],
+};
+
+// A course line exactly as long as the certified distance, so "km 21.0975" is plainly halfway.
+const NYC: PlannerCourse = {
+  courseId: "nyc",
+  timezone: "America/New_York",
+  lineLengthM: 42195,
+  certifiedDistanceM: 42195,
+  editions: [NYC_2026],
+};
+
+const plan = (overrides: Partial<RacePlan> = {}): RacePlan => ({
+  courseId: "nyc",
+  edition: 2026,
+  waveId: "wave-1",
+  goal: { kind: "finish", seconds: 4 * 3600 },
+  ...overrides,
+});
+
+describe("Planner", () => {
+  it("tells the clock time and the elapsed time at a km, for a wave and a goal finish time", () => {
+    const planner = createPlanner(NYC, plan());
+
+    const halfway = planner.at(21.0975);
+    expect(formatElapsed(halfway.elapsedSeconds)).toBe("2:00:00");
+    expect(halfway.localClock).toBe("11:10"); // 09:10 + two hours
+    expect(planner.at(42.195).localClock).toBe("13:10"); // the goal, at the finish line
+    expect(planner.at(0).localClock).toBe("09:10");
+  });
+
+  it("takes the goal as a pace per kilometre instead, the way a training plan states it", () => {
+    // 5:00/km over the certified 42.195 km is 3:30:58.5.
+    const planner = createPlanner(NYC, plan({ goal: { kind: "pace", secondsPerKm: 300 } }));
+
+    expect(formatElapsed(planner.goalFinishSeconds)).toBe("3:30:59");
+    expect(formatElapsed(planner.at(10).elapsedSeconds)).toBe("50:00");
+    expect(planner.at(10).localClock).toBe("10:00"); // 09:10 + 50 minutes
+  });
+
+  it("gets New York right on Sunday 2026-11-01, the morning US clocks go back", () => {
+    const planner = createPlanner(NYC, plan());
+
+    // Daylight saving ended at 02:00, hours before the start: 09:10 is EST (UTC-5). A converter
+    // that still believed in EDT would put the start, and every shadow after it, an hour out.
+    expect(planner.at(0).instant.toISOString()).toBe("2026-11-01T14:10:00.000Z");
+    expect(planner.at(0).zoneLabel).toBe("EST");
+    expect(planner.at(42.195).instant.toISOString()).toBe("2026-11-01T18:10:00.000Z");
+    expect(planner.at(42.195).localClock).toBe("13:10");
+  });
+
+  it("gives the course's time of day whatever time zone the computer is in", () => {
+    const computerZone = process.env.TZ;
+    try {
+      for (const zone of ["Asia/Tokyo", "America/Los_Angeles", "UTC", "Europe/Berlin"]) {
+        process.env.TZ = zone;
+        const halfway = createPlanner(NYC, plan()).at(21.0975);
+
+        expect(halfway.localClock, `on a computer in ${zone}`).toBe("11:10");
+        expect(halfway.zoneLabel, `on a computer in ${zone}`).toBe("EST");
+        expect(halfway.instant.toISOString(), `on a computer in ${zone}`).toBe("2026-11-01T16:10:00.000Z");
+      }
+    } finally {
+      if (computerZone === undefined) delete process.env.TZ;
+      else process.env.TZ = computerZone;
+    }
+  });
+
+  it("maps a clock time back to the km the runner has reached, so scrubbing round-trips", () => {
+    const planner = createPlanner(NYC, plan());
+
+    // A known pair first: 11:10 EST is two hours in, which at even pace is halfway.
+    expect(planner.kmAtInstant(new Date("2026-11-01T16:10:00Z"))).toBeCloseTo(21.0975, 6);
+    // Then there and back, from both ends. A Date holds whole milliseconds and a runner covers
+    // a few millimetres in one, so "the same km" means to within 5 cm (4 decimal places of a km).
+    for (const km of [0, 0.1, 7.3, 31.4, 42.195]) {
+      expect(planner.kmAtInstant(planner.at(km).instant)).toBeCloseTo(km, 4);
+    }
+    const noon = new Date("2026-11-01T17:00:00Z");
+    expect(planner.at(planner.kmAtInstant(noon)).instant.getTime()).toBeCloseTo(noon.getTime(), -1);
+  });
+
+  it("keeps the runner on the course when asked about a time before the start or after the finish", () => {
+    const planner = createPlanner(NYC, plan());
+
+    expect(planner.kmAtInstant(new Date("2026-11-01T06:00:00Z"))).toBe(0);
+    expect(planner.kmAtInstant(new Date("2026-11-02T00:00:00Z"))).toBe(42.195);
+    expect(planner.at(-3).km).toBe(0);
+    expect(planner.at(99).km).toBe(42.195);
+  });
+
+  it("flags times that rest on a carried-over wave, with the edition they came from and why", () => {
+    const planner = createPlanner(NYC, plan({ waveId: "wave-2" }));
+
+    expect(planner.carriedOver).toEqual({ fromEdition: 2025, reason: "The 2026 wave times aren't published yet." });
+    // The times are still given (greyed by whoever draws them), not withheld.
+    expect(planner.at(0).localClock).toBe("09:45");
+  });
+
+  it("does not flag a wave the organizer has confirmed, even in an edition with carried-over waves", () => {
+    expect(createPlanner(NYC, plan({ waveId: "wave-1" })).carriedOver).toBeNull();
+  });
+
+  it("refuses to run a clock for a wave whose start time nobody has published", () => {
+    expect(() => createPlanner(NYC, plan({ waveId: "wave-3" }))).toThrow(/No race clock/);
+  });
+});
+
+describe("Race Plan", () => {
+  // Wave 1 has no published time here, as in Berlin 2026's later waves.
+  const timeless = { ...NYC_2026.waves[2], id: "wave-0", name: "Wave 0" };
+  const course: PlannerCourse = {
+    ...NYC,
+    editions: [{ ...NYC_2026, edition: 2025, date: { day: "2025-11-02", ...SOURCE } }, { ...NYC_2026, waves: [timeless, ...NYC_2026.waves] }],
+  };
+
+  it("starts a new runner on the latest edition, in its first wave with a published time, aiming for four hours", () => {
+    expect(defaultPlan(course)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", goal: { kind: "finish", seconds: 14400 } });
+  });
+
+  it("keeps a remembered plan that still makes sense", () => {
+    const remembered: RacePlan = { courseId: "nyc", edition: 2025, waveId: "wave-2", goal: { kind: "pace", secondsPerKm: 320 } };
+
+    expect(sanitizePlan(course, remembered)).toEqual(remembered);
+  });
+
+  it("replaces only the parts of a remembered plan that no longer make sense", () => {
+    const goal = { kind: "finish", seconds: 3 * 3600 + 45 * 60 };
+
+    // A wave that has since been removed, or has no start time: first wave that has one.
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-9", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", goal });
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-3", goal }).waveId).toBe("wave-1");
+    // An edition we have no facts for: the latest one.
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2019, waveId: "wave-2", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", goal });
+    // A goal nobody could mean.
+    for (const nonsense of [{ kind: "finish", seconds: -5 }, { kind: "finish", seconds: "fast" }, { kind: "pace", secondsPerKm: 1 }, { kind: "stroll" }, null]) {
+      expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-2", goal: nonsense }).goal).toEqual({ kind: "finish", seconds: 14400 });
+    }
+    // Not a plan at all.
+    for (const junk of [null, undefined, "plan", 7, [], { goal: {} }]) {
+      expect(sanitizePlan(course, junk)).toEqual(defaultPlan(course));
+    }
+  });
+
+  it("always yields a plan the Planner can run", () => {
+    expect(() => createPlanner(course, sanitizePlan(course, { edition: 2026, waveId: "wave-0" }))).not.toThrow();
+  });
+
+  it("reads a goal the way a runner types it", () => {
+    expect(parseGoal("finish", "3:45", course)).toEqual({ kind: "finish", seconds: 13500 });
+    expect(parseGoal("finish", " 3:45:30 ", course)).toEqual({ kind: "finish", seconds: 13530 });
+    expect(parseGoal("pace", "5:20", course)).toEqual({ kind: "pace", secondsPerKm: 320 });
+  });
+
+  it("turns down a goal that isn't a time, or isn't a marathon anyone runs", () => {
+    for (const text of ["", "fast", "3:75", "3.45", "-3:45", "0:45", "11:00"]) {
+      expect(parseGoal("finish", text, course), `finish "${text}"`).toBeNull();
+    }
+    // 1:30/km would be a 63-minute marathon; 20:00/km is a fourteen-hour one.
+    for (const text of ["", "5", "5:75", "1:30", "20:00"]) {
+      expect(parseGoal("pace", text, course), `pace "${text}"`).toBeNull();
+    }
+  });
+});
+
+describe("the committed courses", () => {
+  const committed = (id: string) =>
+    plannerCourse(parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${id}/course-bundle.json`, import.meta.url), "utf8")), id));
+
+  it("agree with the pipeline on the exact moment every wave starts", () => {
+    // Two independent answers to "when is 09:10 in New York on 2026-11-01?": Python's zoneinfo
+    // wrote `start` into the bundle, and the app works it out again from the wall-clock time.
+    for (const id of ["berlin", "nyc"]) {
+      const course = committed(id);
+      for (const edition of course.editions) {
+        for (const wave of edition.waves.filter(hasStartTime)) {
+          const planner = createPlanner(course, { ...defaultPlan(course), edition: edition.edition, waveId: wave.id });
+          expect(planner.startInstant.getTime(), `${id} ${edition.edition} ${wave.name}`).toBe(new Date(wave.start as string).getTime());
+        }
+      }
+    }
+  });
+
+  it("put New York's 2026 race on standard time, not daylight time", () => {
+    const course = committed("nyc");
+    const planner = createPlanner(course, { ...defaultPlan(course), edition: 2026 });
+
+    expect(planner.edition.date.day).toBe("2026-11-01");
+    expect(planner.at(0).zoneLabel).toBe("EST");
+    // Berlin in late September is on summer time; browsers call it "GMT+2" or "CEST".
+    expect(createPlanner(committed("berlin"), defaultPlan(committed("berlin"))).at(0).zoneLabel).toMatch(/^(GMT\+2|CEST)$/);
+  });
+});
