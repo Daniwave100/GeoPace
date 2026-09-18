@@ -72,7 +72,7 @@ export function hillsLayer(bundle: CourseBundle): Layer {
 
 /** The strip's own base row: the height of the course, there whether or not a layer is on. */
 export function heightRow(bundle: CourseBundle): StripRow {
-  const { min_m, max_m } = bundle.measured.elevation_summary;
+  const { min_m, max_m, gain_m, loss_m } = bundle.measured.elevation_summary;
   const binned = memoBins(bundle);
   const shown = (meters: number, units: Units) => Math.round(units === "mi" ? metersToFeet(meters) : meters);
   return {
@@ -80,6 +80,8 @@ export function heightRow(bundle: CourseBundle): StripRow {
     name: "Height",
     encoding: "measured",
     scale: (units) => `${heightUnit(units)}, ${shown(min_m, units)} to ${shown(max_m, units)}`,
+    // Every rise and every drop along the course added up: what "a hilly course" means in one number.
+    summary: (units) => `up ${formatHeight(gain_m, units)}, down ${formatHeight(loss_m, units)}`,
     bins: (count) => binned(count).map((bin) => rowBin(bin, bin.elevationM)),
     // Not from sea level: Berlin moves 20 m all day, and drawn from zero it is a slab. The
     // labelled scale says where the bottom is.
@@ -131,7 +133,9 @@ function marksFor(hill: HillStretch, gaps: NotMeasuredSpan[]): LineMark[] {
   return pieces;
 }
 
+/** "+3.4", "−1.1", and a plain "0.0" for level ground: no sign on nothing. */
 function signed(percent: number, digits = 1): string {
   const rounded = Math.abs(percent).toFixed(digits);
-  return `${percent >= 0 || Number(rounded) === 0 ? "+" : MINUS}${rounded}`;
+  if (Number(rounded) === 0) return rounded;
+  return `${percent > 0 ? "+" : MINUS}${rounded}`;
 }

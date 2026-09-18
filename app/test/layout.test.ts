@@ -2,7 +2,7 @@
 // The designs draw differently, but they all have to put a kilometre at the right pixel and keep
 // labels that sit close together on the course from printing on top of each other.
 import { describe, expect, it } from "vitest";
-import { assignLanes, effortReach, heightDomain, linearScale, measuredRuns, spreadLabels } from "../src/core/layout";
+import { assignFreeLanes, assignLanes, effortReach, heightDomain, linearScale, measuredRuns, spreadLabels } from "../src/core/layout";
 
 describe("linear scale", () => {
   it("maps a domain onto a range", () => {
@@ -203,5 +203,21 @@ describe("effort reach", () => {
 
   it("never collapses to zero on a dead-flat course", () => {
     expect(effortReach([{ difficulty: 1 }, { difficulty: 1 }])).toBeGreaterThan(0);
+  });
+});
+
+describe("lanes with no overprinting allowed", () => {
+  it("gives each label the first lane it fits in", () => {
+    expect(assignFreeLanes([{ start: 0, end: 50 }, { start: 40, end: 90 }, { start: 60, end: 100 }], 2)).toEqual([0, 1, 0]);
+  });
+
+  it("leaves a label out when every lane is taken, instead of printing it over another", () => {
+    const crowded = [{ start: 0, end: 50 }, { start: 10, end: 60 }, { start: 20, end: 70 }];
+    expect(assignFreeLanes(crowded, 2)).toEqual([0, 1, null]);
+  });
+
+  it("keeps the gap between neighbours in a lane", () => {
+    expect(assignFreeLanes([{ start: 0, end: 50 }, { start: 52, end: 90 }], 1, 6)).toEqual([0, null]);
+    expect(assignFreeLanes([{ start: 0, end: 50 }, { start: 56, end: 90 }], 1, 6)).toEqual([0, 0]);
   });
 });

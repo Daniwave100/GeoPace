@@ -11,7 +11,7 @@
 // file only listens and draws.
 import { ENCODINGS, type Encoding } from "../core/encoding";
 import type { StripRow } from "../core/layers";
-import { assignLanes, linearScale, type Scale } from "../core/layout";
+import { assignFreeLanes, linearScale, type Scale } from "../core/layout";
 import { kmAfterKey, kmAtFraction } from "../core/scrub";
 import { plainName } from "../core/sentence";
 import { tracePaths } from "../core/trace";
@@ -206,18 +206,21 @@ function landmarkLane(content: StripContent, x: Scale): SVGGElement {
   const widths = names.map((name) => 8 + name.length * LANDMARK_CHAR);
   // Names near the finish are set to the left of their tick, so they stay on the chart.
   const flipped = content.landmarks.map((landmark, i) => x(landmark.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
-  const lanes = assignLanes(
-    content.landmarks.map((landmark, i) => (flipped[i] ? { start: x(landmark.km) - widths[i], end: x(landmark.km) } : { start: x(landmark.km), end: x(landmark.km) + widths[i] })),
-    laneCount,
-    6,
-  );
+  const spans = content.landmarks.map((landmark, i) => (flipped[i] ? { start: x(landmark.km) - widths[i], end: x(landmark.km) } : { start: x(landmark.km), end: x(landmark.km) + widths[i] }));
+  // Where names crowd (New York's last 2 km), the last one gets its room first: it is the finish.
+  const order = spans.map((_, i) => i);
+  order.unshift(...order.splice(-1));
+  const inOrder = assignFreeLanes(order.map((i) => spans[i]), laneCount, 6);
+  const lanes = new Array<number | null>(spans.length).fill(null);
+  order.forEach((i, position) => (lanes[i] = inOrder[position]));
   content.landmarks.forEach((landmark, i) => {
     const at = x(landmark.km);
-    const baseline = 12 + lanes[i] * LANDMARK_LANE;
-    group.append(
-      svg("line", { x1: at, x2: at, y1: baseline - 9, y2: LANDMARKS_HEIGHT, class: "strip-landmark-tick" }),
-      svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-landmark", text: names[i] }, svg("title", { text: landmark.name })),
-    );
+    const lane = lanes[i];
+    // No free lane (a narrow screen, a crowded finish): the tick stays, with the name in its tooltip.
+    const baseline = lane === null ? LANDMARKS_HEIGHT - 6 : 12 + lane * LANDMARK_LANE;
+    group.append(svg("line", { x1: at, x2: at, y1: baseline - 9, y2: LANDMARKS_HEIGHT, class: "strip-landmark-tick" }, svg("title", { text: landmark.name })));
+    if (lane === null) return;
+    group.append(svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-landmark", text: names[i] }, svg("title", { text: landmark.name })));
   });
   return group;
 }
@@ -239,6 +242,7 @@ function traceGroup(row: StripRow, bins: ReturnType<StripRow["bins"]>, x: Scale,
 function headCell(row: StripRow, top: number, height: number, units: Units): HeadCell {
   const value = html("span", { class: "strip-head-value" });
   const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: row.name }), value, html("span", { class: "strip-head-scale", text: row.scale(units) }));
+  if (row.summary) node.append(html("span", { class: "strip-head-scale", text: row.summary(units) }));
   node.style.top = `${top}px`;
   node.style.height = `${height}px`;
   return {

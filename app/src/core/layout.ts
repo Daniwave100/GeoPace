@@ -107,6 +107,21 @@ export function assignLanes(labels: { start: number; end: number }[], laneCount:
 }
 
 /**
+ * The strict version: a label gets the first lane where it touches nothing, and `null` when
+ * every lane is taken, so whoever draws it can leave the name off rather than overprint another.
+ * Labels are given in the order that matters: earlier ones get their room first.
+ */
+export function assignFreeLanes(labels: { start: number; end: number }[], laneCount: number, gap = 0): (number | null)[] {
+  const placed: { start: number; end: number }[][] = Array.from({ length: laneCount }, () => []);
+  return labels.map((label) => {
+    const lane = placed.findIndex((taken) => taken.every((other) => label.end + gap <= other.start || other.end + gap <= label.start));
+    if (lane < 0) return null;
+    placed[lane].push(label);
+    return lane;
+  });
+}
+
+/**
  * Which way a wind arrow points on the page: the direction the wind *travels*, as the runner
  * meets it. `angleDeg` is `windOnRunner().angleDeg` — where the wind comes FROM relative to the
  * runner, 0 dead ahead — and `runs` is the way the runner moves across the page in this design.

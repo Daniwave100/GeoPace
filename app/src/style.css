@@ -854,7 +854,7 @@ button.map-label {
 /* The value under the cursor, printed in the row's header. */
 .strip-head-value {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   align-self: center;
   max-width: calc(var(--head) * 0.62);
   text-align: right;
@@ -996,6 +996,18 @@ button.map-label {
 /* ── Narrow or short screens: the blocks stop overlapping the map and stack under it ────── */
 
 @media (max-width: 760px), (max-height: 620px) {
+  :root {
+    --head: 118px; /* less header, more course */
+  }
+
+  .strip-head {
+    padding: 0 6px 0 10px;
+  }
+
+  .strip-head-value {
+    font-size: 14px;
+  }
+
   .stage {
     display: flex;
     flex-direction: column;

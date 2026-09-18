@@ -54,6 +54,8 @@ export interface StripRow {
   encoding: Encoding;
   /** The labelled scale, in the runner's units: "m, 33 to 53". */
   scale(units: Units): string;
+  /** One more line for the header, about the row as a whole: "up 262 m, down 293 m". */
+  summary?(units: Units): string;
   /** The course cut into `binCount` slices. */
   bins(binCount: number): RowBin[];
   /** The values at the bottom and the top of the row. */

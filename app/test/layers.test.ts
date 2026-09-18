@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { ENCODINGS, type Encoding } from "../src/core/encoding";
-import { hillsLayer } from "../src/core/hills-layer";
+import { heightRow, hillsLayer } from "../src/core/hills-layer";
 import { type Layer, NO_LAYERS, onScreen, pressEverything, pressLayer } from "../src/core/layers";
 
 const bundleFor = (course: string) =>
@@ -119,8 +119,29 @@ describe("the Hills layer", () => {
     expect(hills.rows()[0].valueAt(1.0, "km").notMeasured).toBe(true);
   });
 
-  it("calls a road flat when a runner would", () => {
+  it("calls a road flat when a runner would, and puts no sign on a grade of nothing", () => {
+    const flatCourse = structuredClone(berlin);
+    flatCourse.measured.course_line.grade = flatCourse.measured.course_line.grade.map(() => 0.0002);
+    flatCourse.measured.course_line.difficulty = flatCourse.measured.course_line.difficulty.map(() => 1.001);
+    const [grade, effort] = hillsLayer(flatCourse).rows();
+
     expect(hillsLayer(berlin).clause(10, "km")?.text).toBe("Flat.");
+    expect(grade.valueAt(10, "km").text).toBe("0.0%");
+    expect(effort.valueAt(10, "km").text).toBe("0%");
+  });
+});
+
+describe("the strip's own row, the height", () => {
+  it("is there whatever the layers are doing, with its scale, the value under the cursor and the course's total climb", () => {
+    const height = heightRow(nyc);
+
+    expect(height.scale("km")).toBe("m, 2 to 78");
+    expect(height.scale("mi")).toBe("ft, 8 to 256");
+    expect(height.summary?.("km")).toBe("up 262 m, down 293 m");
+    expect(height.summary?.("mi")).toBe("up 860 ft, down 962 ft");
+    expect(height.valueAt(0, "km")).toMatchObject({ text: "56 m", notMeasured: false });
+    // The crest of the Verrazzano is a straight line between measured heights: struck through.
+    expect(height.valueAt(1.0, "mi")).toMatchObject({ text: "250 ft", notMeasured: true }); // 76.2 m
   });
 });
 
