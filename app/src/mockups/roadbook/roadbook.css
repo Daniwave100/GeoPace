@@ -1,6 +1,13 @@
 /* Direction A — Roadbook. A survey sheet: map stock, blue-black ink, sepia contours, a red route,
    and purple pencil for anything nobody has checked. Paper has no dark mode; this commits to light. */
 
+/* Light only, all the way out: without this a dark system theme paints a dark canvas and dark
+   scrollbars around the paper. */
+html:has(.rb) {
+  color-scheme: only light;
+  background: #ebe6d5;
+}
+
 .rb {
   --paper: #ebe6d5;
   --paper-light: #f4f0e3;
@@ -25,13 +32,9 @@
   min-height: calc(100vh - var(--review-bar-height, 36px));
 }
 
-.rb h1,
-.rb h2,
-.rb p,
-.rb ul,
-.rb dl,
-.rb dd,
-.rb figure {
+/* :where() keeps this reset at the weight of a single class, so any rule further down the file
+   wins over it. Written as `.rb p` it silently cancelled later margins and paddings. */
+.rb :where(h1, h2, p, ul, dl, dd, figure) {
   margin: 0;
   padding: 0;
 }
@@ -90,6 +93,12 @@
 
 .rb-card__pencil {
   left: 10px;
+}
+
+.rb-card__pencil-stamp {
+  position: absolute;
+  top: 16px;
+  left: 0;
 }
 
 .rb-note,
@@ -473,7 +482,7 @@
   font-size: 13.5px;
 }
 
-.rb-credits__heading {
+.rb-credits .rb-credits__heading {
   margin-top: 8px;
   font-size: 13.5px;
 }

@@ -31,8 +31,7 @@ export function contourSegments(field: number[][], level: number): ContourSegmen
       const left = () => ({ x: column, y: row + between(topLeft, bottomLeft, level) });
       const right = () => ({ x: column + 1, y: row + between(topRight, bottomRight, level) });
 
-      const corners =
-        (topLeft >= level ? 8 : 0) | (topRight >= level ? 4 : 0) | (bottomRight >= level ? 2 : 0) | (bottomLeft >= level ? 1 : 0);
+      const corners = (topLeft >= level ? 8 : 0) | (topRight >= level ? 4 : 0) | (bottomRight >= level ? 2 : 0) | (bottomLeft >= level ? 1 : 0);
       const join = (from: { x: number; y: number }, to: { x: number; y: number }) => segments.push({ from, to });
 
       switch (corners) {

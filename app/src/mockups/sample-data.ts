@@ -55,6 +55,17 @@ export const SAMPLE_PREVAILING_WIND: Record<string, { fromDeg: number; speedMs: 
   nyc: { fromDeg: 310, speedMs: 5.1 },
 };
 
+/**
+ * The street model's invented buildings: a seed so a course's blocks are the same on every
+ * reload, and a ceiling so Manhattan reads taller than Berlin. Not data about either city.
+ */
+export const SAMPLE_MASSING: Record<string, { seed: number; maxHeightM: number }> = {
+  berlin: { seed: 3, maxHeightM: 30 },
+  nyc: { seed: 7, maxHeightM: 64 },
+};
+
+export const FALLBACK_MASSING = { seed: 1, maxHeightM: 30 };
+
 export interface SampleAidStation {
   /** Kilometre on the organizer's certified scale — converted onto the course line before use. */
   certifiedKm: number;

@@ -11,16 +11,14 @@
 import "@fontsource-variable/archivo/wdth.css";
 import "./poster.css";
 
-import { type Entry, type Field, entriesNear, headlineFields, layerFields } from "../content";
+import { type Entry, type Field, NOTE_HEADINGS, entriesNear, headlineFields, layerFields } from "../content";
 import { buildCredits } from "../credits";
 import * as show from "../format";
-import { heightDomain, linearScale, spreadLabels } from "../layout";
+import { effortReach, heightDomain, linearScale, measuredRuns, spreadLabels, windArrowOnPage } from "../layout";
 import { type MaquetteStyle, renderMaquette } from "../maquette";
 import { type MockupContext, startMockup } from "../shell";
 import type { CourseStory, StripBin } from "../story";
 import { drawToFit, html, link, perFrame, svg } from "../svg";
-
-const NOTE_HEADINGS = { gps: "Watch trouble", crowd: "Crowd", surface: "Underfoot" } as const;
 
 /** How many of the twelve columns each fact gets. Long sentences get room; numbers don't need it. */
 const FIELD_SPAN: Record<string, number> = { elevation: 1, grade: 1, difficulty: 2, sun: 2, exposure: 2, wind: 2, aid: 2 };
@@ -31,8 +29,34 @@ const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 function maquetteStyle(): MaquetteStyle {
   const blue = darkScheme.matches ? "#5a7dff" : "#1546ff";
   return darkScheme.matches
-    ? { ground: "#8a8a86", street: "#a3a39f", roof: "#f4f4f0", wallLit: "#d2d2ce", wallShaded: "#777", outline: "#000", outlineWidth: 0.5, shadow: "#000", shadowOpacity: 1, courseLine: blue, runner: blue }
-    : { ground: "#dededa", street: "#f4f4f0", roof: "#fff", wallLit: "#fff", wallShaded: "#9a9a96", outline: "#000", outlineWidth: 0.5, shadow: "#000", shadowOpacity: 1, courseLine: blue, runner: blue };
+    ? {
+        ground: "#8a8a86",
+        street: "#a3a39f",
+        roof: "#f4f4f0",
+        wallLit: "#d2d2ce",
+        wallShaded: "#777",
+        outline: "#000",
+        outlineWidth: 0.5,
+        shadow: "#000",
+        shadowOpacity: 1,
+        courseLine: blue,
+        runner: blue,
+        annotation: "#000",
+      }
+    : {
+        ground: "#dededa",
+        street: "#f4f4f0",
+        roof: "#fff",
+        wallLit: "#fff",
+        wallShaded: "#9a9a96",
+        outline: "#000",
+        outlineWidth: 0.5,
+        shadow: "#000",
+        shadowOpacity: 1,
+        courseLine: blue,
+        runner: blue,
+        annotation: "#000",
+      };
 }
 
 startMockup({ id: "poster", mount });
@@ -55,7 +79,12 @@ function mount(stage: HTMLElement, context: MockupContext): void {
     html(
       "section",
       { class: "ps-main" },
-      html("div", { class: "ps-cell ps-km", "aria-live": "off" }, html("span", { class: "ps-km__number" }, kmWhole, kmPart), html("span", { class: "ps-km__unit", text: "km" })),
+      html(
+        "div",
+        { class: "ps-cell ps-km", "aria-live": "off" },
+        html("span", { class: "ps-km__number" }, kmWhole, kmPart),
+        html("span", { class: "ps-km__unit", text: "km" }),
+      ),
       clock,
       elapsed,
       html("div", { class: "ps-cell ps-model" }, model, modelCaption),
@@ -67,16 +96,15 @@ function mount(stage: HTMLElement, context: MockupContext): void {
     buildCredits(story, "ps", "Flat ink works either way up: this direction follows your system's light or dark theme."),
   );
 
-  const seed = story.course.id === "nyc" ? 7 : 3;
   const update = () => {
     const readout = story.at(context.km);
-    const [km, clockField, elapsedField] = headlineFields(story, readout);
+    const headline = new Map(headlineFields(story, readout).map((field) => [field.key, field]));
 
-    const [whole, part] = km.value.split(".");
+    const [whole, part] = show.km(readout.km).split(".");
     kmWhole.textContent = whole;
     kmPart.textContent = `.${part}`;
-    clock.replaceChildren(...bigNumber(clockField));
-    elapsed.replaceChildren(...bigNumber(elapsedField));
+    clock.replaceChildren(...bigNumber(headline.get("clock")));
+    elapsed.replaceChildren(...bigNumber(headline.get("elapsed")));
     next.replaceChildren(...entriesNear(story, context.km).map((entry) => nextItem(entry, context.km)));
     facts.replaceChildren(...layerFields(story, readout).map(factCell));
 
@@ -85,8 +113,8 @@ function mount(stage: HTMLElement, context: MockupContext): void {
         positionM: readout.km * 1000,
         headingDeg: readout.headingDeg,
         sun: readout.sun,
-        seed,
-        view: { acrossM: 92, aheadM: 120, behindM: 50, maxHeightM: story.course.id === "nyc" ? 64 : 30 },
+        seed: story.massing.seed,
+        view: { acrossM: 92, aheadM: 120, behindM: 50, maxHeightM: story.massing.maxHeightM },
         style: maquetteStyle(),
       }),
     );
@@ -107,31 +135,46 @@ function banner(story: CourseStory): HTMLElement {
     { class: "ps-banner" },
     html("h1", { text: story.course.name }),
     date,
-    html("span", { class: "ps-banner__item" }, `${story.edition.waveLabel.split(" · ")[0]} starts ${story.edition.waveStartLocal} `, tape()),
-    html("span", { class: "ps-banner__item", text: `Goal ${show.formatElapsed(story.clock.elapsedSecondsAtKm(story.lengthKm))} at ${show.formatPace(story.clock.goalPaceSecondsPerKm)}/km` }),
+    html("span", { class: "ps-banner__item" }, `${story.edition.waveLabel} starts ${story.edition.waveStartLocal} `, tape()),
+    html("span", {
+      class: "ps-banner__item",
+      text: `Goal ${show.formatElapsed(story.clock.elapsedSecondsAtKm(story.lengthKm))} at ${show.formatPace(story.clock.goalPaceSecondsPerKm)}/km`,
+    }),
+    html("span", {
+      class: "ps-banner__item",
+      text: `${story.lengthKm.toFixed(2)} km, up ${story.elevation.gainM.toFixed(0)} m, down ${story.elevation.lossM.toFixed(0)} m`,
+    }),
   );
 }
 
-function bigNumber(field: Field): HTMLElement[] {
+function bigNumber(field: Field | undefined): HTMLElement[] {
+  if (!field) return [];
   const value = html("span", { class: "ps-big__value", text: field.value });
   if (field.detail) value.append(html("small", { text: ` ${field.detail}` }));
-  return [value, html("span", { class: "ps-big__label", text: field.label }), html("span", { class: "ps-big__assumption", text: field.assumption ?? "" })];
+  return [
+    value,
+    html("span", { class: "ps-big__label", text: field.label }),
+    html("span", { class: "ps-big__assumption", text: field.assumption ?? "" }),
+  ];
 }
 
 function factCell(field: Field): HTMLElement {
   const cell = html("div", { class: "ps-cell ps-fact", style: `grid-column: span ${FIELD_SPAN[field.key] ?? 2}`, "data-unknown": field.unknown });
   const label = html("span", { class: "ps-fact__label", text: field.label });
   if (field.sample) label.append(" ", tape());
-  const small = field.unknown && field.key === "elevation" ? "not measured here" : (field.detail ?? field.assumption ?? "");
-  cell.append(label, html("span", { class: "ps-fact__value", text: field.value }), html("span", { class: "ps-fact__small", title: field.detail ?? field.assumption, text: small }));
+  const small = field.unknownNote ?? field.detail ?? field.assumption ?? "";
+  cell.append(
+    label,
+    html("span", { class: "ps-fact__value", text: field.value }),
+    html("span", { class: "ps-fact__small", title: field.detail ?? field.assumption, text: small }),
+  );
   return cell;
 }
 
 function nextItem(entry: Entry, km: number): HTMLElement {
   const item = html("li", { class: `ps-next__item ps-next__item--${entry.provenance}` });
-  const distance = entry.km - km;
-  const where = Math.abs(distance) < 0.05 ? "here" : distance > 0 ? `in ${show.km(distance)} km` : `${show.km(-distance)} km back`;
-  const title = entry.kind === "note" ? `Runners say: ${NOTE_HEADINGS[entry.title as keyof typeof NOTE_HEADINGS].toLowerCase()}` : entry.kind === "aid" ? "Aid station" : entry.title;
+  const where = show.distanceWords(entry.km - km);
+  const title = entry.kind === "note" ? `Runners say: ${entry.title.toLowerCase()}` : entry.title;
 
   const head = html("span", { class: "ps-next__head" }, html("b", { text: title }), html("span", { text: where }));
   item.append(head);
@@ -142,18 +185,53 @@ function nextItem(entry: Entry, km: number): HTMLElement {
 }
 
 function legend(): HTMLElement {
-  const solid = svg("svg", { width: 30, height: 18, viewBox: "0 0 30 18", "aria-hidden": true }, svg("rect", { x: 1, y: 1, width: 28, height: 16, class: "ps-solid" }));
-  const hollow = svg("svg", { width: 30, height: 18, viewBox: "0 0 30 18", "aria-hidden": true }, svg("rect", { x: 1.5, y: 1.5, width: 27, height: 15, class: "ps-hollow" }));
+  const solid = svg(
+    "svg",
+    { width: 30, height: 18, viewBox: "0 0 30 18", "aria-hidden": true },
+    svg("rect", { x: 1, y: 1, width: 28, height: 16, class: "ps-solid" }),
+  );
+  const hollow = svg(
+    "svg",
+    { width: 30, height: 18, viewBox: "0 0 30 18", "aria-hidden": true },
+    svg("rect", { x: 1.5, y: 1.5, width: 27, height: 15, class: "ps-hollow" }),
+  );
   const struck = html("span", { class: "ps-legend__struck", text: "75 m" });
+  const dots = svg(
+    "svg",
+    { width: 30, height: 18, viewBox: "0 0 30 18", "aria-hidden": true },
+    // Its own copy of the pattern: the strip's <defs> belong to a different drawing.
+    svg("defs", {}, dotPattern("ps-legend-dots")),
+    svg("rect", { x: 1, y: 9, width: 28, height: 8, class: "ps-solid" }),
+    svg("rect", { x: 1, y: 1, width: 28, height: 8, fill: "url(#ps-legend-dots)" }),
+  );
   const rows: [Node, string, string][] = [
     [solid, "Solid is measured", "or computed from measurements by a published model. Sources are in the credits."],
     [hollow, "Hollow is hearsay", "what runners report. Worth knowing, never checked, never mixed into a number."],
+    [dots, "Dots are maybe", "in the sun row, solid is sun you get whatever the trees do; dotted is sun you only get if the leaves are down."],
     [struck, "Grey and struck is a gap", "the survey has nothing at this spot, so the value is a fill-in and says so."],
     [tape(), "Stripes are stand-ins", "invented values for layers that aren't built yet. They show layout, not the course."],
   ];
   const box = html("section", { class: "ps-legend", "aria-label": "How to read this poster" });
-  for (const [mark, title, rest] of rows) box.append(html("div", { class: "ps-cell ps-legend__cell" }, html("span", { class: "ps-legend__mark" }, mark), html("p", {}, html("b", { text: `${title}: ` }), rest)));
+  for (const [mark, title, rest] of rows)
+    box.append(
+      html(
+        "div",
+        { class: "ps-cell ps-legend__cell" },
+        html("span", { class: "ps-legend__mark" }, mark),
+        html("p", {}, html("b", { text: `${title}: ` }), rest),
+      ),
+    );
   return box;
+}
+
+/** Halftone dots: the poster's way of saying "maybe". */
+function dotPattern(id: string): SVGPatternElement {
+  return svg(
+    "pattern",
+    { id, width: 4, height: 4, patternUnits: "userSpaceOnUse" },
+    svg("circle", { cx: 1, cy: 1, r: 0.95, class: "ps-solid" }),
+    svg("circle", { cx: 3, cy: 3, r: 0.95, class: "ps-solid" }),
+  );
 }
 
 function tape(): HTMLElement {
@@ -177,10 +255,10 @@ interface Row {
 const ROWS: Row[] = [
   { id: "height", label: "Height", weight: 3 },
   { id: "effort", label: "Effort vs flat", weight: 1.5 },
-  { id: "sun", label: "In the sun", weight: 2, sample: true },
-  { id: "wind", label: "Wind", weight: 1.3, sample: true },
-  { id: "aid", label: "Aid", weight: 1.3, sample: true },
-  { id: "say", label: "Runners say", weight: 1.2, sample: true, hollow: true },
+  { id: "sun", label: "In the sun", weight: 2.2, sample: true },
+  { id: "wind", label: "Wind", weight: 1.7, sample: true },
+  { id: "aid", label: "Aid", weight: 1.7, sample: true },
+  { id: "say", label: "Runners say", weight: 1.7, sample: true, hollow: true },
   { id: "line", label: "", weight: 1.7 },
 ];
 
@@ -201,8 +279,16 @@ function strip(context: MockupContext): HTMLElement {
       band.set(row.id, { top, height: row.weight * unit });
       if (row.label) {
         const middle = top + (row.weight * unit) / 2;
-        node.append(svg("text", { x: 20, y: middle + 4.5, class: row.hollow ? "ps-row ps-row--hollow" : "ps-row", text: row.label }));
-        if (row.sample) node.append(svg("rect", { x: 6, y: top + 2, width: 7, height: row.weight * unit - 4, fill: "url(#ps-stripes)" }));
+        node.append(
+          svg("text", { x: 20, y: middle + (row.sample ? -1.5 : 4.5), class: row.hollow ? "ps-row ps-row--hollow" : "ps-row", text: row.label }),
+        );
+        // Stripes and the word: a swatch alone is a code the reader has to have learned.
+        if (row.sample) {
+          node.append(
+            svg("rect", { x: 6, y: top + 2, width: 7, height: row.weight * unit - 4, fill: "url(#ps-stripes)" }),
+            svg("text", { x: 20, y: middle + 10, class: "ps-row__sample", text: "sample" }),
+          );
+        }
         node.append(svg("line", { x1: 0, y1: top, x2: width, y2: top, class: "ps-rule" }));
       }
       top += row.weight * unit;
@@ -213,8 +299,12 @@ function strip(context: MockupContext): HTMLElement {
       svg(
         "defs",
         {},
-        svg("pattern", { id: "ps-stripes", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, svg("rect", { width: 3, height: 6, class: "ps-solid" })),
-        svg("pattern", { id: "ps-hatch", width: 5, height: 5, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, svg("rect", { width: 1.6, height: 5, class: "ps-solid" })),
+        svg(
+          "pattern",
+          { id: "ps-stripes", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" },
+          svg("rect", { width: 3, height: 6, class: "ps-solid" }),
+        ),
+        dotPattern("ps-dots"),
       ),
       landmarkLabels(story, x),
       heightRow(bins, x, at("height"), story),
@@ -236,7 +326,7 @@ function strip(context: MockupContext): HTMLElement {
     node.append(cursor);
     moveCursor = () => {
       cursor.setAttribute("transform", `translate(${x(context.km).toFixed(1)} 0)`);
-      flag.textContent = context.km.toFixed(1);
+      flag.textContent = show.km(context.km);
     };
     moveCursor();
     section.replaceChildren(node);
@@ -246,7 +336,6 @@ function strip(context: MockupContext): HTMLElement {
   context.scrubbable(section, {
     axis: "horizontal",
     toKm: (fraction) => fraction * story.lengthKm,
-    toFraction: (km) => km / story.lengthKm,
     inset: { start: GUTTER, end: RIGHT_PAD },
   });
   return section;
@@ -258,37 +347,46 @@ type X = (km: number) => number;
 /** Names set on the diagonal, the way a timetable poster does. Bracketed asides are dropped here. */
 function landmarkLabels(story: CourseStory, x: X): SVGGElement {
   const group = svg("g", {});
-  const centres = spreadLabels(story.landmarks.map((landmark) => ({ at: x(landmark.km), size: 15 })), { min: GUTTER, max: x(story.lengthKm) + 8 }, 0);
+  const centres = spreadLabels(
+    story.landmarks.map((landmark) => ({ at: x(landmark.km), size: 15 })),
+    { min: GUTTER, max: x(story.lengthKm) + 8 },
+    0,
+  );
   story.landmarks.forEach((landmark, index) => {
     const at = x(landmark.km);
     const anchor = centres[index];
     group.append(
       svg("path", { d: `M${at.toFixed(1)} ${LABEL_BAND}V${LABEL_BAND - 6}L${anchor.toFixed(1)} ${LABEL_BAND - 13}`, class: "ps-tick" }),
-      svg("text", { transform: `translate(${(anchor + 3).toFixed(1)} ${LABEL_BAND - 16}) rotate(-48)`, class: "ps-landmark", text: show.shortName(landmark.name) }, svg("title", { text: landmark.name })),
+      svg(
+        "text",
+        {
+          transform: `translate(${(anchor + 3).toFixed(1)} ${LABEL_BAND - 16}) rotate(-48)`,
+          class: "ps-landmark",
+          text: show.shortName(landmark.name),
+        },
+        svg("title", { text: landmark.name }),
+      ),
     );
   });
   return group;
 }
 
-/** A solid silhouette. Where the survey has a gap the silhouette is hatched, not filled. */
+/** A solid silhouette. Where the survey has a gap the silhouette is flat grey — the legend's colour for "not measured". */
 function heightRow(bins: StripBin[], x: X, band: Band, story: CourseStory): SVGGElement {
   const group = svg("g", {});
   const y = linearScale(heightDomain(story), [band.top + band.height, band.top + 5]);
   const floor = band.top + band.height;
-  for (const measured of [true, false]) {
-    let run: StripBin[] = [];
-    const flush = () => {
-      if (run.length > 0) {
-        const outline = run.map((bin) => `L${x(bin.startKm).toFixed(1)} ${y(bin.elevationM).toFixed(1)}L${x(bin.endKm).toFixed(1)} ${y(bin.elevationM).toFixed(1)}`).join("");
-        group.append(svg("path", { d: `M${x(run[0].startKm).toFixed(1)} ${floor}${outline}L${x(run[run.length - 1].endKm).toFixed(1)} ${floor}Z`, class: measured ? "ps-solid" : "ps-gap" }));
-      }
-      run = [];
-    };
-    for (const bin of bins) {
-      if (bin.elevationMeasured === measured) run.push(bin);
-      else flush();
-    }
-    flush();
+  for (const run of measuredRuns(bins)) {
+    const outline = run.bins
+      .map((bin) => `L${x(bin.startKm).toFixed(1)} ${y(bin.elevationM).toFixed(1)}L${x(bin.endKm).toFixed(1)} ${y(bin.elevationM).toFixed(1)}`)
+      .join("");
+    const last = run.bins[run.bins.length - 1];
+    group.append(
+      svg("path", {
+        d: `M${x(run.bins[0].startKm).toFixed(1)} ${floor}${outline}L${x(last.endKm).toFixed(1)} ${floor}Z`,
+        class: run.measured ? "ps-solid" : "ps-gap",
+      }),
+    );
   }
   group.append(
     svg("text", { x: GUTTER - 8, y: band.top + 12, "text-anchor": "end", class: "ps-scale", text: `${story.elevation.maxM.toFixed(0)} m` }),
@@ -301,7 +399,7 @@ function heightRow(bins: StripBin[], x: X, band: Band, story: CourseStory): SVGG
 function effortRow(bins: StripBin[], x: X, band: Band): SVGGElement {
   const group = svg("g", {});
   const middle = band.top + band.height / 2;
-  const reach = Math.max(0.08, ...bins.map((bin) => Math.abs((bin.difficulty ?? 1) - 1)));
+  const reach = effortReach(bins);
   for (const bin of bins) {
     const left = x(bin.startKm);
     const width = Math.max(1, x(bin.endKm) - left - 1);
@@ -310,22 +408,34 @@ function effortRow(bins: StripBin[], x: X, band: Band): SVGGElement {
       continue;
     }
     const length = (Math.abs(bin.difficulty - 1) / reach) * (band.height / 2 - 3);
-    group.append(svg("rect", { x: left, y: bin.difficulty >= 1 ? middle - length : middle, width, height: Math.max(0.8, length), class: "ps-solid" }));
+    group.append(
+      svg("rect", { x: left, y: bin.difficulty >= 1 ? middle - length : middle, width, height: Math.max(0.8, length), class: "ps-solid" }),
+    );
   }
   return group;
 }
 
-/** Solid up to the sun you get whatever the trees do; hatched above it for the part that depends on leaves. */
+/** Solid up to the sun you get whatever the trees do; halftone dots above it for the part that depends on leaves. */
 function sunRow(bins: StripBin[], x: X, band: Band): SVGGElement {
   const group = svg("g", {});
   const y = linearScale([0, 100], [band.top + band.height, band.top + 3]);
   for (const bin of bins) {
     const left = x(bin.startKm);
     const width = x(bin.endKm) - left + 0.4;
-    if (bin.exposure === null) continue;
+    if (bin.exposure === null) {
+      // Sun down: not zero, not unknown-but-sunny — no reading. Grey, like every other gap.
+      group.append(svg("rect", { x: left, y: band.top + 3, width, height: band.height - 3, class: "ps-gap" }));
+      continue;
+    }
     group.append(
       svg("rect", { x: left, y: y(bin.exposure.lowPercent), width, height: y(0) - y(bin.exposure.lowPercent), class: "ps-solid" }),
-      svg("rect", { x: left, y: y(bin.exposure.highPercent), width, height: y(bin.exposure.lowPercent) - y(bin.exposure.highPercent), fill: "url(#ps-hatch)" }),
+      svg("rect", {
+        x: left,
+        y: y(bin.exposure.highPercent),
+        width,
+        height: y(bin.exposure.lowPercent) - y(bin.exposure.highPercent),
+        fill: "url(#ps-dots)",
+      }),
     );
   }
   group.append(svg("text", { x: GUTTER - 8, y: band.top + 12, "text-anchor": "end", class: "ps-scale", text: "100%" }));
@@ -341,11 +451,13 @@ function windRow(story: CourseStory, x: X, band: Band): SVGGElement {
   const cy = band.top + band.height / 2;
   for (let km = 1; km < story.lengthKm; km += 2) {
     const { wind } = story.at(km);
-    // Direction of travel in the runner's frame (ahead = right across the page, right = down it).
-    const turn = wind.angleDeg + 180;
-    const size = band.height * (0.3 + 0.16 * Math.abs(wind.headwindFraction));
+    const { dx, dy } = windArrowOnPage(wind.angleDeg, "right");
+    const turn = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const size = band.height * (0.3 + 0.16 * Math.max(0, wind.headwindFraction));
     const wedge = `M${size} 0L${-size * 0.8} ${-size * 0.62}L${-size * 0.8} ${size * 0.62}Z`;
-    group.append(svg("path", { d: wedge, transform: `translate(${x(km).toFixed(1)} ${cy.toFixed(1)}) rotate(${turn.toFixed(0)})`, class: "ps-solid" }));
+    group.append(
+      svg("path", { d: wedge, transform: `translate(${x(km).toFixed(1)} ${cy.toFixed(1)}) rotate(${turn.toFixed(0)})`, class: "ps-solid" }),
+    );
   }
   return group;
 }
@@ -356,7 +468,15 @@ function aidRow(story: CourseStory, x: X, band: Band): SVGGElement {
   const side = Math.min(8, (band.height - 6) / 3);
   for (const station of story.aidStations) {
     station.offers.forEach((_, index) => {
-      group.append(svg("rect", { x: x(station.km) - side / 2, y: band.top + band.height - 3 - (index + 1) * side - index * 1.5, width: side, height: side, class: "ps-solid" }));
+      group.append(
+        svg("rect", {
+          x: x(station.km) - side / 2,
+          y: band.top + band.height - 3 - (index + 1) * side - index * 1.5,
+          width: side,
+          height: side,
+          class: "ps-solid",
+        }),
+      );
     });
   }
   return group;
@@ -367,7 +487,13 @@ function sayRow(story: CourseStory, x: X, band: Band): SVGGElement {
   const cy = band.top + band.height / 2;
   const r = Math.min(8, band.height / 2 - 3);
   for (const note of story.notes) {
-    group.append(svg("path", { d: `M${x(note.km)} ${cy - r}l${r} ${r}l${-r} ${r}l${-r} ${-r}Z`, class: "ps-hollow" }, svg("title", { text: `${NOTE_HEADINGS[note.kind]}: ${note.text}` })));
+    group.append(
+      svg(
+        "path",
+        { d: `M${x(note.km)} ${cy - r}l${r} ${r}l${-r} ${r}l${-r} ${-r}Z`, class: "ps-hollow" },
+        svg("title", { text: `${NOTE_HEADINGS[note.kind]}: ${note.text}` }),
+      ),
+    );
   }
   return group;
 }

@@ -13,16 +13,17 @@ export function buildCredits(story: CourseStory, prefix: string, commitment: str
   const name = (part: string) => `${prefix}-credits__${part}`;
   const root = html("footer", { class: `${prefix}-credits` });
 
-  root.append(
-    html("p", { class: name("unofficial"), text: UNOFFICIAL_NOTICE }),
-    html("p", { class: name("sample"), text: SAMPLE_NOTICE }),
-  );
+  root.append(html("p", { class: name("unofficial"), text: UNOFFICIAL_NOTICE }), html("p", { class: name("sample"), text: SAMPLE_NOTICE }));
 
   const layers = html("ul", { class: name("layers") });
   for (const layer of story.layers) {
     const kind = layer.provenance === "measured" ? "measured" : "reported by runners";
     const item = html("li", { class: name("layer"), "data-sample": layer.sample, "data-provenance": layer.provenance });
-    item.append(html("b", { text: layer.label }), ` — ${kind}${layer.sample ? ", sample values" : ""}. `, noteWithLinks(layer.note));
+    item.append(
+      html("b", { text: layer.label }),
+      ` — ${kind}${layer.sample ? ", sample values" : ""}. `,
+      layer.url ? link(layer.url, layer.note) : layer.note,
+    );
     layers.append(item);
   }
   root.append(html("h2", { class: name("heading"), text: "What each layer is" }), layers);
@@ -33,11 +34,4 @@ export function buildCredits(story: CourseStory, prefix: string, commitment: str
 
   root.append(html("p", { class: name("commitment"), text: commitment }));
   return root;
-}
-
-/** Layer notes are "title — https://…"; make the URL a link rather than printing it raw. */
-function noteWithLinks(note: string): Node {
-  const match = note.match(/^(.*?)(?: — )?(https?:\/\/\S+)$/);
-  if (!match) return document.createTextNode(note);
-  return link(match[2], match[1] || match[2]);
 }

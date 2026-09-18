@@ -31,8 +31,6 @@ export interface ScrubTrack {
   axis: "horizontal" | "vertical";
   /** Fraction 0…1 along the track -> km on the course line. */
   toKm(fraction: number): number;
-  /** The inverse, used to place the handle. */
-  toFraction(km: number): number;
   /** Padding inside the element that isn't part of the track, in px. */
   inset?: { start: number; end: number };
 }

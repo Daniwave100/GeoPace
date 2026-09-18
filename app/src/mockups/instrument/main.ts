@@ -15,10 +15,10 @@ import "@fontsource/b612/latin-400-italic.css";
 import "@fontsource/b612/latin-700.css";
 import "./instrument.css";
 
-import { type Entry, type Field, entriesNear, headlineFields, layerFields } from "../content";
+import { type Entry, type Field, NOTE_HEADINGS, entriesNear, headlineFields, layerFields } from "../content";
 import { buildCredits } from "../credits";
 import * as show from "../format";
-import { assignLanes, heightDomain, linearScale } from "../layout";
+import { assignLanes, effortReach, heightDomain, linearScale, measuredRuns } from "../layout";
 import { type MaquetteStyle, renderMaquette } from "../maquette";
 import { type MockupContext, startMockup } from "../shell";
 import type { CourseStory, Readout, StripBin } from "../story";
@@ -29,8 +29,6 @@ const RULE = "#aab5be";
 const TRACE = "#23607a";
 const CURSOR = "#e8590c";
 const GREY = "#8b96a0";
-
-const NOTE_HEADINGS = { gps: "Watch trouble", crowd: "Crowd", surface: "Underfoot" } as const;
 
 const MAQUETTE_STYLE: MaquetteStyle = {
   ground: "#dfe5e9",
@@ -54,6 +52,7 @@ function mount(stage: HTMLElement, context: MockupContext): void {
   stage.className = "fi";
 
   const displays = html("div", { class: "fi-displays" });
+  const footnotes = html("p", { class: "fi-footnotes" });
   const viewport = html("div", { class: "fi-viewport__drawing" });
   const viewportNote = html("p", { class: "fi-panel__note" });
   const sky = html("div", { class: "fi-sky" });
@@ -61,7 +60,7 @@ function mount(stage: HTMLElement, context: MockupContext): void {
   const nearby = html("ul", { class: "fi-nearby" });
 
   stage.append(
-    html("header", { class: "fi-head" }, identity(story), displays),
+    html("header", { class: "fi-head" }, html("div", { class: "fi-head__row" }, identity(story), displays), footnotes),
     html(
       "div",
       { class: "fi-body" },
@@ -76,14 +75,23 @@ function mount(stage: HTMLElement, context: MockupContext): void {
       ),
     ),
     key(),
-    buildCredits(story, "fi", "A dark instrument panel is the look this project set out to avoid, so this direction stays light in either system theme."),
+    buildCredits(
+      story,
+      "fi",
+      "A dark instrument panel is the look this project set out to avoid, so this direction stays light in either system theme.",
+    ),
   );
 
-  const seed = story.course.id === "nyc" ? 7 : 3;
   const sunTrack = sunAlongTheRace(story);
   const update = () => {
     const readout = story.at(context.km);
-    displays.replaceChildren(...headlineFields(story, readout).map(display));
+    const headline = headlineFields(story, readout);
+    displays.replaceChildren(...headline.map(display));
+    // The assumptions behind a starred display are printed, not left in a tooltip.
+    footnotes.textContent = headline
+      .filter((field) => field.assumption)
+      .map((field) => `* ${field.label}: ${field.assumption}.`)
+      .join("  ");
     table.replaceChildren(...layerFields(story, readout).map(tableRow));
     const entries = entriesNear(story, context.km);
     nearby.replaceChildren(...entries.map((entry) => nearbyItem(entry, context.km)));
@@ -93,8 +101,8 @@ function mount(stage: HTMLElement, context: MockupContext): void {
         positionM: readout.km * 1000,
         headingDeg: readout.headingDeg,
         sun: readout.sun,
-        seed,
-        view: { acrossM: 100, aheadM: 118, behindM: 46, maxHeightM: story.course.id === "nyc" ? 64 : 30 },
+        seed: story.massing.seed,
+        view: { acrossM: 100, aheadM: 118, behindM: 46, maxHeightM: story.massing.maxHeightM },
         style: MAQUETTE_STYLE,
       }),
     );
@@ -118,8 +126,10 @@ function identity(story: CourseStory): HTMLElement {
       "p",
       {},
       date,
-      html("span", {}, `${story.edition.waveLabel.split(" · ")[0]} ${story.edition.waveStartLocal} `, tag()),
-      html("span", { text: `goal ${show.formatElapsed(story.clock.elapsedSecondsAtKm(story.lengthKm))}, ${show.formatPace(story.clock.goalPaceSecondsPerKm)}/km even` }),
+      html("span", {}, `${story.edition.waveLabel} ${story.edition.waveStartLocal} `, tag()),
+      html("span", {
+        text: `goal ${show.formatElapsed(story.clock.elapsedSecondsAtKm(story.lengthKm))}, ${show.formatPace(story.clock.goalPaceSecondsPerKm)}/km even`,
+      }),
       html("span", { text: `line ${story.lengthKm.toFixed(2)} km, +${story.elevation.gainM.toFixed(0)} m −${story.elevation.lossM.toFixed(0)} m` }),
     ),
   );
@@ -128,7 +138,12 @@ function identity(story: CourseStory): HTMLElement {
 function display(field: Field): HTMLElement {
   const value = html("span", { class: "fi-display__value", text: field.value });
   if (field.detail) value.append(html("small", { text: ` ${field.detail}` }));
-  return html("div", { class: "fi-display", title: field.assumption }, value, html("span", { class: "fi-display__label", text: field.assumption ? `${field.label} *` : field.label }));
+  return html(
+    "div",
+    { class: "fi-display" },
+    value,
+    html("span", { class: "fi-display__label", text: field.assumption ? `${field.label} *` : field.label }),
+  );
 }
 
 function panel(title: string, ...body: HTMLElement[]): HTMLElement {
@@ -137,9 +152,14 @@ function panel(title: string, ...body: HTMLElement[]): HTMLElement {
 
 function tableRow(field: Field): HTMLElement {
   const value = html("td", { text: field.value });
-  if (field.unknown && field.key === "elevation") value.append(html("i", { text: "not measured here" }));
+  if (field.unknownNote) value.append(html("i", { text: field.unknownNote }));
   if (field.sample) value.append(" ", tag());
-  return html("tr", { "data-unknown": field.unknown, title: [field.detail, field.assumption].filter(Boolean).join(" · ") || undefined }, html("th", { scope: "row", text: field.label }), value);
+  return html(
+    "tr",
+    { "data-unknown": field.unknown, title: [field.detail, field.assumption].filter(Boolean).join(" · ") || undefined },
+    html("th", { scope: "row", text: field.label }),
+    value,
+  );
 }
 
 function nearbyItem(entry: Entry, km: number): HTMLElement {
@@ -147,9 +167,8 @@ function nearbyItem(entry: Entry, km: number): HTMLElement {
   const offset = entry.km - km;
   item.append(html("span", { class: "fi-nearby__km", text: `${offset >= 0 ? "+" : "−"}${show.km(Math.abs(offset))}` }));
   const body = html("span", {});
-  if (entry.kind === "note") body.append(html("b", { text: `${NOTE_HEADINGS[entry.title as keyof typeof NOTE_HEADINGS]}. ` }), entry.detail);
-  else if (entry.kind === "aid") body.append(html("b", { text: "Aid. " }), entry.detail);
-  else body.append(html("b", { text: entry.title }));
+  if (entry.kind === "landmark") body.append(html("b", { text: entry.title }));
+  else body.append(html("b", { text: `${entry.title}. ` }), entry.detail);
   if (entry.source) body.append(" ", link(entry.source, "source"));
   if (entry.sample) body.append(" ", tag());
   item.append(body);
@@ -161,9 +180,19 @@ function key(): HTMLElement {
     svg(
       "svg",
       { width: 44, height: 12, viewBox: "0 0 44 12", "aria-hidden": true },
-      svg("path", { d: "M1 8L12 4L22 7L32 3L43 6", fill: "none", stroke: dashed ? GREY : TRACE, "stroke-width": 1.3, "stroke-dasharray": dashed ? "3 2.5" : undefined }),
+      svg("path", {
+        d: "M1 8L12 4L22 7L32 3L43 6",
+        fill: "none",
+        stroke: dashed ? GREY : TRACE,
+        "stroke-width": 1.3,
+        "stroke-dasharray": dashed ? "3 2.5" : undefined,
+      }),
     );
-  const diamond = svg("svg", { width: 44, height: 12, viewBox: "0 0 44 12", "aria-hidden": true }, svg("path", { d: "M22 1l5 5l-5 5l-5-5Z", class: "fi-report-mark" }));
+  const diamond = svg(
+    "svg",
+    { width: 44, height: 12, viewBox: "0 0 44 12", "aria-hidden": true },
+    svg("path", { d: "M22 1l5 5l-5 5l-5-5Z", class: "fi-report-mark" }),
+  );
   const rows: [Node, string][] = [
     [line(false), "Solid trace, upright type: measured, or computed from measurements by a published model."],
     [line(true), "Dashed grey: no measurement at this spot. The value is a fill-in, shown struck through."],
@@ -171,7 +200,8 @@ function key(): HTMLElement {
     [tag(), "Invented values standing in for a layer that isn't built yet."],
   ];
   const box = html("section", { class: "fi-key", "aria-label": "Key" });
-  for (const [mark, text] of rows) box.append(html("div", { class: "fi-key__row" }, html("span", { class: "fi-key__mark" }, mark), html("span", { text })));
+  for (const [mark, text] of rows)
+    box.append(html("div", { class: "fi-key__row" }, html("span", { class: "fi-key__mark" }, mark), html("span", { text })));
   return box;
 }
 
@@ -209,18 +239,53 @@ function skyPoint(altitudeDeg: number, azimuthDeg: number): { x: number; y: numb
 
 function skyDial(readout: Readout, track: SkyPoint[]): SVGSVGElement {
   const c = DIAL / 2;
-  const node = svg("svg", { class: "fi-sky__dial", width: DIAL, height: DIAL, viewBox: `0 0 ${DIAL} ${DIAL}`, role: "img", "aria-label": "Sun position, running direction and wind direction, seen from above" });
+  const node = svg("svg", {
+    class: "fi-sky__dial",
+    width: DIAL,
+    height: DIAL,
+    viewBox: `0 0 ${DIAL} ${DIAL}`,
+    role: "img",
+    "aria-label": "Sun position, running direction and wind direction, seen from above",
+  });
 
-  for (const altitude of [0, 30, 60]) node.append(svg("circle", { cx: c, cy: c, r: ((90 - altitude) / 90) * DIAL_R, fill: "none", stroke: altitude === 0 ? INK : RULE, "stroke-width": altitude === 0 ? 0.9 : 0.6 }));
+  for (const altitude of [0, 30, 60])
+    node.append(
+      svg("circle", {
+        cx: c,
+        cy: c,
+        r: ((90 - altitude) / 90) * DIAL_R,
+        fill: "none",
+        stroke: altitude === 0 ? INK : RULE,
+        "stroke-width": altitude === 0 ? 0.9 : 0.6,
+      }),
+    );
   node.append(svg("path", { d: `M${c} ${c - DIAL_R}V${c + DIAL_R}M${c - DIAL_R} ${c}H${c + DIAL_R}`, stroke: RULE, "stroke-width": 0.6 }));
-  for (const [label, azimuth] of [["N", 0], ["E", 90], ["S", 180], ["W", 270]] as const) {
+  for (const [label, azimuth] of [
+    ["N", 0],
+    ["E", 90],
+    ["S", 180],
+    ["W", 270],
+  ] as const) {
     const a = azimuth * (Math.PI / 180);
-    node.append(svg("text", { x: c + (DIAL_R + 10) * Math.sin(a), y: c - (DIAL_R + 10) * Math.cos(a) + 3.5, "text-anchor": "middle", class: "fi-sky__cardinal", text: label }));
+    node.append(
+      svg("text", {
+        x: c + (DIAL_R + 10) * Math.sin(a),
+        y: c - (DIAL_R + 10) * Math.cos(a) + 3.5,
+        "text-anchor": "middle",
+        class: "fi-sky__cardinal",
+        text: label,
+      }),
+    );
   }
 
   const lit = track.filter((point) => point.altitudeDeg > 0);
   if (lit.length > 1) {
-    const path = lit.map((point, index) => `${index === 0 ? "M" : "L"}${skyPoint(point.altitudeDeg, point.azimuthDeg).x.toFixed(1)} ${skyPoint(point.altitudeDeg, point.azimuthDeg).y.toFixed(1)}`).join("");
+    const path = lit
+      .map(
+        (point, index) =>
+          `${index === 0 ? "M" : "L"}${skyPoint(point.altitudeDeg, point.azimuthDeg).x.toFixed(1)} ${skyPoint(point.altitudeDeg, point.azimuthDeg).y.toFixed(1)}`,
+      )
+      .join("");
     node.append(svg("path", { d: path, fill: "none", stroke: TRACE, "stroke-width": 1.4 }));
   }
 
@@ -229,11 +294,21 @@ function skyDial(readout: Readout, track: SkyPoint[]): SVGSVGElement {
   const tip = { x: c + (DIAL_R - 4) * Math.sin(heading), y: c - (DIAL_R - 4) * Math.cos(heading) };
   node.append(
     svg("line", { x1: c, y1: c, x2: tip.x, y2: tip.y, stroke: INK, "stroke-width": 1.1 }),
-    svg("path", { d: "M0 -5L3.4 3L-3.4 3Z", fill: INK, transform: `translate(${tip.x.toFixed(1)} ${tip.y.toFixed(1)}) rotate(${readout.headingDeg.toFixed(0)})` }),
+    svg("path", {
+      d: "M0 -5L3.4 3L-3.4 3Z",
+      fill: INK,
+      transform: `translate(${tip.x.toFixed(1)} ${tip.y.toFixed(1)}) rotate(${readout.headingDeg.toFixed(0)})`,
+    }),
   );
 
   // Wind: a wedge on the rim at the bearing it blows FROM, pointing the way it travels — inward.
-  node.append(svg("path", { d: `M0 ${-DIAL_R + 9}L5 ${-DIAL_R - 3}L-5 ${-DIAL_R - 3}Z`, class: "fi-sky__wind", transform: `translate(${c} ${c}) rotate(${readout.wind.fromDeg.toFixed(0)})` }));
+  node.append(
+    svg("path", {
+      d: `M0 ${-DIAL_R + 9}L5 ${-DIAL_R - 3}L-5 ${-DIAL_R - 3}Z`,
+      class: "fi-sky__wind",
+      transform: `translate(${c} ${c}) rotate(${readout.wind.fromDeg.toFixed(0)})`,
+    }),
+  );
 
   if (readout.sun.isUp) {
     const sun = skyPoint(readout.sun.altitudeDeg, readout.sun.azimuthDeg);
@@ -244,7 +319,13 @@ function skyDial(readout: Readout, track: SkyPoint[]): SVGSVGElement {
 
 function skyLegend(readout: Readout): HTMLElement {
   const row = (mark: string, label: string, value: string, sample = false) => {
-    const item = html("li", {}, html("span", { class: `fi-sky__mark fi-sky__mark--${mark}` }), html("span", { class: "fi-sky__label", text: label }), html("b", { text: value }));
+    const item = html(
+      "li",
+      {},
+      html("span", { class: `fi-sky__mark fi-sky__mark--${mark}` }),
+      html("span", { class: "fi-sky__label", text: label }),
+      html("b", { text: value }),
+    );
     if (sample) item.append(tag());
     return item;
   };
@@ -293,7 +374,10 @@ const TRACKS: Track[] = [
     scale: (story) => `m, ${story.elevation.minM.toFixed(0)} to ${story.elevation.maxM.toFixed(0)}`,
     weight: 3,
     sample: false,
-    value: (_story, readout) => ({ text: `${show.metres(readout.elevationM)}  ${show.grade(readout.gradePercent)}`, unknown: !readout.elevationMeasured }),
+    value: (_story, readout) => ({
+      text: `${show.metres(readout.elevationM)}  ${show.grade(readout.gradePercent)}`,
+      unknown: !readout.elevationMeasured,
+    }),
   },
   {
     id: "effort",
@@ -328,7 +412,10 @@ const TRACKS: Track[] = [
     scale: () => "dots: water, drink, gel",
     weight: 1.5,
     sample: true,
-    value: (_story, readout) => ({ text: readout.nextAid ? `next +${show.km(Math.max(0, readout.nextAid.km - readout.km))}` : show.NOT_KNOWN, unknown: !readout.nextAid }),
+    value: (_story, readout) => ({
+      text: readout.nextAid ? `next +${show.km(Math.max(0, readout.nextAid.km - readout.km))}` : show.NOT_KNOWN,
+      unknown: !readout.nextAid,
+    }),
   },
   {
     id: "reports",
@@ -350,6 +437,7 @@ function tracks(context: MockupContext): HTMLElement {
   const chart = html("div", { class: "fi-tracks__chart" });
   const heads = html("div", { class: "fi-tracks__heads" });
   section.append(chart, heads);
+  heads.style.width = `${HEAD_WIDTH}px`;
 
   const liveValues = new Map<Track["id"], HTMLElement>();
   for (const track of TRACKS) {
@@ -357,7 +445,15 @@ function tracks(context: MockupContext): HTMLElement {
     liveValues.set(track.id, live);
     const name = html("span", { class: "fi-trackhead__name", text: track.name });
     if (track.sample) name.append(" ", tag());
-    heads.append(html("div", { class: track.subjective ? "fi-trackhead fi-trackhead--subjective" : "fi-trackhead", "data-track": track.id }, name, html("span", { class: "fi-trackhead__scale", text: track.scale(story) }), live));
+    heads.append(
+      html(
+        "div",
+        { class: track.subjective ? "fi-trackhead fi-trackhead--subjective" : "fi-trackhead", "data-track": track.id },
+        name,
+        html("span", { class: "fi-trackhead__scale", text: track.scale(story) }),
+        live,
+      ),
+    );
   }
 
   let moveCursor: (() => void) | undefined;
@@ -392,7 +488,16 @@ function tracks(context: MockupContext): HTMLElement {
     // Kilometre grid through every track.
     for (let km = 0; km <= story.lengthKm; km += 1) {
       const major = km % 5 === 0;
-      node.append(svg("line", { x1: x(km), y1: 0, x2: x(km), y2: chartBottom + (major ? 7 : 3), stroke: major ? RULE : "#dbe1e6", "stroke-width": major ? 0.8 : 0.5 }));
+      node.append(
+        svg("line", {
+          x1: x(km),
+          y1: 0,
+          x2: x(km),
+          y2: chartBottom + (major ? 7 : 3),
+          stroke: major ? RULE : "#dbe1e6",
+          "stroke-width": major ? 0.8 : 0.5,
+        }),
+      );
       if (major) node.append(svg("text", { x: x(km), y: chartBottom + 20, "text-anchor": "middle", class: "fi-axis", text: String(km) }));
     }
     node.append(
@@ -405,7 +510,7 @@ function tracks(context: MockupContext): HTMLElement {
       elevationTrack(bins, x, band("elevation"), story),
       effortTrack(bins, x, band("effort")),
       sunTrackBand(bins, x, band("sun")),
-      windTrack(bins, x, band("wind"), story),
+      windTrack(bins, x, band("wind")),
       aidTrack(story, x, band("aid")),
       reportTrack(story, x, band("reports")),
     );
@@ -443,7 +548,6 @@ function tracks(context: MockupContext): HTMLElement {
   context.scrubbable(section, {
     axis: "horizontal",
     toKm: (fraction) => fraction * story.lengthKm,
-    toFraction: (km) => km / story.lengthKm,
     inset: { start: HEAD_WIDTH, end: RIGHT_PAD },
   });
   return section;
@@ -474,7 +578,17 @@ function landmarkTrack(story: CourseStory, x: X, band: Band): SVGGElement {
     const baseline = band.top + 11 + lanes[index] * LANE;
     group.append(
       svg("line", { x1: at, y1: baseline - 8, x2: at, y2: band.top + band.height, stroke: INK, "stroke-width": 0.7 }),
-      svg("text", { x: flipped[index] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[index] ? "end" : "start", class: "fi-landmark", text: names[index] }, svg("title", { text: landmark.name })),
+      svg(
+        "text",
+        {
+          x: flipped[index] ? at - 4 : at + 4,
+          y: baseline,
+          "text-anchor": flipped[index] ? "end" : "start",
+          class: "fi-landmark",
+          text: names[index],
+        },
+        svg("title", { text: landmark.name }),
+      ),
     );
   });
   return group;
@@ -485,22 +599,18 @@ function elevationTrack(bins: StripBin[], x: X, band: Band, story: CourseStory):
   const y = linearScale(heightDomain(story), [band.top + band.height - 1, band.top + 6]);
   const floor = band.top + band.height;
 
-  for (const measured of [true, false]) {
-    let run: StripBin[] = [];
-    const flush = () => {
-      if (run.length > 1) {
-        const line = run.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.midKm).toFixed(1)} ${y(bin.elevationM).toFixed(1)}`).join("");
-        if (measured) group.append(svg("path", { d: `${line}L${x(run[run.length - 1].midKm).toFixed(1)} ${floor}L${x(run[0].midKm).toFixed(1)} ${floor}Z`, fill: TRACE, "fill-opacity": 0.12 }));
-        group.append(svg("path", measured ? { d: line, fill: "none", stroke: TRACE, "stroke-width": 1.2, "stroke-linejoin": "round" } : { d: line, fill: "none", stroke: GREY, "stroke-width": 1.2, "stroke-dasharray": "3 2.5" }));
-      }
-      run = [];
-    };
-    bins.forEach((bin, index) => {
-      const belongs = bin.elevationMeasured === measured || (!measured && (bins[index - 1]?.elevationMeasured === false || bins[index + 1]?.elevationMeasured === false));
-      if (belongs) run.push(bin);
-      else flush();
-    });
-    flush();
+  for (const run of measuredRuns(bins, { bridgeGaps: true })) {
+    if (run.bins.length < 2) continue;
+    const line = run.bins.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.midKm).toFixed(1)} ${y(bin.elevationM).toFixed(1)}`).join("");
+    if (run.measured) {
+      const area = `${line}L${x(run.bins[run.bins.length - 1].midKm).toFixed(1)} ${floor}L${x(run.bins[0].midKm).toFixed(1)} ${floor}Z`;
+      group.append(
+        svg("path", { d: area, fill: TRACE, "fill-opacity": 0.12 }),
+        svg("path", { d: line, fill: "none", stroke: TRACE, "stroke-width": 1.2, "stroke-linejoin": "round" }),
+      );
+    } else {
+      group.append(svg("path", { d: line, fill: "none", stroke: GREY, "stroke-width": 1.2, "stroke-dasharray": "3 2.5" }));
+    }
   }
 
   for (const span of story.unmeasured) {
@@ -515,15 +625,34 @@ function elevationTrack(bins: StripBin[], x: X, band: Band, story: CourseStory):
 /** A stepped trace about 1.0. Where the grade is outside the model there is no trace, only a grey block. */
 function effortTrack(bins: StripBin[], x: X, band: Band): SVGGElement {
   const group = svg("g", {});
-  const reach = Math.max(0.08, ...bins.map((bin) => Math.abs((bin.difficulty ?? 1) - 1)));
+  const reach = effortReach(bins);
   const y = linearScale([1 - reach, 1 + reach], [band.top + band.height - 3, band.top + 3]);
-  group.append(svg("line", { x1: x(bins[0].startKm), y1: y(1), x2: x(bins[bins.length - 1].endKm), y2: y(1), stroke: INK, "stroke-width": 0.5, "stroke-dasharray": "1 2" }));
+  group.append(
+    svg("line", {
+      x1: x(bins[0].startKm),
+      y1: y(1),
+      x2: x(bins[bins.length - 1].endKm),
+      y2: y(1),
+      stroke: INK,
+      "stroke-width": 0.5,
+      "stroke-dasharray": "1 2",
+    }),
+  );
 
   let path = "";
   let penDown = false;
   for (const bin of bins) {
     if (bin.difficulty === null) {
-      group.append(svg("rect", { x: x(bin.startKm), y: band.top + 2, width: x(bin.endKm) - x(bin.startKm), height: band.height - 4, fill: GREY, "fill-opacity": 0.3 }));
+      group.append(
+        svg("rect", {
+          x: x(bin.startKm),
+          y: band.top + 2,
+          width: x(bin.endKm) - x(bin.startKm),
+          height: band.height - 4,
+          fill: GREY,
+          "fill-opacity": 0.3,
+        }),
+      );
       penDown = false;
       continue;
     }
@@ -538,30 +667,82 @@ function effortTrack(bins: StripBin[], x: X, band: Band): SVGGElement {
 function sunTrackBand(bins: StripBin[], x: X, band: Band): SVGGElement {
   const group = svg("g", {});
   const y = linearScale([0, 100], [band.top + band.height - 2, band.top + 4]);
-  const lit = bins.filter((bin) => bin.exposure !== null);
-  if (lit.length < 2) return group;
-  const upper = lit.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.midKm).toFixed(1)} ${y(bin.exposure?.highPercent ?? 0).toFixed(1)}`).join("");
-  const lower = lit.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.midKm).toFixed(1)} ${y(bin.exposure?.lowPercent ?? 0).toFixed(1)}`).join("");
-  const back = [...lit].reverse().map((bin) => `L${x(bin.midKm).toFixed(1)} ${y(bin.exposure?.lowPercent ?? 0).toFixed(1)}`).join("");
   group.append(
-    svg("line", { x1: x(bins[0].startKm), y1: y(50), x2: x(bins[bins.length - 1].endKm), y2: y(50), stroke: RULE, "stroke-width": 0.5, "stroke-dasharray": "1 2" }),
-    svg("path", { d: `${upper}${back}Z`, fill: TRACE, "fill-opacity": 0.2 }),
-    svg("path", { d: upper, fill: "none", stroke: TRACE, "stroke-width": 0.9 }),
-    svg("path", { d: lower, fill: "none", stroke: TRACE, "stroke-width": 0.9 }),
+    svg("line", {
+      x1: x(bins[0].startKm),
+      y1: y(50),
+      x2: x(bins[bins.length - 1].endKm),
+      y2: y(50),
+      stroke: RULE,
+      "stroke-width": 0.5,
+      "stroke-dasharray": "1 2",
+    }),
   );
+
+  // One band per stretch of daylight. With the sun down there is no reading, so the trace stops
+  // and the stretch is greyed — it is never joined across as if the sun had stayed up.
+  let lit: { km: number; low: number; high: number }[] = [];
+  const flush = () => {
+    if (lit.length > 1) {
+      const upper = lit.map((point, index) => `${index === 0 ? "M" : "L"}${x(point.km).toFixed(1)} ${y(point.high).toFixed(1)}`).join("");
+      const lower = lit.map((point, index) => `${index === 0 ? "M" : "L"}${x(point.km).toFixed(1)} ${y(point.low).toFixed(1)}`).join("");
+      const back = [...lit]
+        .reverse()
+        .map((point) => `L${x(point.km).toFixed(1)} ${y(point.low).toFixed(1)}`)
+        .join("");
+      group.append(
+        svg("path", { d: `${upper}${back}Z`, fill: TRACE, "fill-opacity": 0.2 }),
+        svg("path", { d: upper, fill: "none", stroke: TRACE, "stroke-width": 0.9 }),
+        svg("path", { d: lower, fill: "none", stroke: TRACE, "stroke-width": 0.9 }),
+      );
+    }
+    lit = [];
+  };
+  for (const bin of bins) {
+    if (bin.exposure) {
+      lit.push({ km: bin.midKm, low: bin.exposure.lowPercent, high: bin.exposure.highPercent });
+      continue;
+    }
+    flush();
+    group.append(
+      svg("rect", {
+        x: x(bin.startKm),
+        y: band.top + 2,
+        width: x(bin.endKm) - x(bin.startKm),
+        height: band.height - 4,
+        fill: GREY,
+        "fill-opacity": 0.3,
+      }),
+    );
+  }
+  flush();
   return group;
 }
 
 /** The part of the wind that is in the runner's face, as a trace about zero: above the line costs you. */
-function windTrack(bins: StripBin[], x: X, band: Band, story: CourseStory): SVGGElement {
+function windTrack(bins: StripBin[], x: X, band: Band): SVGGElement {
   const group = svg("g", {});
-  const speed = story.at(0).wind.speedMs;
-  const y = linearScale([-speed, speed], [band.top + band.height - 3, band.top + 3]);
-  const line = bins.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.midKm).toFixed(1)} ${y(bin.headwindFraction * speed).toFixed(1)}`).join("");
+  const strongest = Math.max(0.1, ...bins.map((bin) => bin.windSpeedMs));
+  const y = linearScale([-strongest, strongest], [band.top + band.height - 3, band.top + 3]);
+  const line = bins
+    .map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.midKm).toFixed(1)} ${y(bin.headwindFraction * bin.windSpeedMs).toFixed(1)}`)
+    .join("");
   const zero = y(0).toFixed(1);
   group.append(
-    svg("path", { d: `${line}L${x(bins[bins.length - 1].midKm).toFixed(1)} ${zero}L${x(bins[0].midKm).toFixed(1)} ${zero}Z`, fill: TRACE, "fill-opacity": 0.12 }),
-    svg("line", { x1: x(bins[0].startKm), y1: y(0), x2: x(bins[bins.length - 1].endKm), y2: y(0), stroke: INK, "stroke-width": 0.5, "stroke-dasharray": "1 2" }),
+    svg("path", {
+      d: `${line}L${x(bins[bins.length - 1].midKm).toFixed(1)} ${zero}L${x(bins[0].midKm).toFixed(1)} ${zero}Z`,
+      fill: TRACE,
+      "fill-opacity": 0.12,
+    }),
+    svg("line", {
+      x1: x(bins[0].startKm),
+      y1: y(0),
+      x2: x(bins[bins.length - 1].endKm),
+      y2: y(0),
+      stroke: INK,
+      "stroke-width": 0.5,
+      "stroke-dasharray": "1 2",
+    }),
     svg("path", { d: line, fill: "none", stroke: TRACE, "stroke-width": 1.1 }),
   );
   return group;

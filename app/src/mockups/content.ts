@@ -21,14 +21,20 @@ export interface Field {
   sample: boolean;
   /** The modelling choice the value rests on, if any. */
   assumption?: string;
-  /** True when there is no value — render a dash, grayed, never a number. */
+  /** True when the value can't be relied on — render it grayed and struck, or as a dash. */
   unknown?: boolean;
+  /** Why, in a few words, when `unknown` needs saying out loud: "not measured here". */
+  unknownNote?: string;
   detail?: string;
 }
+
+/** What a runner would call each kind of report. */
+export const NOTE_HEADINGS = { gps: "Watch trouble", crowd: "Crowd", surface: "Underfoot" } as const;
 
 export interface Entry {
   kind: "landmark" | "aid" | "note";
   km: number;
+  /** A landmark's name, "Aid station", or a report's heading — ready to print. */
   title: string;
   detail: string;
   provenance: Provenance;
@@ -68,10 +74,11 @@ export function layerFields(story: CourseStory, readout: Readout): Field[] {
     {
       key: "elevation",
       label: "Elevation",
-      value: readout.elevationMeasured ? show.metres(readout.elevationM) : show.metres(readout.elevationM),
+      value: show.metres(readout.elevationM),
       provenance: "measured",
       sample: false,
       unknown: !readout.elevationMeasured,
+      unknownNote: readout.elevationMeasured ? undefined : "not measured here",
       detail: readout.elevationMeasured ? undefined : gapReason(story, readout.km),
     },
     { key: "grade", label: "Grade", value: show.grade(readout.gradePercent), provenance: "measured", sample: false },
@@ -127,7 +134,7 @@ export function entriesNear(story: CourseStory, km: number, noteRangeKm = 2.5): 
       kind: "landmark",
       km: landmark.km,
       title: landmark.name,
-      detail: `${(landmark.km - km >= 0 ? "in " : "passed ") + show.km(Math.abs(landmark.km - km))} km`,
+      detail: show.distanceWords(landmark.km - km),
       provenance: "measured",
       sample: false,
       source: landmark.source,
@@ -139,8 +146,8 @@ export function entriesNear(story: CourseStory, km: number, noteRangeKm = 2.5): 
     entries.push({
       kind: "aid",
       km: aid.km,
-      title: `Aid station · organizer km ${aid.certifiedKm}`,
-      detail: aid.offers.join(", "),
+      title: "Aid station",
+      detail: `${aid.offers.join(", ")} (organizer km ${aid.certifiedKm})`,
       provenance: "measured",
       sample: true,
     });
@@ -148,7 +155,7 @@ export function entriesNear(story: CourseStory, km: number, noteRangeKm = 2.5): 
 
   for (const note of story.notes) {
     if (Math.abs(note.km - km) > noteRangeKm) continue;
-    entries.push({ kind: "note", km: note.km, title: note.kind, detail: note.text, provenance: "subjective", sample: true });
+    entries.push({ kind: "note", km: note.km, title: NOTE_HEADINGS[note.kind], detail: note.text, provenance: "subjective", sample: true });
   }
 
   return entries.sort((a, b) => a.km - b.km);

@@ -1,20 +1,15 @@
 // Putting things at the right place on a page. Shared by all three directions: they disagree
 // about what a kilometre should look like, not about where it goes.
+import { localVector } from "../core/bearing";
 
-export interface Scale {
-  (value: number): number;
-  /** The inverse: from a position on the page back to a value. */
-  invert(position: number): number;
-}
+export type Scale = (value: number) => number;
 
 /** A straight-line mapping from `domain` onto `range`. Either may run backwards. */
 export function linearScale(domain: [number, number], range: [number, number]): Scale {
   const [d0, d1] = domain;
   const [r0, r1] = range;
   const span = d1 - d0;
-  const scale = ((value: number) => (span === 0 ? r0 : r0 + ((value - d0) / span) * (r1 - r0))) as Scale;
-  scale.invert = (position) => (r1 === r0 ? d0 : d0 + ((position - r0) / (r1 - r0)) * span);
-  return scale;
+  return (value) => (span === 0 ? r0 : r0 + ((value - d0) / span) * (r1 - r0));
 }
 
 export interface LabelSlot {
@@ -108,4 +103,52 @@ export function assignLanes(labels: { start: number; end: number }[], laneCount:
     placed[lane].push(label);
     return lane;
   });
+}
+
+/**
+ * Which way a wind arrow points on the page: the direction the wind *travels*, as the runner
+ * meets it. `angleDeg` is `windOnRunner().angleDeg` — where the wind comes FROM relative to the
+ * runner, 0 dead ahead — and `runs` is the way the runner moves across the page in this design.
+ *
+ * A headwind therefore always points back at the runner: left on a strip read left to right, up
+ * on a card read top to bottom. Sideways, the runner's right hand is towards the bottom of the
+ * page when they run right, and towards the page's left when they run down it.
+ */
+export function windArrowOnPage(angleDeg: number, runs: "right" | "down"): { dx: number; dy: number } {
+  // Travelling is the reverse of coming from.
+  const travel = localVector(0, angleDeg + 180);
+  return runs === "right" ? { dx: travel.ahead, dy: travel.right } : { dx: -travel.right, dy: travel.ahead };
+}
+
+export interface MeasuredRun<Bin> {
+  measured: boolean;
+  bins: Bin[];
+}
+
+/**
+ * Splits a profile into consecutive stretches that are measured and stretches that are filled
+ * in, so a design can draw the two differently. With `bridgeGaps`, an unmeasured stretch also
+ * takes the one measured bin either side of it, so its dashed line joins up with the solid line
+ * instead of leaving a hole; measured stretches are never widened.
+ */
+export function measuredRuns<Bin extends { elevationMeasured: boolean }>(bins: Bin[], options: { bridgeGaps?: boolean } = {}): MeasuredRun<Bin>[] {
+  const runs: MeasuredRun<Bin>[] = [];
+  let start = 0;
+  for (let index = 1; index <= bins.length; index += 1) {
+    if (index < bins.length && bins[index].elevationMeasured === bins[start].elevationMeasured) continue;
+    const measured = bins[start].elevationMeasured;
+    const reach = !measured && options.bridgeGaps ? 1 : 0;
+    runs.push({ measured, bins: bins.slice(Math.max(0, start - reach), Math.min(bins.length, index + reach)) });
+    start = index;
+  }
+  return runs;
+}
+
+/**
+ * How far the effort chart has to reach either side of flat-ground effort (1.0) to fit the
+ * course, ignoring stretches outside the difficulty model. Never zero, so a flat course still
+ * has an axis.
+ */
+export function effortReach(bins: { difficulty: number | null }[]): number {
+  return Math.max(0.08, ...bins.map((bin) => Math.abs((bin.difficulty ?? 1) - 1)));
 }

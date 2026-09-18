@@ -32,10 +32,9 @@
   grid-column: 1 / -1;
 }
 
-.ps h1,
-.ps h2,
-.ps p,
-.ps ul {
+/* :where() keeps this reset at the weight of a single class, so any rule further down the file
+   wins over it. Written as `.ps p` it silently cancelled later margins and paddings. */
+.ps :where(h1, h2, p, ul) {
   margin: 0;
   padding: 0;
 }
@@ -170,7 +169,7 @@
   grid-template-columns: subgrid;
 }
 
-.ps .ps-next h2 {
+.ps-next h2 {
   padding: 12px 16px;
   grid-column: 1 / span 2;
   font-size: 22px;
@@ -251,7 +250,7 @@
   height: 100%;
 }
 
-.ps .ps-model__caption {
+.ps-model__caption {
   padding: 8px 16px;
   border-top: var(--rule) solid var(--ink);
   font-weight: 600;
@@ -337,8 +336,7 @@
 }
 
 .ps-gap {
-  fill: url(#ps-hatch);
-  opacity: 0.45;
+  fill: var(--grey);
 }
 
 .ps-blue,
@@ -368,12 +366,19 @@
   fill: var(--ink);
 }
 
+.ps-row__sample {
+  font: 700 9.5px "Archivo Variable", Arial, sans-serif;
+  font-stretch: 80%;
+  letter-spacing: 0.06em;
+  fill: var(--ink);
+}
+
 .ps-row--hollow {
   fill: var(--paper);
   stroke: var(--ink);
   stroke-width: 1;
   paint-order: stroke;
-  font-size: 15.5px;
+  font-size: 14px;
   font-weight: 900;
   font-stretch: 100%;
   letter-spacing: 0.03em;
@@ -434,7 +439,7 @@
 
 .ps-legend {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .ps-legend__cell {
@@ -469,7 +474,7 @@
   padding: 18px 0 28px;
 }
 
-.ps .ps-credits > * {
+.ps-credits > * {
   padding: 0 16px;
 }
 

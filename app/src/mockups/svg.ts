@@ -37,9 +37,10 @@ export function points(list: { x: number; y: number }[]): string {
 /**
  * Draw something sized to its container, and draw it again when the container changes size. The
  * strips are built in real pixels rather than a scaled viewBox so their type stays the size it
- * was designed at.
+ * was designed at. Returns a function that redraws on demand — for when something other than the
+ * size changed, like a web font arriving.
  */
-export function drawToFit(container: HTMLElement, draw: (width: number, height: number) => void): void {
+export function drawToFit(container: HTMLElement, draw: (width: number, height: number) => void): () => void {
   let pending = 0;
   const run = () => {
     const { clientWidth, clientHeight } = container;
@@ -50,6 +51,7 @@ export function drawToFit(container: HTMLElement, draw: (width: number, height: 
     pending = requestAnimationFrame(run);
   }).observe(container);
   run();
+  return run;
 }
 
 /** Collapses a burst of updates into one per frame — dragging fires far faster than it can paint. */

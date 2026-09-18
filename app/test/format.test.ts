@@ -1,6 +1,6 @@
 // Seam: numbers and dates -> the words a runner reads.
 import { describe, expect, it } from "vitest";
-import { grade, raceDate, shortName } from "../src/mockups/format";
+import { distanceWords, grade, raceDate, shortName } from "../src/mockups/format";
 
 describe("mockup formatting", () => {
   it("writes a race date out in full, whatever time zone the browser is in", () => {
@@ -19,5 +19,11 @@ describe("mockup formatting", () => {
     expect(shortName("Ed Koch Queensboro Bridge (into Manhattan)")).toBe("Ed Koch Queensboro…");
     expect(shortName("Leaves the park at Grand Army Plaza")).toBe("Leaves the park at Grand…");
     expect(shortName("Columbus Circle")).toBe("Columbus Circle");
+  });
+
+  it("says how far away something is, and on which side of the runner", () => {
+    expect(distanceWords(3.96)).toBe("in 3.96 km");
+    expect(distanceWords(-0.64)).toBe("0.64 km back");
+    expect(distanceWords(0.02)).toBe("here");
   });
 });

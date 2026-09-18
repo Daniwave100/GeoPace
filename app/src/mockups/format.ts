@@ -83,3 +83,9 @@ export function shortName(name: string, maxLength = 24): string {
   const whole = /\s/.test(plain[maxLength]) ? cut : cut.replace(/\s+\S*$/, "");
   return `${whole.trimEnd()}…`;
 }
+
+/** "in 3.96 km", "0.64 km back", or "here": where something is, from the runner's position. */
+export function distanceWords(offsetKm: number): string {
+  if (Math.abs(offsetKm) < 0.05) return "here";
+  return offsetKm > 0 ? `in ${km(offsetKm)} km` : `${km(-offsetKm)} km back`;
+}

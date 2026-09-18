@@ -1,6 +1,12 @@
 /* Direction C — Field instrument. Cool greys, hairlines, B612. One warm colour: the cursor.
    Deliberately light: a dark instrument panel is the HUD this project refuses to be. */
 
+/* Light only, all the way out — see the note at the top of main.ts. */
+html:has(.fi) {
+  color-scheme: only light;
+  background: #e6eaed;
+}
+
 .fi {
   --ground: #e6eaed;
   --panel: #f6f8f9;
@@ -22,10 +28,9 @@
   gap: 10px;
 }
 
-.fi h1,
-.fi h2,
-.fi p,
-.fi ul {
+/* :where() keeps this reset at the weight of a single class, so any rule further down the file
+   wins over it. Written as `.fi p` it silently cancelled later margins and paddings. */
+.fi :where(h1, h2, p, ul) {
   margin: 0;
   padding: 0;
 }
@@ -43,6 +48,11 @@
 /* ── Head ───────────────────────────────────────────────────────────────────── */
 
 .fi-head {
+  display: grid;
+  gap: 4px;
+}
+
+.fi-head__row {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
@@ -83,6 +93,12 @@
 .fi-displays {
   display: flex;
   gap: 6px;
+}
+
+.fi-footnotes {
+  font-size: 10px;
+  color: var(--ink-2);
+  text-align: right;
 }
 
 .fi-display {
@@ -132,9 +148,11 @@
 .fi-tracks {
   position: sticky;
   top: calc(var(--review-bar-height, 36px) + 10px);
-  height: clamp(520px, calc(100vh - var(--review-bar-height, 36px) - 100px), 900px);
+  height: clamp(520px, calc(100vh - var(--review-bar-height, 36px) - 120px), 900px);
   background: var(--panel);
-  border: 1px solid var(--rule);
+  /* A frame, but not a border: the scrub position is measured on this box, and a border would
+     put every kilometre a pixel out. */
+  box-shadow: inset 0 0 0 1px var(--rule);
   border-radius: 3px;
   overflow: hidden;
   cursor: ew-resize;
@@ -148,9 +166,9 @@
   inset: 0;
 }
 
+/* Its width is set from main.ts, which owns the number the chart is drawn against. */
 .fi-tracks__heads {
   right: auto;
-  width: 178px;
   pointer-events: none;
 }
 

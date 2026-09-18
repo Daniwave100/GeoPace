@@ -14,11 +14,11 @@ import "@fontsource/kalam/latin-400.css";
 import "@fontsource/kalam/latin-700.css";
 import "./roadbook.css";
 
-import { type Entry, type Field, entriesNear, headlineFields, layerFields } from "../content";
+import { type Entry, type Field, NOTE_HEADINGS, entriesNear, headlineFields, layerFields } from "../content";
 import { contourSegments, sampleTerrain } from "../contours";
 import { buildCredits } from "../credits";
 import * as show from "../format";
-import { heightDomain, linearScale, spreadLabels } from "../layout";
+import { effortReach, heightDomain, linearScale, measuredRuns, spreadLabels, windArrowOnPage } from "../layout";
 import { type MaquetteStyle, renderMaquette } from "../maquette";
 import { type MockupContext, startMockup } from "../shell";
 import type { CourseStory, StripBin } from "../story";
@@ -29,8 +29,6 @@ const SEPIA = "#9a6a3c";
 const PENCIL = "#7d2e8c";
 const ROUTE_RED = "#b8322a";
 const GREY = "#8d9298";
-
-const NOTE_HEADINGS = { gps: "Watch trouble", crowd: "Crowd", surface: "Underfoot" } as const;
 
 const MAQUETTE_STYLE: MaquetteStyle = {
   ground: "#e4dfcd",
@@ -78,11 +76,14 @@ function mount(stage: HTMLElement, context: MockupContext): void {
       html("section", { class: "rb-section" }, html("h2", { text: "At this kilometre" }), ledger),
       html("section", { class: "rb-section" }, html("h2", { text: "Coming up" }), around),
       legend(),
-      buildCredits(story, "rb", "This direction is printed on paper, so it stays light whatever theme your system uses."),
+      buildCredits(
+        story,
+        "rb",
+        "This direction is printed on paper, so it stays light whatever theme your system uses. The contour lines behind the title are texture, traced from invented ground; they are not this course's terrain.",
+      ),
     ),
   );
 
-  const seed = story.course.id === "nyc" ? 7 : 3;
   const update = () => {
     const readout = story.at(context.km);
 
@@ -95,8 +96,8 @@ function mount(stage: HTMLElement, context: MockupContext): void {
         positionM: readout.km * 1000,
         headingDeg: readout.headingDeg,
         sun: readout.sun,
-        seed,
-        view: { acrossM: 74, aheadM: 150, behindM: 56, maxHeightM: story.course.id === "nyc" ? 64 : 30 },
+        seed: story.massing.seed,
+        view: { acrossM: 74, aheadM: 150, behindM: 56, maxHeightM: story.massing.maxHeightM },
         style: MAQUETTE_STYLE,
       }),
     );
@@ -122,17 +123,18 @@ function titleBlock(story: CourseStory): HTMLElement {
   )}, which is ${show.formatPace(story.clock.goalPaceSecondsPerKm)} per kilometre at an even pace.`;
 
   const date = html("p", { class: "rb-title__date", text: show.raceDate(story.edition.date) });
-  if (!story.edition.dateVerified) date.append(html("span", { class: "rb-approx", title: story.edition.dateNote, text: " date believed, not yet confirmed" }));
+  if (!story.edition.dateVerified)
+    date.append(html("span", { class: "rb-approx", title: story.edition.dateNote, text: " date believed, not yet confirmed" }));
 
   block.append(
     html("p", { class: "rb-title__series", text: "GeoPace course sheet" }),
     html("h1", { text: story.course.name }),
     date,
     html("p", { class: "rb-title__plan" }, plan, " ", stamp("sample start time")),
-    html(
-      "p",
-      { class: "rb-title__facts", text: `${story.lengthKm.toFixed(2)} km along the course line. Climbs ${story.elevation.gainM.toFixed(0)} m, drops ${story.elevation.lossM.toFixed(0)} m, between ${story.elevation.minM.toFixed(0)} and ${story.elevation.maxM.toFixed(0)} m.` },
-    ),
+    html("p", {
+      class: "rb-title__facts",
+      text: `${story.lengthKm.toFixed(2)} km along the course line. Climbs ${story.elevation.gainM.toFixed(0)} m, drops ${story.elevation.lossM.toFixed(0)} m, between ${story.elevation.minM.toFixed(0)} and ${story.elevation.maxM.toFixed(0)} m.`,
+    }),
   );
   return block;
 }
@@ -142,12 +144,19 @@ function contourField(seed: number): SVGSVGElement {
   const columns = 72;
   const rows = 22;
   const field = sampleTerrain(columns, rows, seed);
-  const node = svg("svg", { class: "rb-title__contours", viewBox: `0 0 ${columns - 1} ${rows - 1}`, preserveAspectRatio: "none", "aria-hidden": true });
+  const node = svg("svg", {
+    class: "rb-title__contours",
+    viewBox: `0 0 ${columns - 1} ${rows - 1}`,
+    preserveAspectRatio: "none",
+    "aria-hidden": true,
+  });
   for (let step = 1; step <= 14; step += 1) {
     const path = contourSegments(field, step * 0.07)
       .map(({ from, to }) => `M${from.x.toFixed(2)} ${from.y.toFixed(2)}L${to.x.toFixed(2)} ${to.y.toFixed(2)}`)
       .join("");
-    node.append(svg("path", { d: path, fill: "none", stroke: SEPIA, "stroke-width": step % 5 === 0 ? 1.3 : 0.6, "vector-effect": "non-scaling-stroke" }));
+    node.append(
+      svg("path", { d: path, fill: "none", stroke: SEPIA, "stroke-width": step % 5 === 0 ? 1.3 : 0.6, "vector-effect": "non-scaling-stroke" }),
+    );
   }
   return node;
 }
@@ -166,20 +175,25 @@ function ledgerRow(field: Field): HTMLElement {
   const row = html("tr", { class: field.unknown ? "rb-ledger__row rb-ledger__row--unknown" : "rb-ledger__row" });
   const value = html("td", { class: "rb-ledger__value", text: field.value });
   if (field.sample) value.append(" ", stamp("sample"));
-  const remarks = [field.unknown && field.key === "elevation" ? "Not measured here. " : "", field.detail ?? "", field.assumption ?? ""].filter(Boolean).join(" ");
+  const remarks = [
+    field.unknownNote ? `${field.unknownNote[0].toUpperCase()}${field.unknownNote.slice(1)}.` : "",
+    field.detail ?? "",
+    field.assumption ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   row.append(html("th", { scope: "row", text: field.label }), value, html("td", { class: "rb-ledger__remark", text: remarks }));
   return row;
 }
 
 function aroundItem(entry: Entry, km: number): HTMLElement {
   const item = html("li", { class: `rb-around__item rb-around__item--${entry.provenance}` });
-  const distance = entry.km - km;
-  const where = Math.abs(distance) < 0.05 ? "here" : distance > 0 ? `in ${show.km(distance)} km` : `${show.km(-distance)} km back`;
+  const where = show.distanceWords(entry.km - km);
   item.append(html("span", { class: "rb-around__km", text: `km ${show.km(entry.km)}` }));
 
   const body = html("div", { class: "rb-around__body" });
   if (entry.kind === "note") {
-    body.append(html("b", { text: NOTE_HEADINGS[entry.title as keyof typeof NOTE_HEADINGS] ?? entry.title }), ` ${entry.detail} `, html("i", { text: `(${where})` }));
+    body.append(html("b", { text: entry.title }), ` ${entry.detail} `, html("i", { text: `(${where})` }));
   } else {
     body.append(html("b", { text: entry.title }), ` ${entry.kind === "aid" ? `${entry.detail}, ${where}` : where}. `);
     if (entry.source) body.append(link(entry.source, "source"));
@@ -193,10 +207,20 @@ function legend(): HTMLElement {
   const box = html("section", { class: "rb-legend" });
   box.append(html("h2", { text: "How to read this sheet" }));
   const rows: [HTMLElement | SVGElement, string][] = [
-    [html("span", { class: "rb-legend__printed", text: "Printed" }), "Measured, or computed from measurements by a published model. Sourced in the credits."],
-    [html("span", { class: "rb-legend__pencil", text: "In pencil" }), "What runners report. Nobody has checked it, which is what purple means on a survey map."],
+    [
+      html("span", { class: "rb-legend__printed", text: "Printed" }),
+      "Measured, or computed from measurements by a published model. Sourced in the credits.",
+    ],
+    [
+      html("span", { class: "rb-legend__pencil", text: "In pencil" }),
+      "What runners report. Nobody has checked it, which is what purple means on a survey map.",
+    ],
     [swatch("dashed"), "A value that isn't measured at this spot, such as the middle of the Verrazzano span, where the survey has no returns."],
     [swatch("sun"), "Share of the kilometre in direct sun. Ochre is sunny whatever the trees do; green is sunny only if the leaves are down."],
+    [
+      swatch("wind"),
+      "Wind, drawn the way the card reads: you run down the page, so an arrow pointing up at you is a headwind (drawn heavier) and one pointing down is at your back.",
+    ],
     [stamp("sample"), "An invented stand-in for a layer that isn't built yet. It shows the layout, and says nothing about the course."],
   ];
   const list = html("dl", {});
@@ -205,10 +229,20 @@ function legend(): HTMLElement {
   return box;
 }
 
-function swatch(kind: "dashed" | "sun"): SVGSVGElement {
+function swatch(kind: "dashed" | "sun" | "wind"): SVGSVGElement {
   const node = svg("svg", { width: 58, height: 14, viewBox: "0 0 58 14", "aria-hidden": true });
-  if (kind === "dashed") node.append(svg("path", { d: "M2 10 C14 2 24 12 34 6 S50 4 56 8", fill: "none", stroke: GREY, "stroke-width": 1.4, "stroke-dasharray": "4 3" }));
-  else node.append(svg("rect", { x: 2, y: 3, width: 26, height: 8, class: "rb-fill-sun" }), svg("rect", { x: 28, y: 3, width: 18, height: 8, class: "rb-fill-trees" }));
+  if (kind === "wind")
+    node.append(
+      svg("path", { d: "M12 13V2M12 2l-3.5 4.5M12 2l3.5 4.5", fill: "none", stroke: INK, "stroke-width": 1.7, "stroke-linecap": "round" }),
+      svg("path", { d: "M34 1V12M34 12l-3 -4M34 12l3 -4", fill: "none", stroke: INK, "stroke-width": 0.9, "stroke-linecap": "round" }),
+    );
+  else if (kind === "dashed")
+    node.append(svg("path", { d: "M2 10 C14 2 24 12 34 6 S50 4 56 8", fill: "none", stroke: GREY, "stroke-width": 1.4, "stroke-dasharray": "4 3" }));
+  else
+    node.append(
+      svg("rect", { x: 2, y: 3, width: 26, height: 8, class: "rb-fill-sun" }),
+      svg("rect", { x: 28, y: 3, width: 18, height: 8, class: "rb-fill-trees" }),
+    );
   return node;
 }
 
@@ -237,7 +271,8 @@ function routeCard(context: MockupContext): HTMLElement {
     node: html("p", { class: "rb-note" }, html("b", { text: NOTE_HEADINGS[note.kind] }), html("br"), note.text),
   }));
   const landmarks = story.landmarks.map((landmark) => ({ km: landmark.km, node: html("p", { class: "rb-mark", text: landmark.name }) }));
-  pencil.append(...notes.map((note) => note.node));
+  // The margin notes are invented too, and say so where they are written, not only in the legend.
+  pencil.append(html("p", { class: "rb-card__pencil-stamp" }, stamp("sample notes")), ...notes.map((note) => note.node));
   marks.append(...landmarks.map((landmark) => landmark.node));
 
   let moveCursor: (() => void) | undefined;
@@ -276,13 +311,21 @@ function routeCard(context: MockupContext): HTMLElement {
     const bounds = { min: PAD_TOP - 8, max: height - 4 };
     const leaders = svg("g", { fill: "none" });
 
-    const noteCentres = spreadLabels(notes.map((note) => ({ at: y(note.km), size: note.node.offsetHeight })), bounds, 10);
+    const noteCentres = spreadLabels(
+      notes.map((note) => ({ at: y(note.km), size: note.node.offsetHeight })),
+      bounds,
+      10,
+    );
     notes.forEach((note, index) => {
       note.node.style.top = `${noteCentres[index] - note.node.offsetHeight / 2}px`;
       leaders.append(pencilLeader(margin - 16, noteCentres[index], x.axis - 3, y(note.km)));
     });
 
-    const markCentres = spreadLabels(landmarks.map((landmark) => ({ at: y(landmark.km), size: landmark.node.offsetHeight })), bounds, 3);
+    const markCentres = spreadLabels(
+      landmarks.map((landmark) => ({ at: y(landmark.km), size: landmark.node.offsetHeight })),
+      bounds,
+      3,
+    );
     landmarks.forEach((landmark, index) => {
       landmark.node.style.top = `${markCentres[index] - landmark.node.offsetHeight / 2}px`;
       const at = y(landmark.km);
@@ -296,7 +339,7 @@ function routeCard(context: MockupContext): HTMLElement {
     const cursor = svg("g", { class: "rb-cursor" });
     const cursorLabel = svg("text", { x: x.axis - 7, y: 3.5, "text-anchor": "end", class: "rb-cursor__km" });
     cursor.append(
-      svg("rect", { x: x.axis - COLUMNS.km - 6, y: -8, width: COLUMNS.km + 2, height: 16, class: "rb-cursor__tab" }),
+      svg("rect", { x: x.axis - COLUMNS.km - 10, y: -8, width: COLUMNS.km + 6, height: 16, class: "rb-cursor__tab" }),
       cursorLabel,
       svg("line", { x1: x.axis - 3, y1: 0, x2: x.end + 2, y2: 0, stroke: ROUTE_RED, "stroke-width": 1.6 }),
       svg("path", { d: `M${x.end + 2} -4.5L${x.end + 9} 0L${x.end + 2} 4.5Z`, fill: ROUTE_RED }),
@@ -304,21 +347,20 @@ function routeCard(context: MockupContext): HTMLElement {
     node.append(cursor);
     moveCursor = () => {
       cursor.setAttribute("transform", `translate(0 ${y(context.km).toFixed(1)})`);
-      cursorLabel.textContent = context.km.toFixed(1);
+      cursorLabel.textContent = show.km(context.km);
     };
     moveCursor();
 
     drawing.replaceChildren(node);
   };
 
-  drawToFit(drawing, draw);
+  const redraw = drawToFit(drawing, draw);
   // The labels are measured to place them, and they change height when the real fonts arrive.
-  void document.fonts.ready.then(() => draw(drawing.clientWidth, drawing.clientHeight));
+  void document.fonts.ready.then(redraw);
   context.onScrub(() => moveCursor?.());
   context.scrubbable(card, {
     axis: "vertical",
     toKm: (fraction) => fraction * story.lengthKm,
-    toFraction: (km) => km / story.lengthKm,
     inset: { start: PAD_TOP, end: PAD_BOTTOM },
   });
   return card;
@@ -338,7 +380,7 @@ function columnHeads(x: Columns, story: CourseStory): SVGGElement {
   head(x.profile, COLUMNS.profile, "Height", `${story.elevation.minM.toFixed(0)} to ${story.elevation.maxM.toFixed(0)} m`);
   head(x.effort, COLUMNS.effort, "Effort", "vs flat");
   head(x.sun, COLUMNS.sun, "In sun", "0 to 100%");
-  head(x.wind, COLUMNS.wind, "Wind", "as felt");
+  head(x.wind, COLUMNS.wind, "Wind", "you run ↓");
   head(x.aid, COLUMNS.aid, "Aid", "");
   group.append(svg("text", { x: x.axis - 7, y: PAD_TOP - 17, "text-anchor": "end", class: "rb-head", text: "km" }));
 
@@ -372,28 +414,18 @@ function profileColumn(bins: StripBin[], left: number, y: (km: number) => number
   const group = svg("g", {});
   const x = linearScale(heightDomain(story), [left + 2, left + COLUMNS.profile]);
 
-  for (const measured of [true, false]) {
-    let run: StripBin[] = [];
-    const flush = () => {
-      if (run.length > 1) {
-        const line = run.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.elevationM).toFixed(1)} ${y(bin.midKm).toFixed(1)}`).join("");
-        if (measured) {
-          const area = `${line}L${left} ${y(run[run.length - 1].midKm).toFixed(1)}L${left} ${y(run[0].midKm).toFixed(1)}Z`;
-          group.append(svg("path", { d: area, fill: SEPIA, "fill-opacity": 0.2 }));
-        }
-        group.append(
-          svg("path", measured ? { d: line, fill: "none", stroke: INK, "stroke-width": 1.2, "stroke-linejoin": "round" } : { d: line, fill: "none", stroke: GREY, "stroke-width": 1.2, "stroke-dasharray": "3 2.5" }),
-        );
-      }
-      run = [];
-    };
-    bins.forEach((bin, index) => {
-      // A run borrows one bin either side so dashed and solid lines meet instead of leaving a gap.
-      const belongs = bin.elevationMeasured === measured || (!measured && (bins[index - 1]?.elevationMeasured === false || bins[index + 1]?.elevationMeasured === false));
-      if (belongs) run.push(bin);
-      else flush();
-    });
-    flush();
+  for (const run of measuredRuns(bins, { bridgeGaps: true })) {
+    if (run.bins.length < 2) continue;
+    const line = run.bins.map((bin, index) => `${index === 0 ? "M" : "L"}${x(bin.elevationM).toFixed(1)} ${y(bin.midKm).toFixed(1)}`).join("");
+    if (run.measured) {
+      const area = `${line}L${left} ${y(run.bins[run.bins.length - 1].midKm).toFixed(1)}L${left} ${y(run.bins[0].midKm).toFixed(1)}Z`;
+      group.append(
+        svg("path", { d: area, fill: SEPIA, "fill-opacity": 0.2 }),
+        svg("path", { d: line, fill: "none", stroke: INK, "stroke-width": 1.2, "stroke-linejoin": "round" }),
+      );
+    } else {
+      group.append(svg("path", { d: line, fill: "none", stroke: GREY, "stroke-width": 1.2, "stroke-dasharray": "3 2.5" }));
+    }
   }
   return group;
 }
@@ -402,7 +434,7 @@ function profileColumn(bins: StripBin[], left: number, y: (km: number) => number
 function effortColumn(bins: StripBin[], left: number, y: (km: number) => number): SVGGElement {
   const group = svg("g", {});
   const centre = left + COLUMNS.effort / 2;
-  const reach = Math.max(0.08, ...bins.map((bin) => Math.abs((bin.difficulty ?? 1) - 1)));
+  const reach = effortReach(bins);
   const half = COLUMNS.effort / 2;
   group.append(svg("line", { x1: centre, y1: y(bins[0].startKm), x2: centre, y2: y(bins[bins.length - 1].endKm), stroke: INK, "stroke-width": 0.6 }));
 
@@ -415,7 +447,16 @@ function effortColumn(bins: StripBin[], left: number, y: (km: number) => number)
     }
     const length = (Math.abs(bin.difficulty - 1) / reach) * half;
     const harder = bin.difficulty >= 1;
-    group.append(svg("rect", { x: harder ? centre : centre - length, y: top, width: length, height, fill: harder ? INK : SEPIA, "fill-opacity": harder ? 0.85 : 0.6 }));
+    group.append(
+      svg("rect", {
+        x: harder ? centre : centre - length,
+        y: top,
+        width: length,
+        height,
+        fill: harder ? INK : SEPIA,
+        "fill-opacity": harder ? 0.85 : 0.6,
+      }),
+    );
   }
   return group;
 }
@@ -424,7 +465,15 @@ function effortColumn(bins: StripBin[], left: number, y: (km: number) => number)
 function sunColumn(bins: StripBin[], left: number, y: (km: number) => number): SVGGElement {
   const group = svg("g", {});
   const x = linearScale([0, 100], [left, left + COLUMNS.sun]);
-  group.append(svg("rect", { x: left, y: y(bins[0].startKm), width: COLUMNS.sun, height: y(bins[bins.length - 1].endKm) - y(bins[0].startKm), class: "rb-fill-blank" }));
+  group.append(
+    svg("rect", {
+      x: left,
+      y: y(bins[0].startKm),
+      width: COLUMNS.sun,
+      height: y(bins[bins.length - 1].endKm) - y(bins[0].startKm),
+      class: "rb-fill-blank",
+    }),
+  );
   for (const bin of bins) {
     const top = y(bin.startKm);
     const height = y(bin.endKm) - top + 0.3;
@@ -434,29 +483,43 @@ function sunColumn(bins: StripBin[], left: number, y: (km: number) => number): S
     }
     group.append(
       svg("rect", { x: left, y: top, width: x(bin.exposure.lowPercent) - left, height, class: "rb-fill-sun" }),
-      svg("rect", { x: x(bin.exposure.lowPercent), y: top, width: x(bin.exposure.highPercent) - x(bin.exposure.lowPercent), height, class: "rb-fill-trees" }),
+      svg("rect", {
+        x: x(bin.exposure.lowPercent),
+        y: top,
+        width: x(bin.exposure.highPercent) - x(bin.exposure.lowPercent),
+        height,
+        class: "rb-fill-trees",
+      }),
     );
   }
   for (const percent of [0, 50, 100]) {
-    group.append(svg("line", { x1: x(percent), y1: y(bins[0].startKm), x2: x(percent), y2: y(bins[bins.length - 1].endKm), stroke: INK, "stroke-width": 0.5, "stroke-opacity": percent === 50 ? 0.35 : 0.8 }));
+    group.append(
+      svg("line", {
+        x1: x(percent),
+        y1: y(bins[0].startKm),
+        x2: x(percent),
+        y2: y(bins[bins.length - 1].endKm),
+        stroke: INK,
+        "stroke-width": 0.5,
+        "stroke-opacity": percent === 50 ? 0.35 : 0.8,
+      }),
+    );
   }
   return group;
 }
 
 /**
- * Wind as the runner feels it. Like the junction diagrams in a rally roadbook, each arrow is drawn
- * with the runner heading *up* the page, whichever way the card itself reads: an arrow pointing
- * down at you is a headwind.
+ * Wind as the runner meets it, drawn in the card's own frame: the course runs *down* the page, so
+ * the runner does too. An arrow pointing up the page, against the way you read, is a headwind;
+ * one pointing down with you is a tailwind. (Facing down the page, the runner's right is the
+ * page's left — the same as reading a map with south at the top.)
  */
 function windColumn(story: CourseStory, left: number, y: (km: number) => number): SVGGElement {
   const group = svg("g", {});
   const centre = left + COLUMNS.wind / 2;
   for (let km = 1; km < story.lengthKm; km += 2) {
     const { wind } = story.at(km);
-    const angle = wind.angleDeg * (Math.PI / 180);
-    // The wind's direction of travel is the reverse of where it comes from.
-    const dx = -Math.sin(angle);
-    const dy = Math.cos(angle);
+    const { dx, dy } = windArrowOnPage(wind.angleDeg, "down");
     const reach = 9;
     const against = wind.headwindFraction > 0.5;
     const tip = { x: centre + dx * reach, y: y(km) + dy * reach };

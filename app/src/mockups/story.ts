@@ -14,8 +14,10 @@ import { clamp, nearestIndex } from "../core/series";
 import { type SunPosition, sunPosition } from "../core/solar";
 import {
   FALLBACK_EDITION,
+  FALLBACK_MASSING,
   SAMPLE_AID_STATIONS,
   SAMPLE_EDITIONS,
+  SAMPLE_MASSING,
   SAMPLE_NOTES,
   SAMPLE_PREVAILING_WIND,
   type SampleEdition,
@@ -32,8 +34,10 @@ export interface LayerMeta {
   provenance: Provenance;
   /** True while this layer's numbers are placeholders for a pipeline that isn't built. */
   sample: boolean;
-  /** Where the real values come from: a source for measured layers, an issue for sample ones. */
+  /** Where the real values come from: a source's title for measured layers, an issue for sample ones. */
   note: string;
+  /** The source itself, when there is one to link to. */
+  url?: string;
 }
 
 export interface AidStation {
@@ -121,11 +125,15 @@ export interface StripBin {
   canyonScore: number;
   /** Sample: +1 a full headwind, -1 a full tailwind. */
   headwindFraction: number;
+  /** Sample: wind speed, so a design can turn the fraction into m/s in the runner's face. */
+  windSpeedMs: number;
 }
 
 export interface CourseStory {
   course: { id: string; name: string; city: string; timezone: string };
   edition: SampleEdition;
+  /** Sample: what the street model's invented buildings are generated from. */
+  massing: { seed: number; maxHeightM: number };
   clock: RaceClock;
   lengthKm: number;
   elevation: { minM: number; maxM: number; gainM: number; lossM: number };
@@ -260,6 +268,7 @@ export function buildStory(bundle: CourseBundle, plan: RacePlan): CourseStory {
         exposure: readout.exposure,
         canyonScore: readout.canyonScore,
         headwindFraction: readout.wind.headwindFraction,
+        windSpeedMs: readout.wind.speedMs,
       });
     }
     return bins;
@@ -268,6 +277,7 @@ export function buildStory(bundle: CourseBundle, plan: RacePlan): CourseStory {
   return {
     course: { id: courseId, name: bundle.course.name, city: bundle.course.city, timezone: bundle.course.timezone },
     edition,
+    massing: SAMPLE_MASSING[courseId] ?? FALLBACK_MASSING,
     clock,
     lengthKm,
     elevation: {
@@ -296,14 +306,16 @@ function layersFor(bundle: CourseBundle): LayerMeta[] {
       label: "Elevation & grade",
       provenance: "measured",
       sample: false,
-      note: elevationSource ? `${elevationSource.title} — ${elevationSource.url}` : "Official terrain model, smoothed before grade.",
+      note: elevationSource ? elevationSource.title : "Official terrain model, smoothed before grade.",
+      url: elevationSource?.url,
     },
     {
       id: "difficulty",
       label: "Difficulty",
       provenance: "measured",
       sample: false,
-      note: `${bundle.measured.difficulty_model.name} — ${bundle.measured.difficulty_model.source}`,
+      note: bundle.measured.difficulty_model.name,
+      url: bundle.measured.difficulty_model.source,
     },
     { id: "landmarks", label: "Landmarks", provenance: "measured", sample: false, note: "Each one sourced in the Course Bundle." },
     { id: "exposure", label: "Sun exposure", provenance: "measured", sample: true, note: "Placeholder — the shade pipeline is #9 and #10." },

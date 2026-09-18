@@ -156,9 +156,14 @@ dark HUD every 3D map demo uses.
 **Decided:** km strip as UI spine (D14) · architectural-model analysis mode (D15) · choose via 3 mockups (D13).
 
 **Still open:** which of the three directions (or a mix) wins. The mockups are at
-`http://localhost:5173/mockups/` with the app running (code in `app/src/mockups/`). All three show
-identical content by construction: one module (`story.ts` + `content.ts`) decides what is on
-screen and how honest each number is; a design only decides how it looks.
+`http://localhost:5173/mockups/` with the app running (code in `app/src/mockups/`). All three draw
+the same layers and print the same readout fields, entries and credits, because one module
+(`story.ts` + `content.ts`) decides what is on screen and how honest each number is; a design only
+decides how it looks. Two differences follow from layout rather than content, and either can be
+moved into whichever direction wins: the Roadbook has room to print every runner report in its
+margin (the other two show markers, with the text in "coming up"), and the Field instrument adds a
+**sky dial** — the same sun, heading and wind numbers the others give in words, drawn as one
+diagram with the sun's path over the whole race.
 
 **Starting thesis:**
 - **The course is the interface.** One continuous kilometer strip — the "roadbook" — where every
@@ -185,6 +190,9 @@ screen and how honest each number is; a design only decides how it looks.
 | **Theme** | Light only (it is paper) | Follows the system, light or dark | Light only (a dark instrument is the HUD we're avoiding) |
 
 **Open questions:**
+- 🟡 **The blue line (direction B).** The poster's one colour refers to the blue line painted on the road at both
+  races. A road marking is not a logo, and no organizer's palette, typeface or mark is used — but D12 says "no trade
+  dress", so the owner should be comfortable with it before B (or its blue) is picked.
 - 🟡 Pick direction from mockups: (a) Roadbook · (b) Race poster · (c) Field instrument — or a mix.
   When picked: record it as a decision, copy the winning tokens here as *the* tokens, and #6 applies them.
 - 🟡 Light vs. dark default; typography; color system (falls out of the pick)
