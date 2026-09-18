@@ -86,10 +86,14 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D27 | ✅ **Typefaces are open-licence and self-hosted** (npm `@fontsource` packages, bundled by Vite). ⛔ No font CDN. | The app runs locally (D2): it should render the same offline, and a design shouldn't make a third-party request per visit. Every candidate face was checked for tabular figures, because a readout that jiggles while you scrub is unusable. | 09-18 |
 | D28 | ✅ **Visual direction: B · Race poster.** Black, white and one blue on a strict grid with the rules showing; Archivo (one variable family: width 62% / weight 900 for numerals); solid = measured, hollow = hearsay, halftone dots = "depends on the trees", grey and struck = not measured, hazard stripes = sample; flat street model with solid black shadows; follows the system's light or dark theme. Tokens in §6. The blue refers to the line painted on the road at both races; the owner confirmed on 09-18 that this is fine under D12. No organizer palette, typeface or mark is used. | Owner's pick from the three mockups (#4): "the one that looked the coolest". | 09-18 |
 | D29 | ✅ **The mockup's screen is the *everything* view, not the first screen.** Owner on seeing it: love the look, but "there's a lot" — it has to be easy for a runner who isn't technical (principle 8). #6 applies the look with far less on screen by default; how (see §6 "Simplifying the screen") is 🟡 proposed, not yet agreed. | A design that wins on looks and loses the user on first contact doesn't earn stars. | 09-18 |
-| D30 | ✅ **Photoreal is the headline look; the white model is what opens with no set-up.** The app advertises photoreal (Google 3D Tiles with the runner's own key) as *the* way to see the ride, with a prominent "Make it photoreal" control and plain set-up help. With no key it opens straight into the **white model of the city's real buildings** — real footprints and heights from each city's open data (§5 "Buildings"), cut to the course corridor by the pipeline (#7) — never a blank or a nag screen. Refines D3/D4; does not change them: no key ships with the project. | Owner directive 09-18: people should know the key is what makes it look cool, and the fallback should still be the actual buildings, "a white 3D layout". A key can't be the literal default because none can ship in the repo (and it would bill the maintainer), and most non-technical runners will never create one (principle 8) — so the white city has to stand on its own. | 09-18 |
+| D30 | ✅ **Photoreal is the headline look; the white model is what opens with no set-up.** The app advertises photoreal (Google 3D Tiles with the runner's own key) as *the* way to see the ride, with a prominent "Make it photoreal" control and plain set-up help. With no key it opens straight into the **white model of the city's real buildings** — real footprints and heights from each city's open data (§5 "Buildings"), cut to the course corridor by the pipeline (#7) — never a blank or a nag screen. Refines D3/D4; does not change them: no key ships with the project. "White model" is now the name for what older rows call *analysis mode* (see `CONTEXT.md`). | Owner directive 09-18: people should know the key is what makes it look cool, and the fallback should still be the actual buildings, "a white 3D layout". A key can't be the literal default because none can ship in the repo (and it would bill the maintainer), and most non-technical runners will never create one (principle 8) — so the white city has to stand on its own. | 09-18 |
 | D31 | ✅ **B is refined with the Field instrument's charts, and ships with both light and dark.** The poster keeps its identity (Archivo, the blue, the grid, solid/hollow), but the km strip's layers are drawn as the instrument drew them: thin line traces with a light fill, a labelled scale, and the value under the cursor printed in the row's header. Light and dark are both first-class, with a switch in the app as well as following the system. | Owner on 09-18: the instrument's charts "are much easier to understand" than the poster's solid bars and wedges; and light mode matters as much as dark. D13 always allowed a mix. | 09-18 |
 | D32 | ✅ **The interface has to belong on top of photoreal imagery, not beside it.** The design is judged against Google's photoreal city, not only the white model. Not "a map inside a web page". | Owner directive 09-18. None of the mockups or prototypes has been seen against real imagery yet — that is the biggest unknown left in the look. | 09-18 |
 | D33 | ✅ **Two cameras, and the ride is a time-lapse.** A bird's-eye view and a runner's view of the same ride; nobody watches a three-hour video. *How low the runner's view can go is 🟡 open* — see §6 "The ride". | Owner's vision 09-18: "like a drive cam… you're on the actual ground", plus a bird's-eye view. | 09-18 |
+| D34 | ✅ **Two modes: Explore and Ride.** *Explore* is home: the city seen from above with the course on it, moved freely like any maps app, with layers switched on and off. *Ride* carries the runner along the course as a time-lapse that slows down at Stops, seen either **From above** or **On the road** (D33). The same layers, the same strip and the same sentence appear in both. This settles D29's open "how", and replaces Claude's earlier proposal that the whole app be a video player: the player is the Ride. | Owner's idea 09-18, and better than the proposal it replaces: a runner's questions are random-access ("where's the last hill?", "where will my family stand?") and a map answers them at once, where a ride makes them wait. From above is also where Google's imagery is at its best. | 09-18 |
+| D35 | ✅ **One layer system; layers are drawn on the course line, one at a time.** Switching a layer on marks the course line on the map, adds that layer's row to the strip, and adds its clause to the sentence. ⛔ No area heat maps or coloured blobs over the map. One layer is on at a time by default; "Show everything" opens the full strip. Plain names: **Hills · Sun · Wind · Aid · Crowds · Bottlenecks · Watch trouble**. | All of GeoPace's data lives along a line, and coloured areas over satellite imagery are hard to read. One at a time keeps the screen from becoming "a lot" again (principle 8). | 09-18 |
+| D36 | ✅ **Crowd support is a v1 layer, and it is subjective.** "Crowds" shows where spectators are, from three kinds of source: runner reports (loud / mixed / quiet stretches, paraphrased with links), official cheer zones and entertainment points (sourced facts), and stretches where spectators aren't allowed, such as bridges (sourced facts). ⛔ Not a heat map: nobody measures spectator density, and a smooth gradient would claim data we don't have. Moves up from Tier 3; contributed ratings and derived spectator access stay there. | Owner asked for it 09-18. It costs little because it uses the same research method as the watch-trouble reports (#13), and it keeps principle 3: hearsay is drawn as hearsay. | 09-18 |
+| D37 | ✅ **Runner congestion: bottlenecks now, a model later.** v1's "Bottlenecks" layer shows places known to be congested, as sourced facts (e.g. where New York's three start colours merge) and runner reports. It gives no density numbers. A modelled "how packed will it be around me" layer is Tier 2: it needs the field's finish-time spread from officially published summaries only (⛔ never scraped results), wave sizes and street widths. | Owner asked for it 09-18. It is the hardest thing on the list with the least data behind it; a number here would be invented precision (principle 5). | 09-18 |
 
 ---
 
@@ -151,7 +155,7 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 | Bridge deck heights | n/a — decks spanned straight (D18) | ✅ [2017 NYC Topobathymetric LiDAR](https://www.fisheries.noaa.gov/inport/item/64728), class 17 (bridge deck), as COPC tiles on NOAA Digital Coast; only the corridor around each bridge is read (D23). ⚠️ No returns at all over the middle of the Verrazzano's main span (~km 0.85–1.45): that stretch is a straight line between measured deck heights, so the real crest is a few meters higher. | NYC Open Data / NOAA, as above | ✅ NYC |
 | Photoreal 3D | Google Photorealistic 3D Tiles via user's key or Cesium ion token | same | Google ToS: no caching, attribution required · ion Community = personal/non-commercial | ✅ |
 | Aid stations | 🔍 organizer site (paraphrase + source link) | 🔍 NYRR (2026 may publish late) | Facts, not copied layouts | 🔍 |
-| Race date / start waves | Sept 27, 2026 (✅ official site) | 🔍 believed Nov 1, 2026; wave times TBD | — | 🔍 |
+| Race date / start waves | ✅ Sunday 2026-09-27; runners start "from 08.45 am … in 6 waves" after the handbike and wheelchair starts (8.20, 8.26, 8.29) — [race day page](https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners), accessed 2026-09-18. 🔍 The page gives no clock time for waves 2–6; third-party sites list some, but they aren't the organizer. | 🔍 believed Nov 1, 2026; wave times TBD. NYRR's site sat behind a waiting-room page on 2026-09-18, so nothing could be confirmed that day. | — | 🔍 |
 | GPS trouble reports | Forums (Reddit, LetsRun…) paraphrased + linked | same | Link + paraphrase only | ✅ approach |
 | Transit (Tier 3) | 🔍 VBB GTFS | 🔍 MTA GTFS | — | later |
 
@@ -163,7 +167,9 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 dark HUD every 3D map demo uses.
 
 **Decided:** km strip as UI spine (D14) · architectural-model analysis mode (D15) · choose via 3 mockups (D13) ·
-**B · Race poster wins (D28)** · the first screen must be much simpler than the mockup (D29).
+**B · Race poster wins (D28)**, with the instrument's charts and both themes (D31) · the first screen must be much
+simpler than the mockup (D29) · **Explore and Ride** (D34) sharing **one layer system** (D35) · it has to belong on
+photoreal imagery (D32) · two cameras and a time-lapse (D33). Words used here are defined in `CONTEXT.md`.
 
 ### The tokens (from B, as built in `app/src/mockups/poster/`)
 
@@ -178,27 +184,31 @@ dark HUD every 3D map demo uses.
 - **Street model.** White blocks, black outlines, solid black shadows, blue course line, north arrow and sun ray.
 - **Theme.** Follows the system; both are flat ink, neither is a glass HUD.
 
-### Simplifying the screen — 🟡 proposed by Claude 09-18, owner to confirm
+### The shape of the app — ✅ agreed with the owner 09-18 (D34–D37)
 
-The mockup shows every layer and every number at once, which was right for judging a look and is wrong for a first
-visit. Proposal: **the app is a video player for the course.** The 3D view is most of the screen; the km strip is its
-seek bar (elevation silhouette + you, nothing else by default); play/pause, drag, space bar and arrow keys work the way
-they do in any player. Beside it: the kilometre, the time of day, and **one sentence** about where you are
-("Climbing 2% onto the Queensboro Bridge. Sun behind you. Water in 500 m."). Layers (Hills · Sun · Wind · Aid ·
-Runners say) are switched on one at a time; "show everything" opens the full poster for people who want it.
-The ride stops at **chapters** — the 8–12 places where something happens — instead of treating all 42 km alike.
+- **Explore is home.** The city from above, with the course on it, panned and zoomed like any maps app. Beside or over
+  it: the kilometre, the time of day, and **one sentence** about where you are ("Climbing 2% onto the Queensboro
+  Bridge. Sun behind you. Water in 500 m."). A big "Ride the course" button.
+- **Ride is a mode of the same screen.** A time-lapse along the course that slows down at **Stops** — landmarks and the
+  stretches where something happens — and hurries between them. Back / Ride to the next stop; space plays and pauses;
+  the strip is the seek bar. Seen **From above** or **On the road**.
+- **Layers** are switched on one at a time: Hills · Sun · Wind · Aid · Crowds · Bottlenecks · Watch trouble. A layer
+  marks the course line on the map, adds its row to the strip, and adds its clause to the sentence. "Show everything"
+  opens the full strip, which is the poster mockup's screen, for the people who want all of it.
+- **The strip** stays the spine (D14): collapsed to height + where you are by default, drawn the instrument's way (D31).
+- What is shown for Crowds and Bottlenecks, and what is deliberately not, is D36 and D37.
 
-### The ride — 🟡 Claude's thinking 09-18, to be settled by building a slice, not by more mockups
+### The ride — the modes and cameras are ✅ decided (D33, D34); the rest is 🟡 Claude's thinking, to be settled by eye
 
 - **What can't be judged yet.** Everything the owner has seen uses invented blocks drawn in SVG: no real city, no
   imagery, no moving camera. Most of how the product *feels* is the ride, and none of it exists. More mockups won't
-  answer that. **Recommended next step: one real vertical slice** — CesiumJS, the NYC course, a camera that rides it,
-  photoreal tiles on the owner's own key, and the poster UI laid over it — then decide with eyes.
+  answer that. So the tickets are ordered to put the real thing in front of the owner early: race plan and scrubbing
+  (#5), then photoreal on the owner's own key, then Explore in the poster design (#6) laid over it, then the Ride (#8).
 - **Composition over imagery (D32).** The 3D view goes full-bleed and the poster sits *on* it as opaque blocks — black
   or white slabs, the blue, big numerals — the way a marathon TV broadcast lays graphics over the race. Opaque, never
   glass (D11). This argues against a boxed 3D panel beside a column of UI, which is what prototype variants B and C do.
-- **Shape of the screen.** Owner is between prototype **C · Guided tour** and **B · Poster, cut down**. They combine:
-  C's stops with Back / Ride-to-next as the way through the course, B's numeral and list of places, the strip as seek bar.
+- **Which prototype.** Owner is between prototype **C · Guided tour** and **B · Poster, cut down**. They combine: C's
+  Stops with Back / Ride-to-next as the way through the Ride, B's numeral and list of places in Explore.
 - **Runner's view, honestly.** Google's photoreal city is photographed from aircraft. From ~100 m it is superb; at eye
   level facades smear, trees and cars are blobs, and a camera under a tree or *inside a bridge* (the Queensboro's lower
   deck is the course) is inside the mesh. 🔍 To verify in the slice. Likely answer: the "runner's view" is a **lead-vehicle
@@ -248,8 +258,8 @@ diagram with the sun's path over the whole race.
 | **Theme** | Light only (it is paper) | Follows the system, light or dark | Light only (a dark instrument is the HUD we're avoiding) |
 
 **Open questions:**
-- 🟡 Decide whether to build the vertical slice described in "The ride" next (it reorders #5–#8).
-- 🟡 Confirm (or change) "Simplifying the screen" above before #6 starts. A throwaway prototype with three takes
+- 🟡 Composition over imagery ("The ride", second bullet) is the working assumption for #6 until the owner has seen
+  it on real imagery. A throwaway prototype with three takes
   (Cinema · Poster, cut down · Guided tour) is on the branch `prototype/player-screen`, at `/mockups/prototype-player.html`.
 - 🟡 Whether the Roadbook's margin notes or the Field instrument's sky dial should be carried into B.
 
@@ -258,24 +268,27 @@ diagram with the sun's path over the whole race.
 ## 7. Roadmap
 
 ### v1 — Berlin + NYC (target ≈ 2026-10-18)
-1. **Course line** (Python): route ingest, resample, distance axis, terrain-corrected + smoothed
-   elevation, NYC bridge-deck patching, grade. Tests: distance within tolerance of certified 42.195 km;
-   no absurd grades; bridges elevated.
-2. **Design exploration** → pick a visual direction (§6). *(Can run in parallel with step 1.)*
-3. **App shell** (Vite + TS + Cesium): course rendered in analysis mode, keyless, quality selector
-   with conservative default, visible attributions.
-4. **Flyover camera** + photoreal toggle (bring-your-own key, entered in-app, stored locally).
-5. **Sun timeline**: race date + start wave + goal pace drive the clock; runner marker on course.
-   Tests: timezone correctness incl. **US DST ending Nov 1 2026** (likely NYC race day).
-6. **Wind climatology** (Python + Open-Meteo): per-segment head/tail/cross distributions.
-   Test: meteorological "from" direction convention.
-7. **Shade** (Python): surface-model occlusion per point × 5-min step; buildings vs. trees range;
-   km-level "X–Y% exposed, you arrive at HH:MM".
-8. **Aid stations + fueling check**: sourced station data per edition; runner's plan flagged
-   against real layout.
-9. **GPS trouble layer**: forum reports (subjective) + urban canyon score (measured).
-10. **Launch**: README, GIFs, 30–60s photoreal clip, posts drafted for r/nycmarathon, r/running,
-    r/AdvancedRunning, X/TikTok. Flip repo public.
+
+Re-cut on 09-18 after the design pick and D28–D37. Issue numbers are GitHub's; each issue lists what blocks it.
+
+1. ✅ **Course line** (#2 Berlin, #3 NYC): terrain-corrected, smoothed elevation; NYC bridge decks; grade; difficulty.
+2. ✅ **Design exploration** (#4): three mockups; owner picked B · Race poster.
+3. **Race plan, race clock, scrubbing** (#5): edition facts, wave + goal, the runner marker, the clock and the real 3D
+   sun moving together. Tests: time zones incl. **US DST ending Nov 1 2026**.
+4. **Photoreal with your own Google key**: the headline look (D30), and where the design (D32) and the camera heights
+   (D33) get judged against real imagery. Needs the owner's key — a human step.
+5. **Explore** (#6): the map home screen in the poster design, the layer system (D35) with its first layer (Hills),
+   the strip drawn the instrument's way, light and dark.
+6. **Ride** (#8): the time-lapse with Stops, From above and On the road.
+7. **White model** (#7): each city's real buildings along the course as white blocks with real shadows — what opens
+   with no set-up.
+8. **Sun**: building shade (#9), then the tree range (#10).
+9. **Wind** (#11) · **Aid + fueling check** (#12).
+10. **Runner reports and the canyon score** (#13): Watch trouble, Crowds (D36), Bottlenecks (D37).
+11. **Launch** (#14): README, GIFs, a 30–60s photoreal clip of the Ride, draft posts. Confirm repo visibility.
+
+**If the date is at risk — 🟡 Claude's suggestion, owner's call.** Keep: Explore, Ride, Hills, building shade, Aid, the
+runner-report layers. Let slip to just after launch: the tree-shade range (#10) and wind (#11).
 
 **v1 simplification:** runner position uses **even pace** (grade-adjusted pacing is Tier 2), so
 arrival times are approximate — state that in the UI.
@@ -289,6 +302,8 @@ arrival times are approximate — state that in the UI.
   geometry automatically.
 - **Historical editions**: winners, podium, course records, officially published summary stats
   and day-of conditions. ⛔ No scraped finisher tables.
+- **Runner congestion, modelled** (D37): how packed it will be around you at your pace and wave, from officially
+  published field summaries, wave sizes and street widths. ⛔ Never from scraped results.
 - **Contributor course format + validator + more courses by PR** (principle 2 — the growth engine).
 - 🟡 Optional free hosted link (architecture already supports it).
 
@@ -297,7 +312,8 @@ arrival times are approximate — state that in the UI.
   Best version compares a user-uploaded GPX (analyzed in-browser, never stored) against the line.
 - **Spectator planner**: transit-reachable viewing spots. Must model that the course can't be
   crossed on foot and that race-day transit is modified (standard GTFS is wrong that day).
-- **Crowd support map**: contributed ratings and derived spectator-accessibility — two layers.
+- **Crowd support, beyond reports**: contributed ratings and derived spectator access. *(The subjective Crowds layer
+  itself moved into v1 — D36.)*
 - **"Is this actually a fast course?"**: cross-course comparison normalized for field quality,
   from officially published summary stats only.
 - **GPS degradation, full model**: satellite-visibility physics from building geometry, predicting
@@ -342,7 +358,9 @@ arrival times are approximate — state that in the UI.
 
 ## 10. Open items
 
-- ✅ **Design direction (§6)** — owner picked **B · Race poster** on 09-18 (D28). 🟡 Open: how the first screen is simplified (D29, §6).
+- ✅ **Design direction (§6)** — owner picked **B · Race poster** on 09-18 (D28); the app's shape is Explore + Ride with
+  one layer system (D34–D37). 🟡 Open: the owner hasn't yet seen any of it over real imagery (D32).
+- 🟡 **What slips if Oct 18 is at risk** — see §7; owner's call.
 - 🟡 UI framework confirmation (Svelte 5 proposed; the first slice is plain TypeScript).
 - ⚠️ **GitHub repo `Daniwave100/GeoPace` is currently public**, but D10 says private until the demo.
   Owner to decide whether to flip it to private (GitHub → Settings → Danger Zone).
@@ -381,3 +399,7 @@ arrival times are approximate — state that in the UI.
 - **2026-09-18** — Owner feedback on the prototype: between Guided tour and Poster-cut-down; wants the instrument's clearer
   charts and both themes (D31), a UI that belongs on photoreal imagery (D32), and two cameras with a time-lapse ride (D33).
   §6 "The ride" records Claude's assessment and the recommendation to build one real slice next instead of more mockups.
+- **2026-09-18** — Owner set the app's shape: a map home (**Explore**) with layer toggles, plus the **Ride** (D34, D35); asked
+  for crowd support and runner congestion, agreed as a subjective Crowds layer (D36) and sourced Bottlenecks with a model
+  later (D37). §6 and the v1 roadmap rewritten to match; `CONTEXT.md` created as the glossary; GitHub issues re-cut
+  (#6 Explore, #8 Ride, photoreal split out, #13 widened). Berlin 2026's date and first start time verified (§5).
