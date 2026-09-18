@@ -98,7 +98,7 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D39 | ✅ **The 3D scene has no clock of its own: Cesium's clock is stopped and set from the Planner's race clock**, so the scene's sun is the sun at the moment the runner reaches that km. **Look — owner, 09-18: leave it for now and decide in #7**, when the white model's shadows arrive. Cesium's sun lighting is kept on at city scale (by default it fades out within ~10,000 km of the ground, so a city never looks dark), so the map dims as the sun gets low and drops to Cesium's night-side floor (30%) after sunset. It is three lines in `app/src/scene/globe.ts`. | One source of time means the strip, the readout, the sentence, the marker and the sun can't drift apart. Without the lighting change the sun moved but nothing on screen showed it: measured in headless Chrome, map brightness 206 → 63 between an 11:30 start and an 18:00 finish in New York on Nov 1. It becomes properly visible with the white model's shadows (#7), at which point dimming the map may no longer be needed. | 09-18 |
 | D40 | ✅ **A runner can type their own start time, and it outranks everything else.** Under the wave there is always a start-time box: it shows the wave's published time, and the runner can overwrite it. It is the only way to plan with a wave whose time isn't published (Berlin 2026's waves 2–6). The runner's own time is never greyed, even on a carried-over wave, and typing a carried-over time back in counts as confirming it. Picking a wave with no published time doesn't blank the screen: until a time is typed, the plan is unchanged and the form says whose times are still showing. It is part of the Race Plan and is remembered with it. | Owner, 09-18: "type your own start time would be very good". Each runner's start card is a better source for that runner than any schedule, and it closes the gap the review found: a four-hour Berlin runner was shown wave 1's times with nothing to be done about it. | 09-18 |
 | D41 | ✅ **A splits table: the time of day and elapsed time at every kilometre, and at the finish.** Closed until asked for (principle 8); every kilometre in it is a button that moves the runner there. Same honesty as the readout: times of day resting on a carried-over start are greyed. Kilometres are course-line km, like the strip (D20), so where that shows at the second the table says why a kilometre takes less than the runner's pace (New York: 5:37 against a 5:41 pace, because the mapped line is 42.69 km). The Planner computes splits at any step, so a table in miles is the same call with 1.609344. | Owner, 09-18: "a splits table would be pretty nice". #5 asked for times "at every km"; scrubbing alone made a runner hunt for them. | 09-18 |
-| D42 | ✅ **The app will have an imperial / metric toggle. 🔍 Not built yet; it needs its own issue.** It is the *units* choice the Race Plan already lists (`CONTEXT.md`), so it is remembered with the plan. Everything stays metric inside (CLAUDE.md conventions: meters, km from the start); only what is shown and typed converts: the readout and the strip's marks (miles), the goal as a pace per mile, the splits table per mile, heights in feet on the profile. Until it exists, nothing new should format a distance in a way that would be hard to switch. | Owner, 09-18: "we have to also account for a toggle for imperial and metric units". New York is the launch course and its runners think in miles. | 09-18 |
+| D42 | ✅ **The app will have an imperial / metric toggle (#19, not built yet).** It is the *units* choice the Race Plan already lists (`CONTEXT.md`), so it is remembered with the plan. Everything stays metric inside (CLAUDE.md conventions: meters, km from the start); only what is shown and typed converts: the readout and the strip's marks (miles), the goal as a pace per mile, the splits table per mile, heights in feet on the profile. Until it exists, nothing new should format a distance in a way that would be hard to switch. | Owner, 09-18: "we have to also account for a toggle for imperial and metric units". New York is the launch course and its runners think in miles. | 09-18 |
 
 ---
 
@@ -290,7 +290,7 @@ Re-cut on 09-18 after the design pick and D28–D37. Issue numbers are GitHub's;
 8. **Sun**: building shade (#9), then the tree range (#10).
 9. **Wind** (#11) · **Aid + fueling check** (#12).
 10. **Runner reports and the canyon score** (#13): Watch trouble, Crowds (D36), Bottlenecks (D37).
-11. **Imperial / metric toggle** (D42; 🔍 needs an issue): miles, pace per mile, splits per mile, feet. Before launch:
+11. **Imperial / metric toggle** (#19, D42): miles, pace per mile, splits per mile, feet. Before launch:
     New York's runners think in miles.
 12. **Launch** (#14): README, GIFs, a 30–60s photoreal clip of the Ride, draft posts. Confirm repo visibility.
 
@@ -378,7 +378,6 @@ arrival times are approximate — state that in the UI.
 - 🔍 **NYC 2026 date, by a person, when convenient**: nyrr.org sits behind a waiting room that a browser passes and our
   tools don't (and we don't work around it). If the page confirms Sunday 1 November, set the date's `confirmed: true` in
   `data/courses/nyc/editions/2026.yaml`. Wave times are no longer chased (owner, 09-18): runners type their own (D40).
-- 🔍 **Imperial / metric toggle (D42)** has no GitHub issue yet.
 - ✅ Settled by the owner 09-18: wave start times aren't chased, runners type their own (D38, D40); the map's dimming
   waits for #7 (D39); the splits table is built (D41).
 - ✅ Settled by the owner 09-18: a runner can type their own start time (D40), and the strip and readout stay on
@@ -432,4 +431,4 @@ arrival times are approximate — state that in the UI.
   course-line km (D20). Branch `v1-foundation` pushed at the owner's request. Still open for the owner: Berlin's
   not-published waves, the NYRR guide as NYC's source, the map dimming with the sun, and whether to add a per-km table (§10).
 - **2026-09-18** — Owner's second round on #5: don't chase wave start times, runners type their own (D38, D40); leave the
-  map's dimming until #7 (D39); splits table built (D41); an imperial / metric toggle is required and needs an issue (D42).
+  map's dimming until #7 (D39); splits table built (D41); an imperial / metric toggle is required (D42, now #19). #5 closed; the map-dimming question is noted on #7.
