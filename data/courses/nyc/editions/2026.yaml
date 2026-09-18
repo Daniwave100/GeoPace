@@ -1,0 +1,61 @@
+# Hand-maintained facts about the 2026 edition of the New York City Marathon: its date and its waves.
+# Rule: every fact about the world has a `source` URL and the date we `accessed` it.
+#
+# Wave times are wall-clock times in the course's time zone (America/New_York, from course.yaml).
+# ALWAYS put them in quotes ("09:10"): YAML reads an unquoted 10:20 as the number 620.
+#
+# Only the five runner waves are listed. The professional and wheelchair starts (08:00 to 09:05
+# in 2025) are in the same guide, but the app plans a runner's race.
+#
+# STILL TO DO, by a person: on 2026-09-18 every page on nyrr.org sat behind NYRR's waiting room,
+# which a browser passes and our tools don't (and we don't work around it). Open
+# https://www.nyrr.org/tcsnycmarathon in a browser, confirm the 2026 date and wave times, then
+# update this file: new `source`/`accessed`, and drop `carried_over` from whatever is confirmed.
+
+edition: 2026
+
+# NYRR's own 2025 runner guide says the race is held every year on the first Sunday in November;
+# Abbott World Marathon Majors says the same (https://www.worldmarathonmajors.com/races/new-york-city).
+# In 2026 that Sunday is 1 November, which is also the morning US clocks go back an hour.
+date:
+  day: 2026-11-01
+  source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
+  accessed: 2026-09-18
+  note: From the organizer's rule that the race is on the first Sunday in November. NYRR's 2026 pages could not be opened to confirm it.
+
+carried_over:
+  from_edition: 2025
+  reason: NYRR's 2026 wave times could not be confirmed, so these are the 2025 edition's. Check your own start time when NYRR sends it.
+
+# The 2025 start schedule, from NYRR's 2025 runner guide.
+waves:
+  - id: wave-1
+    name: Wave 1
+    start_local: "09:10"
+    carried_over: true
+    source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
+    accessed: 2026-09-18
+  - id: wave-2
+    name: Wave 2
+    start_local: "09:45"
+    carried_over: true
+    source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
+    accessed: 2026-09-18
+  - id: wave-3
+    name: Wave 3
+    start_local: "10:20"
+    carried_over: true
+    source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
+    accessed: 2026-09-18
+  - id: wave-4
+    name: Wave 4
+    start_local: "10:55"
+    carried_over: true
+    source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
+    accessed: 2026-09-18
+  - id: wave-5
+    name: Wave 5
+    start_local: "11:30"
+    carried_over: true
+    source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
+    accessed: 2026-09-18

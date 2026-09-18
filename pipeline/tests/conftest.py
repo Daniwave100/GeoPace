@@ -67,3 +67,16 @@ def synthetic_facts():
         "start": {"lat": 52.5, "lon": 13.4, **source},
         "landmarks": [{"name": "Turnaround", "km": 2.5, **source}],
     }
+
+
+@pytest.fixture
+def synthetic_edition():
+    source = {"source": "https://example.org/race-day", "accessed": "2026-09-18"}
+    return {
+        "edition": 2026,
+        "date": {"day": "2026-11-01", **source},
+        "waves": [
+            {"id": "wave-1", "name": "Wave 1", "start_local": "09:10", **source},
+            {"id": "wave-2", "name": "Wave 2", "start_local": "09:45", **source},
+        ],
+    }
