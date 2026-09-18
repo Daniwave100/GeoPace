@@ -31,6 +31,23 @@ time**, from your start card. You can do the same on any wave, and your own time
 The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
 app needs an internet connection.
 
+### Make it photoreal (optional)
+
+Press **Make it photoreal** on the map to see the course over Google's photographed 3D city. That
+imagery needs a key, and GeoPace can't come with one, so it uses yours. The panel says where to get
+one, roughly how long it takes and what it costs:
+
+- a **Cesium ion token** is free for personal, non-commercial use and takes about five minutes;
+- a **Google Maps key** needs a Google Cloud project with billing switched on; the first 1,000
+  loads a month are free, then Google charges $6.00 per 1,000. (Checked 2026-09-18; the panel links
+  each provider's own page.)
+
+Your key stays in your browser. It is never written to GeoPace's files, and it is sent only to the
+provider it belongs to; **Forget my key** removes it. Everything else works without a key, and if
+the imagery can't be had (a refused key, a used-up allowance, no connection) you are back on the
+plain map with a message saying why. Photoreal is for looking at: its shadows were there when the
+city was photographed, so GeoPace's numbers never come from it.
+
 ## Design mockups
 
 The app's look isn't chosen yet. Three clickable directions show the same course, race plan and
@@ -124,5 +141,6 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
 | Street geometry, bridge locations | [OpenStreetMap](https://www.openstreetmap.org/copyright) | ODbL |
 | Map tiles | [OpenStreetMap](https://www.openstreetmap.org/copyright) ([tile policy](https://operations.osmfoundation.org/policies/tiles/)) | ODbL |
 | 3D terrain | [Re:Earth Terrain](https://terrain.reearth.land/) · [Mapterhorn](https://mapterhorn.com/attribution) | CC BY 4.0 |
+| Photoreal 3D city (optional, with your own key) | [Google Photorealistic 3D Tiles](https://developers.google.com/maps/documentation/tile/3d-tiles), direct or through [Cesium ion](https://cesium.com/platform/cesium-ion/pricing/) | [Google's Map Tiles policies](https://developers.google.com/maps/documentation/tile/policies): display only, never stored; Google's logo and data credits stay on the map |
 
 See [PLAN.md](PLAN.md) for scope, decisions, and the roadmap.

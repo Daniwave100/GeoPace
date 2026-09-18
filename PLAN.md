@@ -88,8 +88,8 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D29 | ✅ **The mockup's screen is the *everything* view, not the first screen.** Owner on seeing it: love the look, but "there's a lot" — it has to be easy for a runner who isn't technical (principle 8). #6 applies the look with far less on screen by default; how (see §6 "Simplifying the screen") is 🟡 proposed, not yet agreed. | A design that wins on looks and loses the user on first contact doesn't earn stars. | 09-18 |
 | D30 | ✅ **Photoreal is the headline look; the white model is what opens with no set-up.** The app advertises photoreal (Google 3D Tiles with the runner's own key) as *the* way to see the ride, with a prominent "Make it photoreal" control and plain set-up help. With no key it opens straight into the **white model of the city's real buildings** — real footprints and heights from each city's open data (§5 "Buildings"), cut to the course corridor by the pipeline (#7) — never a blank or a nag screen. Refines D3/D4; does not change them: no key ships with the project. "White model" is now the name for what older rows call *analysis mode* (see `CONTEXT.md`). | Owner directive 09-18: people should know the key is what makes it look cool, and the fallback should still be the actual buildings, "a white 3D layout". A key can't be the literal default because none can ship in the repo (and it would bill the maintainer), and most non-technical runners will never create one (principle 8) — so the white city has to stand on its own. | 09-18 |
 | D31 | ✅ **B is refined with the Field instrument's charts, and ships with both light and dark.** The poster keeps its identity (Archivo, the blue, the grid, solid/hollow), but the km strip's layers are drawn as the instrument drew them: thin line traces with a light fill, a labelled scale, and the value under the cursor printed in the row's header. Light and dark are both first-class, with a switch in the app as well as following the system. | Owner on 09-18: the instrument's charts "are much easier to understand" than the poster's solid bars and wedges; and light mode matters as much as dark. D13 always allowed a mix. | 09-18 |
-| D32 | ✅ **The interface has to belong on top of photoreal imagery, not beside it.** The design is judged against Google's photoreal city, not only the white model. Not "a map inside a web page". | Owner directive 09-18. None of the mockups or prototypes has been seen against real imagery yet — that is the biggest unknown left in the look. | 09-18 |
-| D33 | ✅ **Two cameras, and the ride is a time-lapse.** A bird's-eye view and a runner's view of the same ride; nobody watches a three-hour video. *How low the runner's view can go is 🟡 open* — see §6 "The ride". | Owner's vision 09-18: "like a drive cam… you're on the actual ground", plus a bird's-eye view. | 09-18 |
+| D32 | ✅ **The interface has to belong on top of photoreal imagery, not beside it.** The design is judged against Google's photoreal city, not only the white model. Not "a map inside a web page". | Owner directive 09-18. None of the mockups or prototypes had been seen against real imagery. **Owner's look, 09-18 (#17):** solid black and white blocks read fine over the imagery, and the course line's colour and width are "good". One thing gets lost, and only up close: the line is draped over whatever is highest, so on a bridge it runs over the towers and cables instead of the road (§6 "The ride"). | 09-18 |
+| D33 | ✅ **Two cameras, and the ride is a time-lapse.** A bird's-eye view and a runner's view of the same ride; nobody watches a three-hour video. *How low the runner's view can go:* **the imagery doesn't set a floor.** Owner's look, 09-18 (#17): having gone "really close to the ground", the owner found New York "really good" and Berlin "still looks good"; trees go first and are "not bad". No number was written down. What the On the road camera needs instead is the road's own height, which the app doesn't have yet — see §6 "The ride". | Owner's vision 09-18: "like a drive cam… you're on the actual ground", plus a bird's-eye view. | 09-18 |
 | D34 | ✅ **Two modes: Explore and Ride.** *Explore* is home: the city seen from above with the course on it, moved freely like any maps app, with layers switched on and off. *Ride* carries the runner along the course as a time-lapse that slows down at Stops, seen either **From above** or **On the road** (D33). The same layers, the same strip and the same sentence appear in both. This settles D29's open "how", and replaces Claude's earlier proposal that the whole app be a video player: the player is the Ride. | Owner's idea 09-18, and better than the proposal it replaces: a runner's questions are random-access ("where's the last hill?", "where will my family stand?") and a map answers them at once, where a ride makes them wait. From above is also where Google's imagery is at its best. | 09-18 |
 | D35 | ✅ **One layer system; layers are drawn on the course line, one at a time.** Switching a layer on marks the course line on the map, adds that layer's row to the strip, and adds its clause to the sentence. ⛔ No area heat maps or coloured blobs over the map. One layer is on at a time by default; "Show everything" opens the full strip. Plain names: **Hills · Sun · Wind · Aid · Crowds · Bottlenecks · Watch trouble**. | All of GeoPace's data lives along a line, and coloured areas over satellite imagery are hard to read. One at a time keeps the screen from becoming "a lot" again (principle 8). | 09-18 |
 | D36 | ✅ **Crowd support is a v1 layer, and it is subjective.** "Crowds" shows where spectators are, from three kinds of source: runner reports (loud / mixed / quiet stretches, paraphrased with links), official cheer zones and entertainment points (sourced facts), and stretches where spectators aren't allowed, such as bridges (sourced facts). ⛔ Not a heat map: nobody measures spectator density, and a smooth gradient would claim data we don't have. Moves up from Tier 3; contributed ratings and derived spectator access stay there. | Owner asked for it 09-18. It costs little because it uses the same research method as the watch-trouble reports (#13), and it keeps principle 3: hearsay is drawn as hearsay. | 09-18 |
@@ -99,6 +99,8 @@ Success for v1 = a few hundred stars within a few months of launch.
 | D40 | ✅ **A runner can type their own start time, and it outranks everything else.** Under the wave there is always a start-time box: it shows the wave's published time, and the runner can overwrite it. It is the only way to plan with a wave whose time isn't published (Berlin 2026's waves 2–6). The runner's own time is never greyed, even on a carried-over wave, and typing a carried-over time back in counts as confirming it. Picking a wave with no published time doesn't blank the screen: until a time is typed, the plan is unchanged and the form says whose times are still showing. It is part of the Race Plan and is remembered with it. | Owner, 09-18: "type your own start time would be very good". Each runner's start card is a better source for that runner than any schedule, and it closes the gap the review found: a four-hour Berlin runner was shown wave 1's times with nothing to be done about it. | 09-18 |
 | D41 | ✅ **A splits table: the time of day and elapsed time at every kilometre, and at the finish.** Closed until asked for (principle 8); every kilometre in it is a button that moves the runner there. Same honesty as the readout: times of day resting on a carried-over start are greyed. Kilometres are course-line km, like the strip (D20), so where that shows at the second the table says why a kilometre takes less than the runner's pace (New York: 5:37 against a 5:41 pace, because the mapped line is 42.69 km). The Planner computes splits at any step, so a table in miles is the same call with 1.609344. | Owner, 09-18: "a splits table would be pretty nice". #5 asked for times "at every km"; scrubbing alone made a runner hunt for them. | 09-18 |
 | D42 | ✅ **The app will have an imperial / metric toggle (#19, not built yet).** It is the *units* choice the Race Plan already lists (`CONTEXT.md`), so it is remembered with the plan. Everything stays metric inside (CLAUDE.md conventions: meters, km from the start); only what is shown and typed converts: the readout and the strip's marks (miles), the goal as a pace per mile, the splits table per mile, heights in feet on the profile. Until it exists, nothing new should format a distance in a way that would be hard to switch. | Owner, 09-18: "we have to also account for a toggle for imperial and metric units". New York is the launch course and its runners think in miles. | 09-18 |
+| D43 | ✅ **The runner's own key: one box, told apart by shape, kept only in the browser, sent only to its own provider.** The panel has one box for either kind of key. A Google Maps key (`AIza…`) and a Cesium ion token (a JSON Web Token, `eyJ…`) are recognized by shape, the panel says which it found and the one host it will go to, and anything else is refused without being sent anywhere. A Google key goes only to `tile.googleapis.com`; an ion token goes only to `api.cesium.com`, and ion answers with a short-lived key of its own for the tiles, so Google never sees the runner's token. The key is handed to CesiumJS explicitly each time and is ⛔ never set as a CesiumJS default (`Ion.defaultAccessToken`, `GoogleMaps.defaultApiKey`); CesiumJS's own bundled demo ion token is switched off. It is stored in `localStorage` under `geopace.photoreal`, apart from the Race Plan, with whether photoreal was left on; masked as it is typed, and afterwards shown only by its last four characters. The box is deliberately *not* a password box: browsers offer to save those to a password manager, which would be a second place the key is kept, and one that may sync it to other machines. ⛔ No key from the build's environment (`VITE_…`), the page address, or any file. | D3 made the key the runner's; this is how that promise is kept and tested. Guessing the provider could send one company's secret to another. A CesiumJS default is sent by any part of CesiumJS that reaches for it. The owner will record a launch clip with photoreal on, so the key must never be readable on screen. Keeping it out of the Race Plan means a plan can later be shared or exported safely. Tests: the real CesiumJS request code with the network replaced by a recorder, and a guard that reads every tracked file for key-shaped strings. | 09-18 |
+| D44 | ✅ **Photoreal can fail; the view can't.** The keyless map is left in place until the imagery's first view has fully arrived, and only then is the plain ground hidden (left on, it pokes through Google's mesh). If the provider refuses the key, says it is over its allowance, or can't be reached, or if the imagery stops arriving later (the very first tile fails, or eight tiles fail in a row with none arriving between), the imagery is removed, the keyless map is showing, and a message says what happened and what to do. The course, the strip and the planning layers never wait on photoreal. There is never more than one load under way, and imagery that arrives after the runner changed their mind (turned it off, pasted another key) is thrown away without ever being put on screen; removing imagery only puts the plain ground back if that imagery was what hid it. A reload opens the way the runner left it. | D30: never a blank view, never a nag. A provider counts and bills each *load* (one start of photoreal; looking around afterwards is free for about three hours), so a double click must not cost two. Google ends a session after about three hours, which looks like every tile failing at once: that should land the runner back on the map with a way to start again, not on a broken picture. | 09-18 |
 
 ---
 
@@ -158,7 +160,7 @@ CLAUDE.md            # working conventions for Claude (created after plan confir
 | Keyless basemap / terrain | ✅ [OpenStreetMap standard tiles](https://operations.osmfoundation.org/policies/tiles/) (attribution visible, no bulk/offline pre-fetching, Referer sent) + [Re:Earth Terrain](https://terrain.reearth.land/) quantized-mesh `cesium-mesh/ellipsoid` ("no signup, no API key", best-effort, may rate-limit heavy clients; attribution "Re:Earth Terrain · Mapterhorn (CC BY 4.0)"). ⛔ Esri (needs key) · ⛔ CARTO raster (watermarked without key). Candidate quieter basemap for Berlin: [basemap.de Web Raster](https://basemap.de/produkte-und-dienste/web-raster/) grayscale (CC BY 4.0, Germany only). | same | OSM: ODbL · Mapterhorn: CC BY 4.0 | ✅ (D16) |
 | Bridge locations | ✅ OpenStreetMap ways, listed per bridge in `data/courses/berlin/course.yaml` | ✅ same, in `data/courses/nyc/course.yaml` (9 spans, incl. the five famous bridges) | ODbL, attribution in bundle | ✅ both |
 | Bridge deck heights | n/a — decks spanned straight (D18) | ✅ [2017 NYC Topobathymetric LiDAR](https://www.fisheries.noaa.gov/inport/item/64728), class 17 (bridge deck), as COPC tiles on NOAA Digital Coast; only the corridor around each bridge is read (D23). ⚠️ No returns at all over the middle of the Verrazzano's main span (~km 0.85–1.45): that stretch is a straight line between measured deck heights, so the real crest is a few meters higher. | NYC Open Data / NOAA, as above | ✅ NYC |
-| Photoreal 3D | Google Photorealistic 3D Tiles via user's key or Cesium ion token | same | Google ToS: no caching, attribution required · ion Community = personal/non-commercial | ✅ |
+| Photoreal 3D | ✅ Google Photorealistic 3D Tiles with the runner's own key (D43), either way, checked 2026-09-18. **Google Maps key** (✅ used by the owner 09-18: it works): the project must have billing enabled ([usage and billing](https://developers.google.com/maps/documentation/tile/usage-and-billing)); what is counted is the *root tileset request* (one per start of photoreal, good for up to three hours of tiles); [1,000 a month free, then $6.00 per 1,000](https://developers.google.com/maps/billing-and-pricing/pricing); set-up in [Google's guide](https://developers.google.com/maps/documentation/tile/get-api-key). **Cesium ion token:** the free Community plan is for personal, non-commercial projects (also unfunded education and evaluation) and [includes 1,000 root tiles a month](https://cesium.com/platform/cesium-ion/pricing/); every account has a [default token](https://cesium.com/learn/ion/cesium-ion-access-tokens/) that works. ion's asset id for the tiles is 2275207 (from CesiumJS's own source). 🔍 Not confirmed: whether a new ion account already has the tiles among My Assets or must add them from the Asset Depot; the app's message covers both. | same | [Google's policies](https://developers.google.com/maps/documentation/tile/policies): no pre-fetching, storing or caching; no extracting geodata; our own objects may be laid over the tiles as long as they aren't derived from them; the Google logo and each tile's data credits shown on the map, along the bottom (the app sets `showCreditsOnScreen`) · ion Community = personal/non-commercial | ✅ |
 | Aid stations | 🔍 organizer site (paraphrase + source link) | 🔍 NYRR (2026 may publish late) | Facts, not copied layouts | 🔍 |
 | Race date / start waves | ✅ Sunday 2026-09-27; runners start "from 08.45 am … in 6 waves" after the handbike and wheelchair starts (8.20, 8.26, 8.29) — [race day page](https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners), accessed 2026-09-18. ⚠️ The organizer publishes **no clock time for waves 2–6** (checked in the page's HTML on 09-18; each runner's time is on their emailed start card), so they are listed without one (D38). Third-party sites print times; one credits the organizer's page, which doesn't contain them. | 🔍 Date 2026-11-01, **not confirmed**: it follows from NYRR's rule "first Sunday in November" ([2025 runner guide](https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf); [Abbott WMM](https://www.worldmarathonmajors.com/races/new-york-city) says the same). Waves 9:10 · 9:45 · 10:20 · 10:55 · 11:30 are **carried over from 2025** (same guide). nyrr.org was behind its waiting room again on 2026-09-18. Owner, 09-18: wave times aren't chased; runners type their own (D40). The date is still worth a look by a person. | Facts, paraphrased with a link | ✅ Berlin · 🔍 NYC |
 | GPS trouble reports | Forums (Reddit, LetsRun…) paraphrased + linked | same | Link + paraphrase only | ✅ approach |
@@ -214,12 +216,39 @@ photoreal imagery (D32) · two cameras and a time-lapse (D33). Words used here a
   glass (D11). This argues against a boxed 3D panel beside a column of UI, which is what prototype variants B and C do.
 - **Which prototype.** Owner is between prototype **C · Guided tour** and **B · Poster, cut down**. They combine: C's
   Stops with Back / Ride-to-next as the way through the Ride, B's numeral and list of places in Explore.
-- **Runner's view, honestly.** Google's photoreal city is photographed from aircraft. From ~100 m it is superb; at eye
-  level facades smear, trees and cars are blobs, and a camera under a tree or *inside a bridge* (the Queensboro's lower
-  deck is the course) is inside the mesh. 🔍 To verify in the slice. Likely answer: the "runner's view" is a **lead-vehicle
-  camera** — a few metres up and behind, looking down the road, the way marathons are actually filmed — not a 1.7 m eye.
+- **Runner's view: what Claude predicted, and what the owner saw.** *Predicted (09-18, before any imagery):* Google's
+  city is photographed from aircraft, so at eye level facades would smear, trees and cars would be blobs, and the
+  camera would have to stay a few metres up like a lead vehicle. *Seen (owner, 09-18, #17, with a Google Maps key,
+  both courses from above and down at road height):* asked for the lowest camera height that still looks good, the
+  owner answered "this looks really good" for New York and "still looks good" for Berlin, having gone "really close to
+  the ground". Trees are what go first, "but its not bad, its really good"; in Berlin "nothing really" fell apart. **So the imagery does not set a floor for the On the road camera (D33).** The owner wrote down no
+  height in metres, so none is recorded here; the prediction was too pessimistic, and a lead-vehicle camera a few
+  metres up is now a choice about how a race is filmed, not something the imagery forces.
   🔍 Street View is the true ground-level source, but it is billed per panorama and its terms restrict turning it into
   video; verify before considering it.
+- **What the look did find: the course line sits on top of things, not on the road.** The line is *draped*: CesiumJS
+  paints it onto whatever surface is there, seen from the camera. From above that is right and reads well ("course
+  line is good"). Close to the ground it is wrong wherever something stands over the road: on a bridge "the line goes
+  over the bridge arches/suspension rather than on the road". The owner: "not the biggest deal breaker because it looks
+  good from above". The same will be true under trees, and on the Queensboro, where runners use the *lower* deck and
+  the line is painted on top of the bridge. Whether the camera can follow the road on the two big bridges at all, the
+  owner was "not sure, kind of". **What this means for the tickets:**
+  - **#8 (Ride, On the road) needs the road's height in the 3D scene, for the camera and for the line.** It can't
+    come from the imagery: draping is what put the line on the cables, and Google's content may not be used to work
+    anything out (D5). It should come from what the pipeline already measures, the course line's elevation with
+    LiDAR bridge decks (D23), which knows the Queensboro's lower deck from its upper one. 🟡 *Proposed, not yet
+    agreed:* that elevation is above sea level (each city's own datum), and the 3D scene needs height above the
+    ellipsoid: a difference of tens of metres, and not the same in the two cities (🔍 to be computed from a published
+    geoid model, with its source, never eyeballed). The pipeline adds that height per point to the Course Bundle (a new
+    optional field, so not a breaking change); the app then draws the line at it in photoreal instead of draping it.
+    Even then Google's surface and a surveyed road won't agree exactly (🔍 by how much is to be seen), so the line may
+    need to float slightly above the road, and whether it shows through buildings is a look to choose in #6/#8.
+  - **#6 (Explore) can keep the draped line from above**, where it is correct and reads well, and keeps opaque blocks
+    for everything laid over the imagery. Nothing else got lost.
+- **How the look was done.** With photoreal on, the map shows "Camera: about N m above the ground" each time the
+  camera comes to rest. It is read from the open terrain, never from Google's mesh (D5): good to a few metres, and on
+  a bridge it counts from the water. The page says under the map how to tilt down. The owner's answers, word for
+  word, are in `docs/photoreal-look-notes.md`.
 - **Speed.** 42 km in 3 minutes is ~230 m/s: fine from the air, unwatchable on the ground. So: bird's-eye between
   stops, drop to the runner's view for the few hundred metres that matter at each stop, at a gentler time-lapse.
 - **Sun in photoreal.** Google's imagery has its own shadows baked in (D4), so the moving sun is only *true* in the
@@ -280,11 +309,13 @@ Re-cut on 09-18 after the design pick and D28–D37. Issue numbers are GitHub's;
 2. ✅ **Design exploration** (#4): three mockups; owner picked B · Race poster.
 3. ✅ **Race plan, race clock, scrubbing** (#5): edition facts (D38), wave + goal, the runner marker, the clock and the real 3D
    sun moving together (D39). Tests: time zones incl. **US DST ending Nov 1 2026**, checked on both sides of the bundle.
-4. **Photoreal with your own Google key**: the headline look (D30), and where the design (D32) and the camera heights
-   (D33) get judged against real imagery. Needs the owner's key — a human step.
+4. ✅ **Photoreal with your own key** (#17): the headline look (D30). "Make it photoreal", the key panel with sourced
+   set-up help, the imagery, and the way back when it fails (D43, D44). The owner looked at both courses with their own
+   Google Maps key on 09-18: what it settled for the camera (D33) and the design (D32) is in §6 "The ride".
 5. **Explore** (#6): the map home screen in the poster design, the layer system (D35) with its first layer (Hills),
    the strip drawn the instrument's way, light and dark.
-6. **Ride** (#8): the time-lapse with Stops, From above and On the road.
+6. **Ride** (#8): the time-lapse with Stops, From above and On the road. *First:* the road's height in the 3D scene, from
+   the pipeline's measured elevation (§6 "The ride") — On the road can't be built without it, and it fixes the draped line.
 7. **White model** (#7): each city's real buildings along the course as white blocks with real shadows — what opens
    with no set-up. Decide there whether the map should still dim with the sun (D39).
 8. **Sun**: building shade (#9), then the tree range (#10).
@@ -348,6 +379,14 @@ arrival times are approximate — state that in the UI.
   and the edition-facts loader refuses a number with advice. Tested.
 - **Cesium fades sun lighting out near the ground** → at city scale the scene's sun changes nothing you can see unless
   the fade distances are pulled in (D39).
+- **A photoreal tile's address has the runner's Google key in it.** CesiumJS prints a failed tile's address to the
+  console unless something listens for failed tiles, and hands that address to whatever listens. The app listens, and
+  never reads, shows or logs what it is handed (D43).
+- **`createGooglePhotorealistic3DTileset()` without a key uses CesiumJS's default ion token, and remembers a failed
+  ion lookup for the life of the page**, so a corrected token would keep failing until a reload. The app builds the
+  ion request itself, with the runner's token, each time.
+- **CesiumJS's library contains a demo Cesium ion token** (public, for evaluation). It is the one token-shaped string
+  in the built app; it is not ours, and the app switches it off at start-up (D43).
 - **Spectators can't cross the course; race-day transit is modified** (Tier 3 routing).
 
 ---
@@ -370,7 +409,7 @@ arrival times are approximate — state that in the UI.
 ## 10. Open items
 
 - ✅ **Design direction (§6)** — owner picked **B · Race poster** on 09-18 (D28); the app's shape is Explore + Ride with
-  one layer system (D34–D37). 🟡 Open: the owner hasn't yet seen any of it over real imagery (D32).
+  one layer system (D34–D37). ✅ Seen over real imagery by the owner 09-18 (#17): it holds up; see D32 and §6.
 - 🟡 **What slips if Oct 18 is at risk** — see §7; owner's call.
 - 🟡 UI framework confirmation (Svelte 5 proposed; the first slice is plain TypeScript).
 - ⚠️ **GitHub repo `Daniwave100/GeoPace` is currently public**, but D10 says private until the demo.
@@ -382,7 +421,14 @@ arrival times are approximate — state that in the UI.
   waits for #7 (D39); the splits table is built (D41).
 - ✅ Settled by the owner 09-18: a runner can type their own start time (D40), and the strip and readout stay on
   course-line km (D20).
-- 🔍 Verify: Open-Meteo archive limits · Cesium ion Community terms for end users.
+- ✅ **The owner's look at photoreal (#17)**, done 09-18 with a Google Maps key. Results in §6 "The ride".
+- 🟡 **The road's height in the 3D scene** (owner's call on the approach; needed by #8): in photoreal the course line is
+  draped over bridge towers and cables instead of lying on the road. Proposed fix in §6 "The ride": the pipeline adds
+  each point's height above the ellipsoid to the Course Bundle, from a published geoid model.
+- 🔍 **Nobody has tried a Cesium ion token for real yet** (the owner used a Google Maps key). Still unconfirmed: whether
+  a new ion account already has Google's tiles or has to add them from ion's Asset Depot (§5).
+- 🔍 Verify: Open-Meteo archive limits. ✅ Cesium ion Community terms checked 09-18 (§5): personal, non-commercial use,
+  which is what a runner planning their own race is; each runner uses their own account, so the terms are theirs.
   ✅ Settled 09-17: there is no downloadable official NYC course file (D21); NYC Open Data has no usage restrictions.
 - ✅ **NYC start line** settled 09-17 from the USATF certification (D25), and pinned by a test. What remains is the
   finish line's exact position (taken as West Drive beside Tavern on the Green); the start moves ~1.5 m for every
@@ -432,3 +478,18 @@ arrival times are approximate — state that in the UI.
   not-published waves, the NYRR guide as NYC's source, the map dimming with the sun, and whether to add a per-km table (§10).
 - **2026-09-18** — Owner's second round on #5: don't chase wave start times, runners type their own (D38, D40); leave the
   map's dimming until #7 (D39); splits table built (D41); an imperial / metric toggle is required (D42, now #19). #5 closed; the map-dimming question is noted on #7.
+- **2026-09-18** — Photoreal with the runner's own key (#17): "Make it photoreal" on the map, a panel that says where to
+  get a key, how long it takes and what it costs (each fact sourced, §5), Google's tiles with the logo and data credits on
+  the map, a note that their shadows are illustrative, and the keyless map back with a reason whenever the imagery can't
+  be had. Added D43 (how the key is handled) and D44 (photoreal can fail, the view can't). Verified both providers' prices
+  and ion's Community terms. The owner's look at real imagery, which settles the On the road camera's height (D33) and
+  what #6 must allow for (D32), is still to do: it needs the owner's own key. After review: late imagery can no longer
+  put the plain ground back under live imagery; the failed-tile trap (§8) has its test; the key box is masked text, not
+  a password box; the panel keeps the keyboard's focus and speaks its messages to a screen reader; the camera height is
+  only asked of the terrain service while photoreal is showing; the page says how to tilt the map.
+- **2026-09-18** — The owner looked at both courses in photoreal with their own Google Maps key (#17 done). The imagery
+  holds up "really close to the ground" in both cities, so it sets no floor for the On the road camera (D33; no number
+  was written down), and the poster's opaque blocks and the course line read fine over it (D32). Claude's prediction that
+  eye level would smear was too pessimistic and is recorded as such in §6. The one real finding: up close, the draped
+  course line runs over bridge towers and cables instead of the road. #8 therefore starts with the road's height in the 3D
+  scene, taken from the pipeline's measured elevation, never from the imagery (🟡 approach proposed in §6, owner's call).

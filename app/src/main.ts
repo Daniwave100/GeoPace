@@ -1,4 +1,5 @@
 import "./style.css";
+import { browserStorage } from "./browser-storage";
 import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
@@ -7,13 +8,16 @@ import { positionAtKm } from "./core/scrub";
 import { sunPosition } from "./core/solar";
 import { COURSES, courseFromUrl, urlForCourse } from "./courses";
 import { createPlanPanel } from "./plan/plan-panel";
-import { loadPlan, type PlanStorage, rememberedCourseId, savePlan } from "./plan/plan-store";
+import { loadPlan, rememberedCourseId, savePlan } from "./plan/plan-store";
 import { createReadout } from "./plan/readout";
 import { createSentence } from "./plan/sentence";
 import { createSplitsTable } from "./plan/splits-table";
+import { createPhotoreal, type Photoreal } from "./photoreal/photoreal";
+import { createPhotorealPanel } from "./photoreal/photoreal-panel";
 import { KM_AXIS, renderProfile } from "./profile/profile";
-import { createGlobe, showCourse, showRunner } from "./scene/globe";
+import { createGlobe, showCourse, showRunner, watchCameraHeight } from "./scene/globe";
 import { html, link } from "./dom";
+import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
 import { createStrip } from "./strip/strip";
 import type { Viewer } from "cesium";
@@ -33,6 +37,7 @@ const readoutView = createReadout(byId("readout"));
 const sentence = createSentence(byId("sentence"));
 const splitsTable = createSplitsTable(byId("splits"), scrubTo);
 let viewer: Viewer | undefined;
+let photoreal: Photoreal | undefined;
 let showing: Showing | undefined;
 let loading = "";
 
@@ -70,6 +75,7 @@ async function show(courseId: string): Promise<void> {
   renderProfile(byId("profile"), bundle);
   viewer ??= createGlobe(byId("globe"));
   showCourse(viewer, bundle);
+  photoreal ??= startPhotoreal(viewer);
 
   const course = plannerCourse(bundle);
   const planner = createPlanner(course, loadPlan(storage, course));
@@ -109,6 +115,28 @@ function scrubTo(km: number): void {
   showRunner(viewer, place, readout.instant);
 }
 
+/**
+ * Photoreal is an extra on top of the scene, made once. Nothing else in the app waits for it or
+ * asks it anything, so whatever happens to the imagery, the course, the strip and the plan carry on.
+ */
+function startPhotoreal(globe: Viewer): Photoreal {
+  const controller = createPhotoreal({ storage, loadTiles: (key) => loadPhotorealTiles(globe, key) });
+  const panel = createPhotorealPanel(byId("photoreal"), controller);
+  // The camera's height is only wanted, and only asked of the terrain service, while photoreal is showing.
+  let stopWatchingHeight: (() => void) | undefined;
+  controller.onChange((state) => {
+    panel.show(state);
+    if (state.look === "photoreal") {
+      stopWatchingHeight ??= watchCameraHeight(globe, (meters) => panel.showCameraHeight(meters));
+    } else {
+      stopWatchingHeight?.();
+      stopWatchingHeight = undefined;
+    }
+  });
+  void controller.start();
+  return controller;
+}
+
 /** Line the strip up with the elevation chart's km axis, so a km on one sits above the same km on the other. */
 function insetToChart(stripBox: HTMLElement): HTMLElement {
   stripBox.style.padding = `0 ${KM_AXIS.insetRightPx}px 0 ${KM_AXIS.insetLeftPx}px`;
@@ -121,15 +149,6 @@ function renderAttributions(bundle: CourseBundle): void {
   list.replaceChildren();
   for (const { text, url } of [...bundle.attributions, ...PROVIDER_ATTRIBUTIONS]) {
     list.append(html("li", {}, link(url, text)));
-  }
-}
-
-/** The browser's own storage, or a stand-in that remembers nothing where the browser forbids it. */
-function browserStorage(): PlanStorage {
-  try {
-    return window.localStorage;
-  } catch {
-    return { getItem: () => null, setItem: () => undefined };
   }
 }
 

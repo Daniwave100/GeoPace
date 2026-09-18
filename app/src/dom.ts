@@ -17,6 +17,19 @@ export function link(href: string, text: string, className?: string): HTMLAnchor
   return html("a", { href, target: "_blank", rel: "noopener", class: className, text });
 }
 
+/** Where a fact comes from and the day it was checked (CLAUDE.md: every fact about the world has both). */
+export interface Source {
+  source: string;
+  accessed: string;
+}
+
+/** The "Source" link that follows a fact; hovering says when it was checked. */
+export function sourceLink(fact: Source): HTMLAnchorElement {
+  const source = link(fact.source, "Source");
+  source.title = `Checked on ${fact.accessed}`;
+  return source;
+}
+
 export function applyAttrs(node: Element, attrs: Attrs): void {
   for (const [name, value] of Object.entries(attrs)) {
     if (value === undefined || value === false) continue;

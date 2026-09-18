@@ -6,6 +6,7 @@
 import {
   BoundingSphere,
   Cartesian3,
+  Cartographic,
   CesiumTerrainProvider,
   Color,
   ConstantPositionProperty,
@@ -13,10 +14,12 @@ import {
   HeadingPitchRange,
   HeightReference,
   ImageryLayer,
+  Ion,
   JulianDate,
   LabelStyle,
   Math as CesiumMath,
   OpenStreetMapImageryProvider,
+  sampleTerrainMostDetailed,
   Terrain,
   VerticalOrigin,
   Viewer,
@@ -30,6 +33,11 @@ const RUNNER_ID = "runner";
 
 /** The viewer is made once; switching course only swaps what is drawn on it. */
 export function createGlobe(container: HTMLElement): Viewer {
+  // CesiumJS comes with a demo Cesium ion token of its own, for trying ion out. This app is keyless
+  // until a runner brings their own key (PLAN.md D3), so the demo token is switched off: nothing
+  // here can reach ion by accident, and a runner's token is only ever handed over explicitly.
+  Ion.defaultAccessToken = "";
+
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
       new OpenStreetMapImageryProvider({
@@ -132,4 +140,32 @@ function frameCourse(viewer: Viewer, lat: number[], lon: number[]): void {
     offset: new HeadingPitchRange(0, CesiumMath.toRadians(-45), sphere.radius * 2.6),
     duration: 0,
   });
+}
+
+/**
+ * Tell `onHeight` how far the camera is above the ground, now and each time the camera comes to
+ * rest, until the function this returns is called. The ground is the keyless open terrain, never
+ * the photoreal imagery, which is for looking at only (PLAN.md D5). That terrain is good to a few
+ * metres, so near the ground the answer is rough. Null when the terrain can't say.
+ */
+export function watchCameraHeight(viewer: Viewer, onHeight: (meters: number | null) => void): () => void {
+  let asked = 0;
+  const measure = async (): Promise<void> => {
+    const mine = ++asked;
+    const eye = Cartographic.clone(viewer.camera.positionCartographic);
+    let meters: number | null = null;
+    try {
+      const [ground] = await sampleTerrainMostDetailed(viewer.terrainProvider, [Cartographic.clone(eye)]);
+      if (Number.isFinite(ground.height)) meters = eye.height - ground.height;
+    } catch {
+      // The terrain is best-effort (PLAN.md D16). No height is better than a wrong one.
+    }
+    if (mine === asked) onHeight(meters);
+  };
+  const stopListening = viewer.camera.moveEnd.addEventListener(() => void measure());
+  void measure();
+  return () => {
+    asked += 1; // an answer still on its way is no longer wanted
+    stopListening();
+  };
 }

@@ -14,7 +14,7 @@ import type { Edition, Wave } from "../bundle/types";
 import { type Goal, goalWrittenAs, hasStartTime, ownStartTimeFor, parseGoal, parseStartTime, type Planner, type PlannerCourse, type RacePlan, sanitizePlan } from "../core/planner";
 import { formatElapsed, formatPace } from "../core/race-clock";
 import { raceDate } from "../core/words";
-import { html, link } from "../dom";
+import { html, sourceLink } from "../dom";
 
 export interface PlanPanel {
   show(course: PlannerCourse, planner: Planner): void;
@@ -218,10 +218,4 @@ function wavesWithoutStartTime(edition: Edition): { names: string; note: string;
     byNote.set(note, [...(byNote.get(note) ?? []), wave]);
   }
   return [...byNote].map(([note, waves]) => ({ names: waves.map((wave) => wave.name).join(", "), note, source: waves[0] }));
-}
-
-function sourceLink(fact: { source: string; accessed: string }): HTMLAnchorElement {
-  const source = link(fact.source, "Source");
-  source.title = `Checked on ${fact.accessed}`;
-  return source;
 }
