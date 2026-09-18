@@ -24,8 +24,8 @@ keys, and the runner on the map, the clock, the sentence and the sun all move to
 own time zone whatever zone your computer is in.
 
 Switch **Hills** on and three things happen at once: every climb and descent is marked on the course
-line (pale yellow where it is gentle, orange for a proper hill, dark red where it is steep) with a
-label saying how steep and how long it is, the strip gains its Grade and Effort rows, and the sentence
+line (yellow fading to deep red going up, aqua fading to deep teal coming down: the darker, the
+steeper) with a label saying how steep and how long it is, the strip gains its Grade and Effort rows, and the sentence
 says what the road is doing under you. Switch it off and all three go. **Show everything** opens every
 row. Where the survey has no height (the middle of the Verrazzano's main span, Berlin's short bridges),
 the map, the strip and the sentence all say **not measured here** instead of drawing a guess.

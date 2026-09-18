@@ -20,7 +20,7 @@ export function showLineMarks(viewer: Viewer, bundle: CourseBundle, marks: LineM
     const first = nearestIndex(line.km, mark.fromKm);
     const last = nearestIndex(line.km, mark.toKm);
     if (last <= first) return [];
-    const look = markLook(mark.encoding, mark.level);
+    const look = markLook(mark.encoding, mark.howMuch);
     return [viewer.entities.add({ polyline: { positions: linePositions(line, first, last), width: look.widthPx, clampToGround: true, zIndex: Z_MARKS, material: material(look) } })];
   });
   drawn.set(viewer, entities);

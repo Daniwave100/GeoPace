@@ -6,8 +6,8 @@
 // All of it is measured (solid), except where the Course Bundle says the height is filled in:
 // those stretches come out as not measured here, on every surface.
 import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
-import { type HillBin, hillBins, hillsAt, type HillStretch, hillStretches, steepnessLevel } from "./hills";
-import type { Layer, LineMark, MarkLabel, MarkLevel, RowBin, StripRow } from "./layers";
+import { type HillBin, hillBins, hillsAt, type HillStretch, hillStretches, howSteep } from "./hills";
+import type { HowMuch, Layer, LineMark, MarkLabel, RowBin, StripRow } from "./layers";
 import { nearestIndex } from "./series";
 import { formatHeight, formatNearby, heightNumber, heightUnit } from "./units";
 
@@ -37,8 +37,8 @@ export function hillsLayer(bundle: CourseBundle): Layer {
       const at = hillsAt(bundle, km);
       return { text: `${signed(at.gradePercent)}%`, notMeasured: at.notMeasured };
     },
-    // The same three steps as the marks on the map, so the strip and the map agree about what is steep.
-    levels: (count) => binned(count).map((bin) => steepnessLevel(bin.gradePercent)),
+    // The same scale as the marks on the map, so the strip and the map agree about what is steep.
+    howMuch: (count) => binned(count).map((bin) => howSteep(bin.gradePercent)),
   };
 
   const effortRow: StripRow = {
@@ -72,7 +72,7 @@ export function hillsLayer(bundle: CourseBundle): Layer {
   return {
     id: "hills",
     name: "Hills",
-    key: "A coloured edge on the blue line is a hill, up or down: pale yellow is gentle, orange is a proper hill, dark red is steep.",
+    key: "A coloured edge on the blue line is a hill: yellow to red going up, aqua to teal coming down. The paler, the gentler; the darker, the steeper.",
     rows: () => [gradeRow, effortRow],
     lineMarks: () => marks,
     lineLabels: () => labels,
@@ -122,28 +122,33 @@ function memoBins(bundle: CourseBundle): (count: number) => HillBin[] {
   };
 }
 
-/** A run of one steepness shorter than this joins the run before it: a mark isn't confetti. */
-const MIN_PIECE_KM = 0.06;
+/** The map draws a hill in this many shades each way. Few enough that pieces of one shade can share a drawing; enough that it reads as a fade. */
+const SHADES = 10;
 
-/** One hill, cut where it changes from gentle to a proper hill to steep. Every part of a hill is at least gentle. */
+/**
+ * One hill, cut where its steepness moves on to the next shade, so that on the map it fades from
+ * pale to deep and back as the road does. (CesiumJS can't blend colours along a line that is
+ * draped on the ground, so the fade is made of pieces.) Every part of a hill is at least gentle,
+ * and goes the way the hill goes.
+ */
 function piecesBySteepness(hill: HillStretch, bundle: CourseBundle): LineMark[] {
   const line = bundle.measured.course_line;
+  const way = hill.kind === "climb" ? 1 : -1;
   const first = nearestIndex(line.km, hill.fromKm);
   const last = nearestIndex(line.km, hill.toKm);
   const pieces: LineMark[] = [];
   for (let i = first; i < last; i += 1) {
-    const level = Math.max(1, steepnessLevel(line.grade[i] * 100)) as Exclude<MarkLevel, 0>;
+    const howMuch = shade(howSteep(line.grade[i] * 100), way);
     const current = pieces[pieces.length - 1];
-    if (current && current.level === level) current.toKm = line.km[i + 1];
-    else pieces.push({ fromKm: line.km[i], toKm: line.km[i + 1], encoding: "measured", level });
+    if (current && current.howMuch === howMuch) current.toKm = line.km[i + 1];
+    else pieces.push({ fromKm: line.km[i], toKm: line.km[i + 1], encoding: "measured", howMuch });
   }
-  // A few metres at another steepness, where the grade hovers round a step, join what came before.
-  return pieces.reduce<LineMark[]>((kept, piece) => {
-    const before = kept[kept.length - 1];
-    if (before && (piece.toKm - piece.fromKm < MIN_PIECE_KM || before.level === piece.level)) before.toKm = piece.toKm;
-    else kept.push({ ...piece });
-    return kept;
-  }, []);
+  return pieces;
+}
+
+/** The nearest of the map's shades, never less than the palest, and always the hill's own way. */
+function shade(howMuch: HowMuch, way: 1 | -1): HowMuch {
+  return (way * Math.max(1, Math.round(Math.abs(howMuch) * SHADES))) / SHADES;
 }
 
 /** The parts of a piece of hill whose height is measured: the piece, with every filled-in stretch cut out of it. */

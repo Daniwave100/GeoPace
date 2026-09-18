@@ -436,24 +436,12 @@ svg .enc-sample {
   stroke: none;
 }
 
-/* ── How much, on the strip: the same warm steps as the marks on the map (core/mark-look.ts) ── */
+/* ── How much, on the strip ─────────────────────────────────────────────────────────────── */
 
-/* Pale yellow, orange, deep red: gentle, a proper hill, steep. Darker as well as redder, never
-   green, and never blue, which stays the course and where you are on it. */
-svg .trace-level {
+/* The colour comes from core/mark-look.ts, the same ramps as the marks on the map: warm going up,
+   teal coming down, fading from pale to deep. Never the blue, which stays the course. */
+svg .trace-how-much {
   stroke: none;
-}
-
-svg .level-1 {
-  fill: #ffd84d;
-}
-
-svg .level-2 {
-  fill: #f07f1f;
-}
-
-svg .level-3 {
-  fill: #a3150f;
 }
 
 /* ── Labels and controls on the map ─────────────────────────────────────────────────────── */
@@ -879,6 +867,28 @@ button.map-label {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
+}
+
+.layer-bar-help {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--grey-text);
+}
+
+/* A layer's switch. Off is an outline; on is a solid block: pressed in, like a key on a machine. */
+.switch {
+  padding: 3px 12px;
+  font-weight: 800;
+  font-stretch: 88%;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  cursor: pointer;
+}
+
+.switch[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--ink);
 }
 
 .strip {

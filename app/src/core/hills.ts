@@ -16,18 +16,26 @@ const SAME_HILL_GAP_KM = 0.15;
 /** Less height than this, up or down, isn't worth marking: a kerb ramp, an underpass dip. */
 const MIN_HILL_HEIGHT_M = 5;
 /**
- * Where gentle, a proper hill and steep begin, as a percentage, up or down alike. Chosen so that
- * all three show on New York (about 10 km, 7 km and 3 km of it) and Berlin is gentle throughout,
- * which is what runners say of both.
+ * The ends of the scale of steepness, as a percentage, up or down alike: at or below the first a
+ * hill is as gentle as hills get, at or above the second it is as steep as the scale goes, and
+ * halfway (3%) is a proper hill. Chosen so that all of it shows on New York (about 10 km under 2%,
+ * 7 km from 2 to 3.5%, 3 km steeper) and Berlin is gentle throughout, which is what runners say.
  */
-const STEEPNESS_STEPS = [HILL_GRADE * 100, 2, 3.5];
+const GENTLEST_PERCENT = 1.5;
+const STEEPEST_PERCENT = 4.5;
+/** Every part of a hill is at least this much, so which way it goes is never lost at the gentle end. */
+const LEAST = 0.05;
 
-/** 0 flat · 1 gentle · 2 a proper hill · 3 steep. */
-export type Steepness = 0 | 1 | 2 | 3;
-
-/** How steep a grade is, going up or coming down: a ramp down off a bridge hurts too. */
-export function steepnessLevel(gradePercent: number): Steepness {
-  return STEEPNESS_STEPS.filter((step) => Math.abs(gradePercent) >= step).length as Steepness;
+/**
+ * How steep a grade is, from 0 (flat: not a hill) to 1 (as steep as the scale goes), negative
+ * coming down: the ramp down off a bridge is as much of a hill as the ramp up. It has no steps in
+ * it, so what is drawn from it fades (PLAN.md D47).
+ */
+export function howSteep(gradePercent: number): number {
+  const size = Math.abs(gradePercent);
+  if (size < HILL_GRADE * 100) return 0;
+  const along = clamp((size - GENTLEST_PERCENT) / (STEEPEST_PERCENT - GENTLEST_PERCENT), 0, 1);
+  return Math.sign(gradePercent) * (LEAST + (1 - LEAST) * along);
 }
 
 export interface HillsAt {

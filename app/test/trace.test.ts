@@ -52,13 +52,13 @@ describe("a strip row's trace", () => {
 
   it("marks how much, bin by bin, from the baseline to the value, and only where the value is measured", () => {
     const grade = { domain: [-4, 4] as [number, number], baseline: 0, stepped: false };
-    const paths = tracePaths(grade, bins([2, -2, 4, 1], [2]), box, [1, 2, 3, 0]);
+    const paths = tracePaths(grade, bins([2, -2, 4, 1], [2]), box, [0.2, -0.2, 0.9, 0]);
 
-    expect(paths.levelBlocks).toEqual([
-      { x: 100, width: 100, y: 36.5, height: 13.5, level: 1 }, // above the flat line: a climb
-      { x: 200, width: 100, y: 50, height: 13.5, level: 2 }, // below it: a descent
-      // bin 2 is steep but not measured: no block; bin 3 is level 0: no block
+    expect(paths.howMuchBlocks).toEqual([
+      { x: 100, width: 100, y: 36.5, height: 13.5, howMuch: 0.2 }, // above the flat line: a climb
+      { x: 200, width: 100, y: 50, height: 13.5, howMuch: -0.2 }, // below it: a descent
+      // bin 2 is steep but not measured: no block; bin 3 is flat: no block
     ]);
-    expect(tracePaths(grade, bins([2, -2]), box).levelBlocks).toEqual([]);
+    expect(tracePaths(grade, bins([2, -2]), box).howMuchBlocks).toEqual([]);
   });
 });

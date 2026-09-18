@@ -14,6 +14,7 @@ import type { StripRow } from "../core/layers";
 import { assignFreeLanes, linearScale, type Scale } from "../core/layout";
 import { kmAfterKey, kmAtFraction } from "../core/scrub";
 import { plainName } from "../core/sentence";
+import { rampColor } from "../core/mark-look";
 import { tracePaths } from "../core/trace";
 import { axisMarks, distanceNumber, unitKm, unitName, type Units } from "../core/units";
 import { html } from "../dom";
@@ -246,14 +247,14 @@ function landmarkLane(content: StripContent, x: Scale): SVGGElement {
 function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, height: number): SVGGElement {
   const group = svg("g", {});
   const bins = row.bins(binCount);
-  const paths = tracePaths(row, bins, { x, top, height }, row.levels?.(binCount));
+  const paths = tracePaths(row, bins, { x, top, height }, row.howMuch?.(binCount));
   const solid = ENCODINGS[row.encoding].cssClass;
   const gap = ENCODINGS["not-measured"].cssClass;
   if (row.baseline !== "bottom") group.append(svg("line", { x1: x(bins[0].startKm), x2: x(bins[bins.length - 1].endKm), y1: paths.baselineY, y2: paths.baselineY, class: "strip-baseline" }));
   for (const block of paths.noValue) group.append(svg("rect", { x: block.x, y: top + 2, width: block.width, height: height - 4, class: `${gap} trace-block` }));
   for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }));
-  // How much, as well as where: the same steps as the marks on the map (style.css fills them in the same three colours).
-  for (const block of paths.levelBlocks) group.append(svg("rect", { x: block.x, y: block.y, width: block.width + 0.4, height: block.height, class: `trace-level level-${block.level}` }));
+  // How much, as well as where: filled from the same ramps as the marks on the map, so a hill is the same colour on both.
+  for (const block of paths.howMuchBlocks) group.append(svg("rect", { x: block.x, y: block.y, width: block.width + 0.4, height: block.height, fill: rampColor(block.howMuch), class: "trace-how-much" }));
   for (const piece of paths.measured) group.append(svg("path", { d: piece.line, class: solid }));
   for (const line of paths.notMeasured) group.append(svg("path", { d: line, class: gap }));
   return group;

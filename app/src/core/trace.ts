@@ -5,7 +5,7 @@
 // are not measured here get a dashed grey line and no fill, joined up to the solid line either
 // side. Where the row has no value at all (a grade outside the effort model), there is no line,
 // only a grey block: nothing is ever drawn through a hole.
-import type { MarkLevel, RowBin, StripRow } from "./layers";
+import type { HowMuch, RowBin, StripRow } from "./layers";
 import { linearScale, measuredRuns, type Scale } from "./layout";
 
 export interface TraceBox {
@@ -23,27 +23,27 @@ export interface TracePaths {
   /** Where the baseline sits, for rows that hang from a value rather than from the bottom. */
   baselineY: number;
   /** For a row that says how much as well as where: a block from the baseline to the value, for each marked, measured bin. */
-  levelBlocks: { x: number; y: number; width: number; height: number; level: Exclude<MarkLevel, 0> }[];
+  howMuchBlocks: { x: number; y: number; width: number; height: number; howMuch: HowMuch }[];
 }
 
 /** Room left above and below the trace, so a line at the top of its scale isn't cut in half. */
 const PAD = 3;
 
-export function tracePaths(row: Pick<StripRow, "domain" | "baseline" | "stepped">, bins: RowBin[], box: TraceBox, levels: MarkLevel[] = []): TracePaths {
+export function tracePaths(row: Pick<StripRow, "domain" | "baseline" | "stepped">, bins: RowBin[], box: TraceBox, howMuch: HowMuch[] = []): TracePaths {
   const bottom = box.top + box.height;
   const y = linearScale(row.domain, [bottom - PAD, box.top + PAD]);
   const baselineY = row.baseline === "bottom" ? bottom : y(row.baseline);
-  const paths: TracePaths = { measured: [], notMeasured: [], noValue: [], baselineY, levelBlocks: [] };
+  const paths: TracePaths = { measured: [], notMeasured: [], noValue: [], baselineY, howMuchBlocks: [] };
 
   bins.forEach((bin, i) => {
     const x = box.x(bin.startKm);
     const width = box.x(bin.endKm) - x;
     if (bin.value === null) paths.noValue.push({ x, width });
     // Only what is measured is marked: a filled-in stretch keeps its dashes and nothing else.
-    const level = levels[i] ?? 0;
-    if (bin.value !== null && bin.measured && level > 0) {
+    const amount = howMuch[i] ?? 0;
+    if (bin.value !== null && bin.measured && amount !== 0) {
       const at = y(bin.value);
-      paths.levelBlocks.push({ x, width, y: Math.min(at, baselineY), height: Math.abs(at - baselineY), level: level as Exclude<MarkLevel, 0> });
+      paths.howMuchBlocks.push({ x, width, y: Math.min(at, baselineY), height: Math.abs(at - baselineY), howMuch: amount });
     }
   });
 
