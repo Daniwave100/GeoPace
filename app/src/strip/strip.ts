@@ -252,7 +252,7 @@ function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, heig
   if (row.baseline !== "bottom") group.append(svg("line", { x1: x(bins[0].startKm), x2: x(bins[bins.length - 1].endKm), y1: paths.baselineY, y2: paths.baselineY, class: "strip-baseline" }));
   for (const block of paths.noValue) group.append(svg("rect", { x: block.x, y: top + 2, width: block.width, height: height - 4, class: `${gap} trace-block` }));
   for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }));
-  // How much, as well as where: the same steps as the marks on the map (style.css draws them in the look on trial).
+  // How much, as well as where: the same steps as the marks on the map (style.css fills them in the same three colours).
   for (const block of paths.levelBlocks) group.append(svg("rect", { x: block.x, y: block.y, width: block.width + 0.4, height: block.height, class: `trace-level level-${block.level}` }));
   for (const piece of paths.measured) group.append(svg("path", { d: piece.line, class: solid }));
   for (const line of paths.notMeasured) group.append(svg("path", { d: line, class: gap }));

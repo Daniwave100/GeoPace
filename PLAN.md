@@ -253,7 +253,7 @@ photoreal imagery (D32) · two cameras and a time-lapse (D33). Words used here a
     need to float slightly above the road, and whether it shows through buildings is a look to choose in #6/#8.
   - **#6 (Explore) can keep the draped line from above**, where it is correct and reads well, and keeps opaque blocks
     for everything laid over the imagery. Nothing else got lost.
-- **The owner's second look, 09-18, at Explore over photoreal (#6):** the line is "better than last time" but still wrong on the Queensboro (it rides the right side of the structure, not the road) and on the Verrazzano ("not on the actual road itself"). Same cause as above: the line is draped over whatever is highest. It bothers the owner in Explore too, not only in the Ride, so the road's height in the 3D scene should be its own ticket, next, rather than the first step of #8. 🟡 Still needs the owner's OK on the approach (the pipeline's measured heights plus a published geoid model).
+- **The owner's second look, 09-18, at Explore over photoreal (#6):** the line is "better than last time" but still wrong on the Queensboro (it rides the right side of the structure, not the road) and on the Verrazzano ("not on the actual road itself"). Same cause as above: the line is draped over whatever is highest. The owner's own diagnosis, later the same day, is exactly right: from one angle the line is perfect, and it distorts as the camera moves, over trees and bridges but never on a plain street with buildings beside it. That is what draping does: the paint lands on whatever stands over the road, which is metres above it and so slides against it as the view changes. "Not a huge deal, but something we would ideally want to fix… let's create this into a new issue." **It is #22**, ahead of #8, which it blocks. The same look also showed that the *not measured here* dashes read as white squares over dark imagery (the grey vanishes, the paper gaps stand out); #22 takes that with it.
 - **How the look was done.** With photoreal on, the map shows "Camera: about N m above the ground" each time the
   camera comes to rest. It is read from the open terrain, never from Google's mesh (D5): good to a few metres, and on
   a bridge it counts from the water. The page says under the map how to tilt down. The owner's answers, word for
@@ -325,8 +325,11 @@ Re-cut on 09-18 after the design pick and D28–D37. Issue numbers are GitHub's;
    (D47), the sentence (D48), the strip drawn the instrument's way, light and dark (D49), kilometres or miles (D42), and
    the bundle saying where the height isn't measured (D45). 🟡 *Still to do, and only the owner can:* look at it over
    photoreal imagery as well as the keyless map (§10).
-6. **Ride** (#8): the time-lapse with Stops, From above and On the road. *First:* the road's height in the 3D scene, from
-   the pipeline's measured elevation (§6 "The ride") — On the road can't be built without it, and it fixes the draped line.
+6. **The course line on the road** (#22): in photoreal the line is drawn at the road's own height, from the pipeline's
+   measured elevation plus a published geoid model, instead of being draped over trees and bridge structures (§6 "The
+   ride"). Its own ticket since 09-18, because it bothers the owner in Explore too; it blocks the Ride, whose On the
+   road camera needs the same height. Starts with a throwaway prototype to settle the look by eye.
+   **Ride** (#8): the time-lapse with Stops, From above and On the road.
 7. **White model** (#7): each city's real buildings along the course as white blocks with real shadows — what opens
    with no set-up. Decide there whether the map should still dim with the sun (D39).
 8. **Sun**: building shade (#9), then the tree range (#10).
@@ -457,7 +460,7 @@ arrival times are approximate — state that in the UI.
 - ✅ **Filled-in elevation is marked as such** (D45, 09-18): the bundle lists every stretch whose height is a straight
   line between measured points, and the app greys them out on the map, on the strip and in the sentence.
 - ✅ **The look of a hill: colour** (owner, 09-18; D47). Still unanswered: should a descent be marked on the same scale as a climb (it is, in the trial); is a hill from 1% and 5 m the right threshold (28 in New York); the sentence's wording (D48); whether the app should open with Hills already on.
-- 🟡 **The line on the road, not draped over bridges**: the owner has now raised it twice (§6 "The ride"). Proposed as the next ticket, ahead of #8. Needs the owner's OK on the approach.
+- ✅ **The line on the road, not draped over trees and bridges**: raised twice by the owner, now its own ticket, **#22**, ahead of #8 (§6 "The ride"). 🔍 The geoid model for each city is to be verified there, with its source.
 - ✅ **The owner's look at Explore (#6)**, 09-18: done, over photoreal. Layout confirmed (D46); dark theme softened (D49); three requests built (D46); Berlin's bridges measured (D50). What was asked, for the record: what to
   judge: whether the blocks and the labels on the course line read over real imagery; whether the first screen is now
   little enough (principle 8); whether 28 hill labels in New York is too many when zoomed in; and whether a Berlin
@@ -551,3 +554,8 @@ arrival times are approximate — state that in the UI.
   "not measured" any more (D50; bundle rebuilt, heights changed only on the bridges, by under a metre). The owner
   confirmed the layout (D46) and is open to several layers at once later (D35). Still open: the pick between A and B,
   and the line riding over bridge structures in photoreal, now proposed as its own next ticket (§6, §10).
+- **2026-09-18** — The owner picked **colour** for hills ("B, color reads wayyy better"): the trial, look A and the
+  address option are gone, and the warm ramp joins the palette for the one job of saying how much (D47, §6 tokens). The
+  owner also confirmed the resizable strip and Straight down ("really good") and described the draped line precisely:
+  right from one angle, distorted as the camera moves, over trees and bridges. Filed as **#22** with the cause, the
+  proposed fix and what must be verified or judged by eye; it blocks #8 (§6, §7, §10).
