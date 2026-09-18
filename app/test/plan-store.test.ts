@@ -8,7 +8,7 @@ import { loadPlan, type PlanStorage, rememberedCourseId, savePlan } from "../src
 const SOURCE = { source: "https://example.org/race-day", accessed: "2026-09-18" };
 const edition = (day: string, waveIds: string[]): Edition => ({
   edition: Number(day.slice(0, 4)),
-  date: { day, ...SOURCE },
+  date: { day, confirmed: true, ...SOURCE },
   waves: waveIds.map((id) => ({ id, name: id, start_local: "09:00", start: `${day}T09:00:00+00:00`, carried_over: false, ...SOURCE })),
 });
 const course = (courseId: string, editions: Edition[]): PlannerCourse => ({ courseId, timezone: "Europe/Berlin", lineLengthM: 42195, certifiedDistanceM: 42195, editions });

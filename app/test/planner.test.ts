@@ -8,14 +8,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { Edition } from "../src/bundle/types";
-import { createPlanner, defaultPlan, hasStartTime, parseGoal, plannerCourse, type PlannerCourse, type RacePlan, sanitizePlan } from "../src/core/planner";
+import { createPlanner, defaultPlan, goalWrittenAs, hasStartTime, parseGoal, plannerCourse, type PlannerCourse, type RacePlan, sanitizePlan } from "../src/core/planner";
 import { formatElapsed } from "../src/core/race-clock";
 
 const SOURCE = { source: "https://example.org/race-day", accessed: "2026-09-18" };
 
 const NYC_2026: Edition = {
   edition: 2026,
-  date: { day: "2026-11-01", ...SOURCE },
+  date: { day: "2026-11-01", confirmed: true, ...SOURCE },
   carried_over: { from_edition: 2025, reason: "The 2026 wave times aren't published yet." },
   waves: [
     { id: "wave-1", name: "Wave 1", start_local: "09:10", start: "2026-11-01T09:10:00-05:00", carried_over: false, ...SOURCE },
@@ -59,6 +59,17 @@ describe("Planner", () => {
     expect(formatElapsed(planner.goalFinishSeconds)).toBe("3:30:59");
     expect(formatElapsed(planner.at(10).elapsedSeconds)).toBe("50:00");
     expect(planner.at(10).localClock).toBe("10:00"); // 09:10 + 50 minutes
+  });
+
+  it("counts km along the course line, which runs longer than the certified distance", () => {
+    // PLAN.md D20: the app's one distance scale is the course line (New York's is 42.69 km), and a
+    // goal is a promise about the finish line. So a 5:00/km runner, who finishes in 3:30:58.5,
+    // reaches line km 10 after 3:30:58.5 x 10 / 42.69 = 49:25, not 50:00: line km 10 is only
+    // 9.88 km of the certified course. Pinned here so it is a known property, not a surprise.
+    const longerLine = createPlanner({ ...NYC, lineLengthM: 42690 }, plan({ goal: { kind: "pace", secondsPerKm: 300 } }));
+
+    expect(formatElapsed(longerLine.at(10).elapsedSeconds)).toBe("49:25");
+    expect(formatElapsed(longerLine.at(42.69).elapsedSeconds)).toBe("3:30:59");
   });
 
   it("gets New York right on Sunday 2026-11-01, the morning US clocks go back", () => {
@@ -134,7 +145,7 @@ describe("Race Plan", () => {
   const timeless = { ...NYC_2026.waves[2], id: "wave-0", name: "Wave 0" };
   const course: PlannerCourse = {
     ...NYC,
-    editions: [{ ...NYC_2026, edition: 2025, date: { day: "2025-11-02", ...SOURCE } }, { ...NYC_2026, waves: [timeless, ...NYC_2026.waves] }],
+    editions: [{ ...NYC_2026, edition: 2025, date: { day: "2025-11-02", confirmed: true, ...SOURCE } }, { ...NYC_2026, waves: [timeless, ...NYC_2026.waves] }],
   };
 
   it("starts a new runner on the latest edition, in its first wave with a published time, aiming for four hours", () => {
@@ -175,6 +186,18 @@ describe("Race Plan", () => {
     expect(parseGoal("pace", "5:20", course)).toEqual({ kind: "pace", secondsPerKm: 320 });
   });
 
+  it("keeps the goal itself when the runner switches how it is written", () => {
+    const fourHours = { kind: "finish", seconds: 4 * 3600 } as const;
+    const asPace = goalWrittenAs("pace", fourHours, course);
+
+    // 4:00:00 is 5:41.27/km. Rounding that to 5:41 and back would quietly make it 3:59:48.
+    expect(asPace.kind).toBe("pace");
+    expect(goalWrittenAs("finish", asPace, course)).toEqual(fourHours);
+    expect(goalWrittenAs("finish", goalWrittenAs("pace", { kind: "finish", seconds: 13500 }, course), course)).toEqual({ kind: "finish", seconds: 13500 });
+    // Written the way it already is: untouched.
+    expect(goalWrittenAs("finish", fourHours, course)).toBe(fourHours);
+  });
+
   it("turns down a goal that isn't a time, or isn't a marathon anyone runs", () => {
     for (const text of ["", "fast", "3:75", "3.45", "-3:45", "0:45", "11:00"]) {
       expect(parseGoal("finish", text, course), `finish "${text}"`).toBeNull();
@@ -198,7 +221,7 @@ describe("the committed courses", () => {
       for (const edition of course.editions) {
         for (const wave of edition.waves.filter(hasStartTime)) {
           const planner = createPlanner(course, { ...defaultPlan(course), edition: edition.edition, waveId: wave.id });
-          expect(planner.startInstant.getTime(), `${id} ${edition.edition} ${wave.name}`).toBe(new Date(wave.start as string).getTime());
+          expect(planner.startInstant.getTime(), `${id} ${edition.edition} ${wave.name}`).toBe(new Date(wave.start).getTime());
         }
       }
     }

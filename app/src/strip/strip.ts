@@ -5,6 +5,7 @@
 // To a screen reader it is a slider, which is what it is: one value (the km) between two ends.
 // All the arithmetic lives in core/scrub.ts, where it is tested; this file only listens and draws.
 import { kmAfterKey, kmAtFraction } from "../core/scrub";
+import { html } from "../dom";
 
 const TICK_EVERY_KM = 5;
 
@@ -20,17 +21,10 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   let lengthKm = 1;
   let km = 0;
 
-  const track = div("strip-track");
-  const ticks = div("strip-ticks");
-  const marker = div("strip-marker");
-  track.append(ticks, marker);
-
-  const slider = div("strip");
-  slider.setAttribute("role", "slider");
-  slider.setAttribute("aria-label", "Where you are on the course, in kilometres");
-  slider.setAttribute("aria-valuemin", "0");
-  slider.tabIndex = 0;
-  slider.append(track);
+  const ticks = html("div", { class: "strip-ticks" });
+  const marker = html("div", { class: "strip-marker" });
+  const track = html("div", { class: "strip-track" }, ticks, marker);
+  const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-label": "Where you are on the course, in kilometres", "aria-valuemin": 0 }, track);
   container.replaceChildren(slider);
 
   const scrubToPointer = (event: PointerEvent) => {
@@ -59,9 +53,8 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
       slider.setAttribute("aria-valuemax", length.toFixed(2));
       ticks.replaceChildren();
       for (let at = 0; at <= length; at += TICK_EVERY_KM) {
-        const tick = div("strip-tick");
+        const tick = html("div", { class: "strip-tick", text: String(at) });
         tick.style.left = `${(at / length) * 100}%`;
-        tick.textContent = String(at);
         ticks.append(tick);
       }
     },
@@ -72,10 +65,4 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
       slider.setAttribute("aria-valuetext", spoken);
     },
   };
-}
-
-function div(className: string): HTMLDivElement {
-  const node = document.createElement("div");
-  node.className = className;
-  return node;
 }

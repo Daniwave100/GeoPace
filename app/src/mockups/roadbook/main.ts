@@ -123,7 +123,8 @@ function titleBlock(story: CourseStory): HTMLElement {
   )}, which is ${show.formatPace(story.clock.goalPaceSecondsPerKm)} per kilometre at an even pace.`;
 
   const date = html("p", { class: "rb-title__date", text: show.raceDate(story.edition.date) });
-  if (story.edition.dateNote) date.append(html("span", { class: "rb-approx", title: story.edition.dateNote, text: " see note" }));
+  if (!story.edition.dateConfirmed)
+    date.append(html("span", { class: "rb-approx", title: story.edition.dateNote, text: " date believed, not yet confirmed" }));
   const carriedOver = story.edition.carriedOver;
 
   block.append(

@@ -11,7 +11,7 @@ from geopace.bundle import BundleInvalid, build_course_bundle, validate_bundle, 
 from geopace.course_facts import parse_course_facts
 from geopace.edition_facts import parse_edition_facts
 
-from conftest import meters_north_of, straight_north_route, synthetic_editions, synthetic_elevation
+from conftest import meters_north_of, straight_north_route, parsed_synthetic_editions, synthetic_elevation
 
 SCHEMA = json.loads((Path(__file__).parents[2] / "schema" / "course-bundle.schema.json").read_text())
 
@@ -31,7 +31,7 @@ def build(facts, sample, editions=None):
         parse_course_facts(facts),
         straight_north_route(5000),
         synthetic_elevation(sample),
-        editions=synthetic_editions() if editions is None else editions,
+        editions=parsed_synthetic_editions() if editions is None else editions,
     )
 
 
@@ -128,7 +128,7 @@ def test_edition_facts_reach_the_bundle_with_their_sources_and_flags(synthetic_f
     assert bundle["editions"] == [
         {
             "edition": 2026,
-            "date": {"day": "2026-11-01", **source},
+            "date": {"day": "2026-11-01", "confirmed": True, **source},
             "carried_over": {"from_edition": 2025, "reason": "The 2026 wave times aren't published yet."},
             "waves": [
                 # 09:10 on the morning US clocks go back is EST: the offset travels with the time.
@@ -142,3 +142,23 @@ def test_edition_facts_reach_the_bundle_with_their_sources_and_flags(synthetic_f
 def test_a_bundle_with_no_edition_is_rejected(synthetic_facts):
     with pytest.raises(BundleInvalid, match=r"bundle.editions"):
         build(synthetic_facts, gentle_hill, editions=[])
+
+
+def test_the_schema_itself_refuses_edition_facts_that_contradict_themselves(synthetic_facts):
+    # The pipeline never writes these, but the app trusts the schema, so the schema must say no.
+    def broken(change) -> str:
+        bundle = build(synthetic_facts, gentle_hill)
+        change(bundle["editions"][0])
+        with pytest.raises(BundleInvalid) as err:
+            validate_bundle(bundle)
+        return str(err.value)
+
+    # A carried-over wave with nothing saying from which edition, or why.
+    assert "carried_over" in broken(lambda edition: edition["waves"][0].update(carried_over=True))
+    # A start time without the instant it means, and the other way round.
+    assert "waves[0]" in broken(lambda edition: edition["waves"][0].update(start=None))
+    assert "waves[0]" in broken(lambda edition: edition["waves"][0].update(start_local=None, note="Not published."))
+    # No wave with a start time: nothing to run a race clock from.
+    assert "waves" in broken(lambda edition: [wave.update(start_local=None, start=None, note="Not published.") for wave in edition["waves"]])
+    # An unconfirmed date that doesn't say how it is known.
+    assert "date" in broken(lambda edition: edition["date"].update(confirmed=False))

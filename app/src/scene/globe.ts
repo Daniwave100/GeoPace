@@ -7,7 +7,6 @@ import {
   BoundingSphere,
   Cartesian3,
   CesiumTerrainProvider,
-  ClockRange,
   Color,
   ConstantPositionProperty,
   Credit,
@@ -65,13 +64,6 @@ export function createGlobe(container: HTMLElement): Viewer {
   viewer.clock.shouldAnimate = false; // time moves only when the runner does
 
   return viewer;
-}
-
-/** The race as the scene's time span: the wave's start to this runner's finish. */
-export function showRaceTimes(viewer: Viewer, start: Date, finish: Date): void {
-  viewer.clock.startTime = JulianDate.fromDate(start);
-  viewer.clock.stopTime = JulianDate.fromDate(finish);
-  viewer.clock.clockRange = ClockRange.CLAMPED;
 }
 
 /** Put the runner at a place on the course at a moment: the marker and the sun move together. */

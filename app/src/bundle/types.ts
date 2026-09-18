@@ -53,10 +53,14 @@ export interface CourseLine {
 
 /** One year's running of a course: its date and its waves. Hand-maintained, every fact sourced. */
 export interface Edition {
-  /** The year. */
+  /** Which edition: the calendar year it is run in. */
   edition: number;
-  /** `day` is the local calendar date in the course's time zone, YYYY-MM-DD. `note` is for the runner. */
-  date: { day: string; source: string; accessed: string; note?: string };
+  /**
+   * `day` is the local calendar date in the course's time zone, YYYY-MM-DD. `confirmed` is false
+   * when the organizer hasn't stated this edition's date; the `note` (for the runner) then says
+   * how it is known.
+   */
+  date: { day: string; confirmed: boolean; source: string; accessed: string; note?: string };
   /** Present when some details are copied from an earlier edition; always flagged to the runner. */
   carried_over?: { from_edition: number; reason: string };
   /** At least one wave has a start time. */

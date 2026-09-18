@@ -126,14 +126,23 @@
       "type": "object",
       "required": ["edition", "date", "waves"],
       "additionalProperties": false,
+      "if": {
+        "description": "A carried-over wave needs the edition to say from which edition, and why.",
+        "properties": { "waves": { "contains": { "type": "object", "properties": { "carried_over": { "const": true } }, "required": ["carried_over"] } } },
+        "required": ["waves"]
+      },
+      "then": { "required": ["carried_over"] },
       "properties": {
-        "edition": { "description": "The year.", "type": "integer", "minimum": 1900 },
+        "edition": { "description": "Which edition: the calendar year it is run in.", "type": "integer", "minimum": 1900 },
         "date": {
           "type": "object",
-          "required": ["day", "source", "accessed"],
+          "required": ["day", "confirmed", "source", "accessed"],
           "additionalProperties": false,
+          "if": { "properties": { "confirmed": { "const": false } }, "required": ["confirmed"] },
+          "then": { "required": ["note"] },
           "properties": {
             "day": { "description": "Local calendar date of the race in course.timezone.", "$ref": "#/$defs/date" },
+            "confirmed": { "description": "false when the organizer hasn't stated this edition's date and it is known another way; the note then says how, and the app says so next to the date.", "type": "boolean" },
             "source": { "$ref": "#/$defs/url" },
             "accessed": { "$ref": "#/$defs/date" },
             "note": { "description": "Shown to the runner, e.g. how the date is known.", "type": "string", "minLength": 1 }
@@ -150,9 +159,10 @@
           }
         },
         "waves": {
-          "description": "At least one wave has a start time; the pipeline refuses an edition where none does.",
+          "description": "At least one wave has a start time: without one there is no race clock to run.",
           "type": "array",
           "minItems": 1,
+          "contains": { "type": "object", "properties": { "start_local": { "type": "string" } }, "required": ["start_local"] },
           "items": { "$ref": "#/$defs/wave" }
         }
       }
@@ -162,6 +172,13 @@
       "type": "object",
       "required": ["id", "name", "start_local", "start", "carried_over", "source", "accessed"],
       "additionalProperties": false,
+      "if": {
+        "description": "A wave has both its wall-clock time and the instant it means, or neither; and with neither, a note saying why and nothing to carry over.",
+        "properties": { "start_local": { "type": "null" } },
+        "required": ["start_local"]
+      },
+      "then": { "properties": { "start": { "type": "null" }, "carried_over": { "const": false } }, "required": ["note"] },
+      "else": { "properties": { "start": { "type": "string" } } },
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string", "minLength": 1 },

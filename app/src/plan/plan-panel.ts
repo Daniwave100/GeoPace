@@ -1,15 +1,19 @@
 // The Race Plan form: edition, start wave, and a goal as a finish time or a pace. Plain on
 // purpose; the look arrives with #6. What it must get right is honesty about the edition facts:
 //   - every fact shown links to its source;
-//   - a wave whose start time nobody has published can't be picked, and the panel says why;
-//   - a carried-over start time is flagged, with the edition it came from and the reason;
+//   - a race date the organizer hasn't confirmed says so, and how it is known;
+//   - a wave whose start time nobody has published can't be picked, and the panel says why, and
+//     that the times on screen are not that wave's;
+//   - every time of day that rests on a carried-over start time is greyed, with the edition it
+//     came from and the reason;
 //   - it says that every time assumes an even pace.
 // The form is built once and then only refreshed, so typing a goal and pressing Tab never loses
 // the runner's place.
 import type { Edition, Wave } from "../bundle/types";
-import { hasStartTime, parseGoal, type Goal, type Planner, type PlannerCourse, type RacePlan, sanitizePlan } from "../core/planner";
+import { type Goal, goalWrittenAs, hasStartTime, parseGoal, type Planner, type PlannerCourse, type RacePlan, sanitizePlan } from "../core/planner";
 import { formatElapsed, formatPace } from "../core/race-clock";
 import { raceDate } from "../core/words";
+import { html, link } from "../dom";
 
 export interface PlanPanel {
   show(course: PlannerCourse, planner: Planner): void;
@@ -25,47 +29,40 @@ const GOAL_ERROR: Record<Goal["kind"], string> = {
   pace: "That doesn't read as a marathon pace. Write minutes and seconds per kilometre, like 5:20.",
 };
 
+const EVEN_PACE = "Every time here assumes an even pace from start to finish. Real races slow on hills and late on, so read them as approximate.";
+
 /** `onChange` gets a complete, valid plan every time the runner changes something. */
 export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePlan) => void): PlanPanel {
   let course: PlannerCourse | undefined;
   let planner: Planner | undefined;
 
-  const edition = document.createElement("select");
-  const raceDay = paragraph("plan-fact");
-  const wave = document.createElement("select");
-  const waveFact = paragraph("plan-fact");
-  const carriedOver = paragraph("plan-flag");
-  const noStartTime = paragraph("plan-note");
+  const edition = html("select");
+  const raceDay = html("p", { class: "plan-fact" });
+  const wave = html("select");
+  const waveFact = html("p", { class: "plan-fact" });
+  const carriedOver = html("p", { class: "plan-flag" });
+  const notPublished = html("p", { class: "plan-note" });
 
-  const finishKind = radio("finish");
-  const paceKind = radio("pace");
-  const goal = document.createElement("input");
-  goal.type = "text";
-  goal.inputMode = "numeric";
-  goal.autocomplete = "off";
-  goal.size = 8;
-  goal.setAttribute("aria-label", "Goal");
-  goal.setAttribute("aria-describedby", "goal-help goal-error");
-  const goalHelp = document.createElement("small");
-  goalHelp.id = "goal-help";
-  const goalError = paragraph("plan-error");
-  goalError.id = "goal-error";
-  goalError.setAttribute("role", "alert");
+  const finishKind = html("input", { type: "radio", name: "goal-kind", value: "finish" });
+  const paceKind = html("input", { type: "radio", name: "goal-kind", value: "pace" });
+  const goal = html("input", { type: "text", inputmode: "numeric", autocomplete: "off", size: 8, "aria-label": "Goal", "aria-describedby": "goal-help goal-error" });
+  const goalHelp = html("small", { id: "goal-help" });
+  const goalError = html("p", { class: "plan-error", id: "goal-error", role: "alert" });
+  const summary = html("p", { class: "plan-summary" });
 
-  const summary = paragraph("plan-summary");
-  const evenPace = paragraph("plan-note");
-  evenPace.textContent =
-    "Every time here assumes an even pace from start to finish. Real races slow on hills and late on, so read them as approximate.";
-
-  const goalBox = document.createElement("fieldset");
-  const legend = document.createElement("legend");
-  legend.textContent = "Goal";
-  goalBox.append(legend, labelled("Finish time", finishKind, "after"), labelled("Pace per km", paceKind, "after"), goal, goalHelp, goalError);
-
-  const form = document.createElement("form");
-  form.className = "plan";
-  form.noValidate = true;
-  form.append(labelled("Edition", edition), raceDay, labelled("Start wave", wave), waveFact, carriedOver, noStartTime, goalBox, summary, evenPace);
+  const form = html(
+    "form",
+    { class: "plan", novalidate: true },
+    html("label", {}, "Edition ", edition),
+    raceDay,
+    html("label", {}, "Start wave ", wave),
+    waveFact,
+    carriedOver,
+    notPublished,
+    html("fieldset", {}, html("legend", { text: "Goal" }), html("label", {}, finishKind, " Finish time"), html("label", {}, paceKind, " Pace per km"), goal, goalHelp, goalError),
+    summary,
+    html("p", { class: "plan-note", text: EVEN_PACE }),
+  );
   container.replaceChildren(form);
 
   const change = (changes: Partial<RacePlan>) => {
@@ -74,15 +71,9 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   edition.addEventListener("change", () => change({ edition: Number(edition.value) }));
   wave.addEventListener("change", () => change({ waveId: wave.value }));
   for (const kind of [finishKind, paceKind]) {
-    // Switching how the goal is written keeps the goal itself: 4:00:00 becomes 5:41 per km.
+    // Switching how the goal is written keeps the goal itself: 4:00:00 reads as 5:41 per km.
     kind.addEventListener("change", () => {
-      if (!planner) return;
-      change({
-        goal:
-          kind.value === "finish"
-            ? { kind: "finish", seconds: Math.round(planner.goalFinishSeconds) }
-            : { kind: "pace", secondsPerKm: Math.round(planner.goalPaceSecondsPerKm) },
-      });
+      if (course && planner) change({ goal: goalWrittenAs(kind.value as Goal["kind"], planner.plan.goal, course) });
     });
   }
   const commitGoal = () => {
@@ -105,19 +96,31 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       course = nextCourse;
       planner = nextPlanner;
       const chosen = planner.edition;
+      // A time of day: greyed, and labelled, when it rests on a carried-over start time.
+      const timeOfDay = (text: string) => html("span", { class: planner?.carriedOver ? "carried-over" : undefined, text });
+      const flag = planner.carriedOver ? ` (carried over from ${planner.carriedOver.fromEdition})` : "";
 
       edition.replaceChildren(...course.editions.map((known) => new Option(String(known.edition), String(known.edition))));
       edition.value = String(chosen.edition);
-      raceDay.replaceChildren(`Race day: ${raceDate(chosen.date.day)}. `, sourceLink(chosen.date), ...(chosen.date.note ? [" ", small(chosen.date.note)] : []));
+      raceDay.replaceChildren(
+        `Race day: ${raceDate(chosen.date.day)}`,
+        ...(chosen.date.confirmed ? [] : [html("span", { class: "carried-over", text: " (not yet confirmed)" })]),
+        ". ",
+        sourceLink(chosen.date),
+        ...(chosen.date.note ? [" ", html("small", { text: chosen.date.note })] : []),
+      );
 
       wave.replaceChildren(...chosen.waves.map(waveOption));
       wave.value = planner.wave.id;
-      waveFact.replaceChildren(`${planner.wave.name} starts at ${planner.wave.start_local}. `, sourceLink(planner.wave));
+      waveFact.replaceChildren(`${planner.wave.name} starts at `, timeOfDay(planner.wave.start_local), `${flag}. `, sourceLink(planner.wave));
       carriedOver.hidden = planner.carriedOver === null;
       carriedOver.textContent = planner.carriedOver ? `Carried over from ${planner.carriedOver.fromEdition}. ${planner.carriedOver.reason}` : "";
       const unpublished = wavesWithoutStartTime(chosen);
-      noStartTime.hidden = unpublished.length === 0;
-      noStartTime.replaceChildren(...unpublished.flatMap(({ names, note, source }) => [`${names}: ${note} `, sourceLink(source), document.createElement("br")]));
+      notPublished.hidden = unpublished.length === 0;
+      notPublished.replaceChildren(
+        ...unpublished.flatMap(({ names, note, source }) => [`${names}: ${note} `, sourceLink(source), html("br")]),
+        "If that is your wave, the times of day and the sun shown here are not yours.",
+      );
 
       const kind = planner.plan.goal.kind;
       finishKind.checked = kind === "finish";
@@ -128,9 +131,11 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       goalError.textContent = "";
 
       const finish = planner.at(planner.lengthKm);
-      summary.textContent =
-        `${formatElapsed(planner.goalFinishSeconds)} finish · ${formatPace(planner.goalPaceSecondsPerKm)} per km · ` +
-        `start ${planner.at(0).localClock}, finish ${finish.localClock} ${finish.zoneLabel}`;
+      summary.replaceChildren(
+        `${formatElapsed(planner.goalFinishSeconds)} finish · ${formatPace(planner.goalPaceSecondsPerKm)} per km · `,
+        timeOfDay(`start ${planner.at(0).localClock}, finish ${finish.localClock} ${finish.zoneLabel}`),
+        flag,
+      );
     },
   };
 }
@@ -152,37 +157,7 @@ function wavesWithoutStartTime(edition: Edition): { names: string; note: string;
 }
 
 function sourceLink(fact: { source: string; accessed: string }): HTMLAnchorElement {
-  const link = document.createElement("a");
-  link.href = fact.source;
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.textContent = "Source";
-  link.title = `Checked on ${fact.accessed}`;
-  return link;
-}
-
-function labelled(text: string, control: HTMLElement, textGoes: "before" | "after" = "before"): HTMLLabelElement {
-  const label = document.createElement("label");
-  label.append(...(textGoes === "before" ? [`${text} `, control] : [control, ` ${text}`]));
-  return label;
-}
-
-function radio(value: Goal["kind"]): HTMLInputElement {
-  const input = document.createElement("input");
-  input.type = "radio";
-  input.name = "goal-kind";
-  input.value = value;
-  return input;
-}
-
-function paragraph(className: string): HTMLParagraphElement {
-  const p = document.createElement("p");
-  p.className = className;
-  return p;
-}
-
-function small(text: string): HTMLElement {
-  const node = document.createElement("small");
-  node.textContent = text;
-  return node;
+  const source = link(fact.source, "Source");
+  source.title = `Checked on ${fact.accessed}`;
+  return source;
 }

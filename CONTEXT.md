@@ -25,6 +25,14 @@ _Avoid_: year, event
 Said of edition details copied from an earlier edition because this year's aren't published yet. Always flagged to the runner.
 _Avoid_: assumed, default, estimated
 
+**Not published**:
+Said of a wave whose start time the organizer hasn't given. It is listed without a time and can't be planned with. Never filled in with a guess.
+_Avoid_: TBD, unknown, estimated
+
+**Not confirmed**:
+Said of a race date the organizer hasn't stated for this edition, known another way (a standing rule, say). Always flagged to the runner, with how it is known.
+_Avoid_: believed, provisional, tentative
+
 **Landmark**:
 A named, sourced place on the course.
 _Avoid_: point of interest, marker

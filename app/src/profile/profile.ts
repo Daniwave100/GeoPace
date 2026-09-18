@@ -5,14 +5,18 @@ import type { CourseBundle } from "../bundle/types";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const HEIGHT = 350;
 const MARGIN = { top: 150, right: 90, bottom: 44, left: 48 };
+const MIN_WIDTH = 600;
 const BAND_HEIGHT = 16;
 const BAND_BIN_KM = 0.1;
+
+/** Where the chart's km axis sits across the page, so the km strip above it can line up with it. */
+export const KM_AXIS = { insetLeftPx: MARGIN.left, insetRightPx: MARGIN.right, minWidthPx: MIN_WIDTH };
 
 let watchingWidth: ResizeObserver | undefined;
 
 export function renderProfile(container: HTMLElement, bundle: CourseBundle): void {
   const draw = () => {
-    container.replaceChildren(summary(bundle), chart(bundle, Math.max(container.clientWidth, 600)), legend(bundle));
+    container.replaceChildren(summary(bundle), chart(bundle, Math.max(container.clientWidth, MIN_WIDTH)), legend(bundle));
   };
   draw();
   // One observer, redrawing whichever course is on screen now.

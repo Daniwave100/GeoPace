@@ -58,7 +58,8 @@ export interface CarriedOver {
 export interface Planner {
   plan: RacePlan;
   edition: Edition;
-  wave: Wave;
+  /** Always a wave with a published start time: there is no Planner for one without. */
+  wave: TimedWave;
   /**
    * Set when the wave's start time is carried over, so every time of day (and the sun with it)
    * is last edition's. Whoever draws those times greys them and shows the reason; elapsed time
@@ -70,9 +71,8 @@ export interface Planner {
   /** The goal both ways round, whichever way the runner gave it. */
   goalFinishSeconds: number;
   goalPaceSecondsPerKm: number;
-  /** The moment the wave starts, and the moment this runner means to finish. */
+  /** The moment the wave starts. */
   startInstant: Date;
-  finishInstant: Date;
   at(km: number): Readout;
   /** The other direction: the km the runner has reached at that moment (0 before the start). */
   kmAtInstant(instant: Date): number;
@@ -81,15 +81,15 @@ export interface Planner {
 export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
   const edition = course.editions.find((candidate) => candidate.edition === plan.edition);
   const wave = edition?.waves.find((candidate) => candidate.id === plan.waveId);
-  // The last check is hasStartTime(wave), spelled out so TypeScript knows start_local is a string.
-  if (!edition || !wave || wave.start_local === null) {
+  if (!edition || !wave || !hasStartTime(wave)) {
     throw new Error(`No race clock for ${plan.courseId} ${plan.edition} ${plan.waveId}: pass the plan through sanitizePlan first.`);
   }
+  const finishSeconds = goalFinishSeconds(plan.goal, course);
   const clock = raceClock({
     date: edition.date.day,
     timezone: course.timezone,
     waveStartLocal: wave.start_local,
-    goalFinishSeconds: goalFinishSeconds(plan.goal, course),
+    goalFinishSeconds: finishSeconds,
     lineLengthM: course.lineLengthM,
     certifiedDistanceM: course.certifiedDistanceM,
   });
@@ -103,10 +103,9 @@ export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
         ? { fromEdition: edition.carried_over.from_edition, reason: edition.carried_over.reason }
         : null,
     lengthKm: clock.lineLengthKm,
-    goalFinishSeconds: goalFinishSeconds(plan.goal, course),
+    goalFinishSeconds: finishSeconds,
     goalPaceSecondsPerKm: clock.goalPaceSecondsPerKm,
     startInstant: clock.startInstant,
-    finishInstant: clock.instantAtKm(clock.lineLengthKm),
     kmAtInstant: (instant) => clock.kmAtElapsedSeconds((instant.getTime() - clock.startInstant.getTime()) / 1000),
     at(km) {
       const position = Math.min(Math.max(km, 0), clock.lineLengthKm);
@@ -152,8 +151,11 @@ const SLOWEST_FINISH_SECONDS = 10 * 3600;
 const FINISH_TIME = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/; // h:mm or h:mm:ss
 const PACE = /^(\d{1,2}):([0-5]\d)$/; // m:ss
 
+/** A wave whose start time is published: the wall-clock time and the instant it means. */
+export type TimedWave = Wave & { start_local: string; start: string };
+
 /** A wave can carry a plan only if its start time is published; otherwise there is no clock to run. */
-export function hasStartTime(wave: Wave): boolean {
+export function hasStartTime(wave: Wave): wave is TimedWave {
   return wave.start_local !== null;
 }
 
@@ -182,6 +184,17 @@ export function parseGoal(kind: Goal["kind"], text: string, course: Pick<Planner
   const [first, second, third] = [match[1], match[2], match[3] ?? "0"].map(Number);
   const goal: Goal = kind === "finish" ? { kind, seconds: first * 3600 + second * 60 + third } : { kind, secondsPerKm: first * 60 + second };
   return isPlausible(goal, course) ? goal : null;
+}
+
+/**
+ * The same goal, written the other way: a finish time as a pace, or a pace as a finish time. The
+ * pace is kept exact rather than rounded to the second a runner would read ("5:41"), because
+ * rounding it and coming back turns 4:00:00 into 3:59:48. A finish time is whole seconds.
+ */
+export function goalWrittenAs(kind: Goal["kind"], goal: Goal, course: Pick<PlannerCourse, "certifiedDistanceM">): Goal {
+  if (goal.kind === kind) return goal;
+  const finish = goalFinishSeconds(goal, course);
+  return kind === "finish" ? { kind, seconds: Math.round(finish) } : { kind, secondsPerKm: finish / (course.certifiedDistanceM / 1000) };
 }
 
 function sanitizeGoal(candidate: unknown, course: PlannerCourse): Goal {

@@ -91,16 +91,19 @@ footer {
   line-height: 1.1;
   font-variant-numeric: tabular-nums; /* so the numbers don't jiggle while scrubbing */
 }
-.figure.carried-over .figure-value {
-  color: #8a8a86;
+/* Rests on a carried-over start time, or isn't confirmed: greyed, never blended in with the rest.
+   Dark enough to stay readable at small sizes. */
+.carried-over {
+  color: #6b6b68;
+}
+#sentence {
+  margin: 8px 0;
 }
 
-/* The km strip. Side padding matches the elevation chart's margins (profile.ts), so a km on the
-   strip sits above the same km on the chart. */
+/* The km strip. main.ts insets it to the elevation chart's km axis, so a km on the strip sits
+   above the same km on the chart. */
 #strip {
-  min-width: 600px;
   box-sizing: border-box;
-  padding: 0 90px 0 48px;
 }
 .strip {
   padding: 10px 0 22px;

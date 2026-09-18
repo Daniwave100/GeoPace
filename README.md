@@ -18,11 +18,12 @@ Then open http://localhost:5173 and pick a course: **Berlin** or **New York City
 Set **your race plan** (the edition, your start wave, and a goal as a finish time or a pace per
 km), then drag the **kilometre strip** under the map, click it, or use the arrow keys. The runner
 on the map, the time of day, the elapsed time and the sun all move together, in the race's own
-time zone whatever zone your computer is in. Your plan is remembered in your browser and goes
+time zone whatever zone your computer is in (the map dims as the sun gets low). Your plan is remembered in your browser and goes
 nowhere else.
 
-Times assume an even pace, and the app says so. Where a start time is last year's because this
-year's isn't published, it is greyed and marked **carried over**, with the reason. A wave whose
+Times assume an even pace, and the app says so. Where a start time is the last edition's because
+this one's isn't published, every time that rests on it is greyed and marked **carried over**, with
+the reason; a race date the organizer hasn't stated yet is marked **not confirmed**. A wave whose
 start time nobody has published is listed but can't be picked: it is never filled with a guess.
 
 The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
@@ -75,7 +76,7 @@ cd app && npm run typecheck
 
 ```
 data/courses/<course>/course.yaml   hand-maintained course facts, each with a source URL
-data/courses/<course>/editions/     one file per year: the race date and the start waves
+data/courses/<course>/editions/     one file per edition: the race date and the start waves
         │
 pipeline/ (Python)                  route → evenly spaced samples → official terrain heights
         │                            → bridge decks → smoothed → grade → difficulty
@@ -98,7 +99,7 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
   bridges are carried straight across. New York's are measured from the 2017 city LiDAR, using the
   returns classified as bridge deck — including which of the two decks runners actually use: the
   Verrazzano's upper level, the Queensboro's lower level.
-- **Race dates and start waves** are written down per year from the organizer's own pages. Wave
+- **Race dates and start waves** are written down per edition from the organizer's own pages. Wave
   times are local wall-clock times; the pipeline turns each into an exact instant in the course's
   time zone, and the app works it out again independently, so the two check each other. That
   matters in New York, where the 2026 race falls on the morning the clocks go back.

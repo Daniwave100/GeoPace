@@ -117,7 +117,7 @@ function mount(stage: HTMLElement, context: MockupContext): void {
 
 function identity(story: CourseStory): HTMLElement {
   const date = html("span", { text: show.raceDate(story.edition.date) });
-  if (story.edition.dateNote) date.append(html("i", { title: story.edition.dateNote, text: " (see note)" }));
+  if (!story.edition.dateConfirmed) date.append(html("i", { title: story.edition.dateNote, text: " (unconfirmed)" }));
   const carriedOver = story.edition.carriedOver;
   return html(
     "div",

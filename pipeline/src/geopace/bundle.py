@@ -128,9 +128,14 @@ def check_length(length_m: float, certified_m: float, traced: bool = False) -> N
 
 def _edition_json(edition: EditionFacts) -> dict:
     """An edition's facts as the app reads them. Optional parts are left out rather than null."""
-    date = {"day": edition.date, "source": edition.date_source, "accessed": edition.date_accessed}
-    if edition.date_note:
-        date["note"] = edition.date_note
+    date = {
+        "day": edition.date.day,
+        "confirmed": edition.date.confirmed,
+        "source": edition.date.source,
+        "accessed": edition.date.accessed,
+    }
+    if edition.date.note:
+        date["note"] = edition.date.note
     out: dict = {"edition": edition.edition, "date": date}
     if edition.carried_over:
         out["carried_over"] = {"from_edition": edition.carried_over.from_edition, "reason": edition.carried_over.reason}

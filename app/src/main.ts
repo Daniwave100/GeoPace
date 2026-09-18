@@ -9,8 +9,10 @@ import { COURSES, courseFromUrl, urlForCourse } from "./courses";
 import { createPlanPanel } from "./plan/plan-panel";
 import { loadPlan, type PlanStorage, rememberedCourseId, savePlan } from "./plan/plan-store";
 import { createReadout } from "./plan/readout";
-import { renderProfile } from "./profile/profile";
-import { createGlobe, showCourse, showRaceTimes, showRunner } from "./scene/globe";
+import { createSentence } from "./plan/sentence";
+import { KM_AXIS, renderProfile } from "./profile/profile";
+import { createGlobe, showCourse, showRunner } from "./scene/globe";
+import { html, link } from "./dom";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
 import { createStrip } from "./strip/strip";
 import type { Viewer } from "cesium";
@@ -25,8 +27,9 @@ interface Showing {
 
 const storage = browserStorage();
 const planPanel = createPlanPanel(byId("plan"), usePlan);
-const strip = createStrip(byId("strip"), scrubTo);
+const strip = createStrip(insetToChart(byId("strip")), scrubTo);
 const readoutView = createReadout(byId("readout"));
+const sentence = createSentence(byId("sentence"));
 let viewer: Viewer | undefined;
 let showing: Showing | undefined;
 let loading = "";
@@ -84,34 +87,37 @@ function usePlan(plan: RacePlan): void {
 function showPlan(): void {
   if (!showing || !viewer) return;
   planPanel.show(showing.course, showing.planner);
-  showRaceTimes(viewer, showing.planner.startInstant, showing.planner.finishInstant);
   scrubTo(showing.km);
 }
 
-/** Scrubbing: the strip's marker, the readout, the runner on the map and the sun, moved as one. */
+/** Scrubbing: the strip's marker, the readout, the sentence, the runner on the map and the sun, moved as one. */
 function scrubTo(km: number): void {
   if (!showing || !viewer) return;
-  const readout = showing.planner.at(km);
+  const { planner } = showing;
+  const readout = planner.at(km);
   showing.km = readout.km;
   const place = positionAtKm(showing.bundle.measured.course_line, readout.km);
 
-  strip.setKm(readout.km, `kilometre ${readout.km.toFixed(1)}, ${readout.localClock}, ${formatElapsed(readout.elapsedSeconds)} elapsed`);
-  readoutView.show(showing.planner, readout, sunPosition(readout.instant, place.lat, place.lon), place.bearingDeg);
+  // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
+  const carriedOver = planner.carriedOver ? `, from the ${planner.carriedOver.fromEdition} start time, carried over` : "";
+  strip.setKm(readout.km, `kilometre ${readout.km.toFixed(1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed`);
+  readoutView.show(planner, readout);
+  sentence.show(sunPosition(readout.instant, place.lat, place.lon), place.bearingDeg, planner.carriedOver);
   showRunner(viewer, place, readout.instant);
+}
+
+/** Line the strip up with the elevation chart's km axis, so a km on one sits above the same km on the other. */
+function insetToChart(stripBox: HTMLElement): HTMLElement {
+  stripBox.style.padding = `0 ${KM_AXIS.insetRightPx}px 0 ${KM_AXIS.insetLeftPx}px`;
+  stripBox.style.minWidth = `${KM_AXIS.minWidthPx}px`;
+  return stripBox;
 }
 
 function renderAttributions(bundle: CourseBundle): void {
   const list = byId("attributions");
   list.replaceChildren();
   for (const { text, url } of [...bundle.attributions, ...PROVIDER_ATTRIBUTIONS]) {
-    const item = document.createElement("li");
-    const link = document.createElement("a");
-    link.href = url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.textContent = text;
-    item.append(link);
-    list.append(item);
+    list.append(html("li", {}, link(url, text)));
   }
 }
 

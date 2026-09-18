@@ -54,15 +54,22 @@ def synthetic_decks(returns):
     )
 
 
-def synthetic_editions() -> list[EditionFacts]:
-    """One made-up edition, for tests that need a complete bundle but aren't about editions."""
+def raw_synthetic_edition() -> dict:
+    """One made-up edition, as it would be read from editions/2026.yaml."""
     source = {"source": "https://example.org/race-day", "accessed": "2026-09-18"}
-    raw = {
+    return {
         "edition": 2026,
-        "date": {"day": "2026-09-27", **source},
-        "waves": [{"id": "wave-1", "name": "Wave 1", "start_local": "09:00", **source}],
+        "date": {"day": "2026-11-01", **source},
+        "waves": [
+            {"id": "wave-1", "name": "Wave 1", "start_local": "09:10", **source},
+            {"id": "wave-2", "name": "Wave 2", "start_local": "09:45", **source},
+        ],
     }
-    return [parse_edition_facts(raw, timezone="Europe/Berlin")]
+
+
+def parsed_synthetic_editions() -> list[EditionFacts]:
+    """The same edition, parsed: for tests that need a complete bundle but aren't about editions."""
+    return [parse_edition_facts(raw_synthetic_edition(), timezone="America/New_York")]
 
 
 @pytest.fixture
@@ -83,12 +90,4 @@ def synthetic_facts():
 
 @pytest.fixture
 def synthetic_edition():
-    source = {"source": "https://example.org/race-day", "accessed": "2026-09-18"}
-    return {
-        "edition": 2026,
-        "date": {"day": "2026-11-01", **source},
-        "waves": [
-            {"id": "wave-1", "name": "Wave 1", "start_local": "09:10", **source},
-            {"id": "wave-2", "name": "Wave 2", "start_local": "09:45", **source},
-        ],
-    }
+    return raw_synthetic_edition()

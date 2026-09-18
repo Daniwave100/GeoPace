@@ -129,7 +129,7 @@ function mount(stage: HTMLElement, context: MockupContext): void {
 
 function banner(story: CourseStory): HTMLElement {
   const date = html("span", { class: "ps-banner__item", text: show.raceDate(story.edition.date) });
-  if (story.edition.dateNote) date.append(html("small", { title: story.edition.dateNote, text: " see note" }));
+  if (!story.edition.dateConfirmed) date.append(html("small", { title: story.edition.dateNote, text: " unconfirmed" }));
   const carriedOver = story.edition.carriedOver;
   return html(
     "header",

@@ -19,6 +19,8 @@ edition: 2026
 # In 2026 that Sunday is 1 November, which is also the morning US clocks go back an hour.
 date:
   day: 2026-11-01
+  # Not confirmed: nothing we could open states the 2026 date itself. The app says so next to it.
+  confirmed: false
   source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
   accessed: 2026-09-18
   note: From the organizer's rule that the race is on the first Sunday in November. NYRR's 2026 pages could not be opened to confirm it.

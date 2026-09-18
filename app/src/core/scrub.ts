@@ -9,26 +9,38 @@ const STEP_KM = 0.1;
 /** Shift + arrow, or Page Up/Down: one kilometre, the unit runners think in. */
 const BIG_STEP_KM = 1;
 
+/** A millimetre, in km: what floating point may have left a km short of, or past, a mark. */
+const ON_THE_MARK_KM = 1e-6;
+
 /** The part of a KeyboardEvent this needs. */
 export interface ScrubKey {
   key: string;
   shiftKey: boolean;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
 }
 
-/** Where a key press moves the runner, or null if the key isn't a scrubbing key. */
+/**
+ * Where a key press moves the runner, or null if the press isn't for the strip. Steps land on
+ * round numbers (the next 100 m mark, the next whole km) rather than adding to wherever a click
+ * left the runner, so "km 30" can always be reached. Presses with Alt, Ctrl or Cmd belong to the
+ * browser: Alt+Left and Cmd+Left are Back.
+ */
 export function kmAfterKey(pressed: ScrubKey, km: number, lengthKm: number): number | null {
+  if (pressed.altKey || pressed.ctrlKey || pressed.metaKey) return null;
   const step = pressed.shiftKey ? BIG_STEP_KM : STEP_KM;
   switch (pressed.key) {
     case "ArrowRight":
     case "ArrowUp":
-      return clamp(km + step, 0, lengthKm);
+      return clamp(nextMark(km, step), 0, lengthKm);
     case "ArrowLeft":
     case "ArrowDown":
-      return clamp(km - step, 0, lengthKm);
+      return clamp(previousMark(km, step), 0, lengthKm);
     case "PageUp":
-      return clamp(km + BIG_STEP_KM, 0, lengthKm);
+      return clamp(nextMark(km, BIG_STEP_KM), 0, lengthKm);
     case "PageDown":
-      return clamp(km - BIG_STEP_KM, 0, lengthKm);
+      return clamp(previousMark(km, BIG_STEP_KM), 0, lengthKm);
     case "Home":
       return 0;
     case "End":
@@ -36,6 +48,17 @@ export function kmAfterKey(pressed: ScrubKey, km: number, lengthKm: number): num
     default:
       return null;
   }
+}
+
+/** The first multiple of `step` beyond `km`. Counted in whole steps, so 0.1 steps never drift. */
+function nextMark(km: number, step: number): number {
+  const stepsPerKm = Math.round(1 / step);
+  return (Math.floor((km + ON_THE_MARK_KM) * stepsPerKm) + 1) / stepsPerKm;
+}
+
+function previousMark(km: number, step: number): number {
+  const stepsPerKm = Math.round(1 / step);
+  return (Math.ceil((km - ON_THE_MARK_KM) * stepsPerKm) - 1) / stepsPerKm;
 }
 
 /** The km under the pointer, given how far along the strip it is (0 = left end, 1 = right end). */
@@ -46,7 +69,6 @@ export function kmAtFraction(fraction: number, lengthKm: number): number {
 export interface RoadPosition {
   lat: number;
   lon: number;
-  elevationM: number;
   /** Direction of travel, degrees clockwise from true north. */
   bearingDeg: number;
 }
@@ -73,7 +95,6 @@ export function positionAtKm(line: CourseLine, km: number): RoadPosition {
   return {
     lat: between(line.lat),
     lon: between(line.lon),
-    elevationM: between(line.elevation_m),
     // The heading of the stretch being run. Blending headings would cut every corner.
     bearingDeg: line.bearing_deg[low],
   };

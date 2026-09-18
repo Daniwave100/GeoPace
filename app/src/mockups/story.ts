@@ -131,7 +131,8 @@ export interface StripBin {
 export interface StoryEdition {
   /** Local calendar date of the race. */
   date: string;
-  /** What the edition facts say about how the date is known, when there is something to say. */
+  /** false when the organizer hasn't stated this edition's date; `dateNote` then says how it is known. */
+  dateConfirmed: boolean;
   dateNote?: string;
   waveLabel: string;
   waveStartLocal: string;
@@ -172,12 +173,14 @@ export function buildStory(bundle: CourseBundle, plan: RacePlan): CourseStory {
   const line = bundle.measured.course_line;
   const courseId = bundle.course_id;
   // The mockups show a new runner's plan: the latest edition, its first wave with a published time.
-  const planned = createPlanner(plannerCourse(bundle), defaultPlan(plannerCourse(bundle)));
+  const planning = plannerCourse(bundle);
+  const planned = createPlanner(planning, defaultPlan(planning));
   const edition: StoryEdition = {
     date: planned.edition.date.day,
+    dateConfirmed: planned.edition.date.confirmed,
     dateNote: planned.edition.date.note,
     waveLabel: planned.wave.name,
-    waveStartLocal: planned.wave.start_local as string, // the Planner only runs for a wave that has one
+    waveStartLocal: planned.wave.start_local,
     carriedOver: planned.carriedOver,
   };
   const prevailingWind = SAMPLE_PREVAILING_WIND[courseId] ?? { fromDeg: 270, speedMs: 4 };
