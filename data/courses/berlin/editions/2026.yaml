@@ -26,7 +26,9 @@ date:
 #   - Last year's times are not carried over. The organizer's 2025 schedule could not be
 #     retrieved on 2026-09-18, and the 2026 page hints that the layout changed: its schedule says
 #     six waves, while its paragraph on pacers still says "all four start waves".
-# When the organizer publishes the times, fill in `start_local` and delete the `note`.
+# Owner's decision, 2026-09-18 (PLAN.md D40): we don't chase these. A runner picks their wave and
+# types the start time from their start card. If the organizer does publish the times, fill in
+# `start_local` and delete the `note`.
 waves:
   - id: wave-1
     name: Wave 1

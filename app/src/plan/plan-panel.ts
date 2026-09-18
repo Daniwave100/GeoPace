@@ -147,7 +147,7 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       const published = hasStartTime(planned) ? `${planned.name}'s published time is ${planned.start_local}${planned.carried_over ? ", carried over" : ""}.` : `${planned.name}'s isn't published.`;
       startFact.replaceChildren(`Your own start time. ${published} `, sourceLink(planned));
     } else {
-      startFact.replaceChildren(`${planned.name}'s published start time${flag}. `, sourceLink(planned));
+      startFact.replaceChildren(`${planned.name}'s published start time${flag}. `, sourceLink(planned), " If your start card says otherwise, type yours over it.");
     }
   }
 

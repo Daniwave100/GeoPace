@@ -18,7 +18,8 @@ Then open http://localhost:5173 and pick a course: **Berlin** or **New York City
 Set **your race plan** (the edition, your start wave, and a goal as a finish time or a pace per
 km), then drag the **kilometre strip** under the map, click it, or use the arrow keys. The runner
 on the map, the time of day, the elapsed time and the sun all move together, in the race's own
-time zone whatever zone your computer is in (the map dims as the sun gets low). Your plan is remembered in your browser and goes
+time zone whatever zone your computer is in (the map dims as the sun gets low). Open **Every
+kilometre** under the strip for a table of splits; click a kilometre in it to jump there. Your plan is remembered in your browser and goes
 nowhere else.
 
 Times assume an even pace, and the app says so. Where a start time is the last edition's because

@@ -10,6 +10,7 @@ import { createPlanPanel } from "./plan/plan-panel";
 import { loadPlan, type PlanStorage, rememberedCourseId, savePlan } from "./plan/plan-store";
 import { createReadout } from "./plan/readout";
 import { createSentence } from "./plan/sentence";
+import { createSplitsTable } from "./plan/splits-table";
 import { KM_AXIS, renderProfile } from "./profile/profile";
 import { createGlobe, showCourse, showRunner } from "./scene/globe";
 import { html, link } from "./dom";
@@ -30,6 +31,7 @@ const planPanel = createPlanPanel(byId("plan"), usePlan);
 const strip = createStrip(insetToChart(byId("strip")), scrubTo);
 const readoutView = createReadout(byId("readout"));
 const sentence = createSentence(byId("sentence"));
+const splitsTable = createSplitsTable(byId("splits"), scrubTo);
 let viewer: Viewer | undefined;
 let showing: Showing | undefined;
 let loading = "";
@@ -87,6 +89,7 @@ function usePlan(plan: RacePlan): void {
 function showPlan(): void {
   if (!showing || !viewer) return;
   planPanel.show(showing.course, showing.planner);
+  splitsTable.show(showing.planner);
   scrubTo(showing.km);
 }
 

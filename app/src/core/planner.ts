@@ -10,6 +10,9 @@
 import type { CourseBundle, Edition, Wave } from "../bundle/types";
 import { raceClock } from "./race-clock";
 
+/** How close to a whole number of steps still counts as on it: floating point, not distance. */
+const ON_THE_MARK = 1e-9;
+
 /** What the runner is aiming for: a finish time, or the per-kilometre pace that implies one. */
 export type Goal =
   | { kind: "finish"; seconds: number }
@@ -88,6 +91,11 @@ export interface Planner {
   at(km: number): Readout;
   /** The other direction: the km the runner has reached at that moment (0 before the start). */
   kmAtInstant(instant: Date): number;
+  /**
+   * The readout at every `stepKm` along the course line, and then at the finish. `splits(1)` is a
+   * table of kilometres; `splits(1.609344)` is the same table in miles.
+   */
+  splits(stepKm: number): Readout[];
 }
 
 export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
@@ -108,6 +116,17 @@ export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
     certifiedDistanceM: course.certifiedDistanceM,
   });
 
+  const at = (km: number): Readout => {
+    const position = Math.min(Math.max(km, 0), clock.lineLengthKm);
+    return {
+      km: position,
+      elapsedSeconds: clock.elapsedSecondsAtKm(position),
+      instant: clock.instantAtKm(position),
+      localClock: clock.localClockAtKm(position),
+      zoneLabel: clock.zoneLabelAtKm(position),
+    };
+  };
+
   return {
     plan,
     edition,
@@ -123,15 +142,13 @@ export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
     goalPaceSecondsPerKm: clock.goalPaceSecondsPerKm,
     startInstant: clock.startInstant,
     kmAtInstant: (instant) => clock.kmAtElapsedSeconds((instant.getTime() - clock.startInstant.getTime()) / 1000),
-    at(km) {
-      const position = Math.min(Math.max(km, 0), clock.lineLengthKm);
-      return {
-        km: position,
-        elapsedSeconds: clock.elapsedSecondsAtKm(position),
-        instant: clock.instantAtKm(position),
-        localClock: clock.localClockAtKm(position),
-        zoneLabel: clock.zoneLabelAtKm(position),
-      };
+    at,
+    splits(stepKm) {
+      // Marks are counted (1, 2, 3 steps), not added up, so a long table never drifts off them.
+      const marks = Math.floor(clock.lineLengthKm / stepKm + ON_THE_MARK);
+      const readouts = Array.from({ length: marks }, (_, i) => at((i + 1) * stepKm));
+      const endsOnAMark = marks > 0 && clock.lineLengthKm - marks * stepKm < ON_THE_MARK * stepKm;
+      return endsOnAMark ? readouts : [...readouts, at(clock.lineLengthKm)];
     },
   };
 }

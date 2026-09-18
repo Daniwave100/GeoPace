@@ -7,10 +7,13 @@
 # Only the five runner waves are listed. The professional and wheelchair starts (08:00 to 09:05
 # in 2025) are in the same guide, but the app plans a runner's race.
 #
-# STILL TO DO, by a person: on 2026-09-18 every page on nyrr.org sat behind NYRR's waiting room,
-# which a browser passes and our tools don't (and we don't work around it). Open
-# https://www.nyrr.org/tcsnycmarathon in a browser, confirm the 2026 date and wave times, then
-# update this file: new `source`/`accessed`, and drop `carried_over` from whatever is confirmed.
+# Owner's decision, 2026-09-18 (PLAN.md D40): we don't chase wave start times. Each runner types
+# their own, from what NYRR sends them, and that always wins. The times below are only what the
+# start-time box shows until they do, and they are flagged as carried over.
+# On 2026-09-18 every page on nyrr.org sat behind NYRR's waiting room, which a browser passes and
+# our tools don't (and we don't work around it). If someone reads the 2026 date and wave times
+# there, update this file: new `source`/`accessed`, `confirmed: true` on the date, and drop
+# `carried_over` from whatever is confirmed.
 
 edition: 2026
 
@@ -27,7 +30,7 @@ date:
 
 carried_over:
   from_edition: 2025
-  reason: NYRR's 2026 wave times could not be confirmed, so these are the 2025 edition's. Check your own start time when NYRR sends it.
+  reason: NYRR's 2026 wave times could not be confirmed, so these are the 2025 edition's. When NYRR sends you your start time, type it in as your own.
 
 # The 2025 start schedule, from NYRR's 2025 runner guide.
 waves:

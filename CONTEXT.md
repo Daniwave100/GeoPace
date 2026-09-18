@@ -59,6 +59,10 @@ _Avoid_: custom time, override, manual time
 For one Race Plan, the link between where the runner is and what time it is there.
 _Avoid_: timer, timeline
 
+**Splits**:
+The time of day and the elapsed time at every kilometre (later, every mile) of a Race Plan, and at the finish.
+_Avoid_: pace chart, pace band, schedule
+
 **Scrubbing**:
 Moving the runner along the course by hand, so that position, time of day, sun and camera move together.
 _Avoid_: seeking, sliding

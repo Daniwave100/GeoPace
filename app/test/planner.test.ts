@@ -124,6 +124,42 @@ describe("Planner", () => {
     expect(planner.at(99).km).toBe(42.195);
   });
 
+  it("lists the time of day and the elapsed time at every whole km, and at the finish", () => {
+    const splits = createPlanner(NYC, plan()).splits(1);
+
+    // Four hours over 42.195 km is 5:41.27 per km, from a 09:10 start.
+    expect(splits.map((split) => split.km).slice(0, 3)).toEqual([1, 2, 3]);
+    expect(formatElapsed(splits[0].elapsedSeconds)).toBe("5:41");
+    expect(splits[0].localClock).toBe("09:15");
+    expect(splits[9].km).toBe(10);
+    expect(formatElapsed(splits[9].elapsedSeconds)).toBe("56:53");
+    expect(splits[9].localClock).toBe("10:06");
+    // 42 whole kilometres, then the finish line at 42.195.
+    expect(splits).toHaveLength(43);
+    expect(splits[42].km).toBe(42.195);
+    expect(formatElapsed(splits[42].elapsedSeconds)).toBe("4:00:00");
+    expect(splits[42].localClock).toBe("13:10");
+  });
+
+  it("splits at any distance, which is what a table in miles will need", () => {
+    const planner = createPlanner(NYC, plan());
+
+    expect(planner.splits(5).map((split) => split.km)).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 42.195]);
+    // A mile is 1.609344 km: 26 whole miles in a marathon, then the finish.
+    const miles = planner.splits(1.609344);
+    expect(miles).toHaveLength(27);
+    expect(miles[25].km).toBeCloseTo(26 * 1.609344, 9);
+    // Four hours is 9:09 a mile.
+    expect(formatElapsed(miles[0].elapsedSeconds)).toBe("9:09");
+  });
+
+  it("does not list the finish twice when the course ends exactly on a mark", () => {
+    const splits = createPlanner({ ...NYC, lineLengthM: 42000 }, plan()).splits(1);
+
+    expect(splits).toHaveLength(42);
+    expect(splits[41].km).toBe(42);
+  });
+
   it("flags times that rest on a carried-over wave, with the edition they came from and why", () => {
     const planner = createPlanner(NYC, plan({ waveId: "wave-2" }));
 
