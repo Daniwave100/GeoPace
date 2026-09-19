@@ -61,6 +61,22 @@ describe("the Stops of a course", () => {
     }
   });
 
+  it("keep both ends even when a landmark stands near one: every landmark is a Stop, and so are the start and the finish", () => {
+    const course = threeKmCourse();
+    course.course.landmarks = [
+      { name: "The gate", km: 0.25, source: "https://example.org/gate" },
+      { name: "The last corner", km: 2.8, source: "https://example.org/corner" },
+    ];
+
+    expect(stopsFor(course).map((stop) => [stop.km, stop.name("km")])).toEqual([
+      [0, "Start"],
+      [0.25, "The gate"],
+      [1, "Climb of 40 m"],
+      [2.8, "The last corner"],
+      [3, "Finish"],
+    ]);
+  });
+
   it("add the climbs a runner will remember: three in New York besides the Verrazzano's, which begins at the start, and none in flat Berlin", () => {
     const climbs = stopsFor(nyc).filter((stop) => stop.kind === "climb");
 
@@ -106,6 +122,13 @@ describe("the line that says where the Ride is among the Stops", () => {
     expect(stopLine(stops, 0, "km")).toBe("Stop 1 of 18: Start");
     expect(stopLine(stops, 25.1, "km")).toBe("Stop 9 of 18: Ed Koch Queensboro Bridge");
     expect(stopLine(stops, 42.688, "mi")).toBe("Stop 18 of 18: Finish");
+  });
+
+  it("never says the next Stop is 0 m away: a step short of being on it, it is 50 m or 100 ft", () => {
+    // The Barclays Center is at km 12.1. The runner counts as on it within 25 m.
+    expect(stopLine(stops, 12.074, "km")).toBe("Next stop: Barclays Center, in 50 m");
+    expect(stopLine(stops, 12.074, "mi")).toBe("Next stop: Barclays Center, in 100 ft");
+    expect(stopLine(stops, 12.076, "km")).toBe("Stop 3 of 18: Barclays Center");
   });
 
   it("between Stops, names the next one and how far it is, in the runner's units", () => {

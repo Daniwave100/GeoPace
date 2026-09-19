@@ -72,11 +72,11 @@ const expectShot = (shot: Shot, wanted: RideView) => {
 };
 
 describe("the Ride's camera in the scene", () => {
-  it("gets to a far-off view in a moment, not in a cut: the start of the Ride, Back, a switch of cameras", () => {
+  it("gets to a view the Ride has jumped to in a moment, not in a cut: the start of the Ride, Back, a switch of cameras", () => {
     const { viewer, shots, now, run } = fakeViewer();
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
 
-    camera.show(view(40.6));
+    camera.follow(() => view(40.6), "jump");
     run(0.1);
 
     expect(shots.length).toBeGreaterThan(0);
@@ -85,20 +85,37 @@ describe("the Ride's camera in the scene", () => {
 
     run(2);
     expectShot(shots[shots.length - 1], view(40.6));
-    // On the way it never went under the road it was heading for.
-    expect(Math.min(...shots.map((shot) => shot.heightM))).toBeGreaterThanOrEqual(28 - 1e-6);
   });
 
-  it("follows a Ride under way exactly, frame by frame, with no lag", () => {
-    const { viewer, shots, now, run } = fakeViewer();
+  it("goes over the city, not through it, between two places at road height, and turns the short way round", () => {
+    const from: RideView = { eye: { lat: 40.6, lon: -74.05, heightM: 28 }, headingDeg: 350, pitchDeg: -3 };
+    const to: RideView = { eye: { lat: 40.65, lon: -74.05, heightM: 12 }, headingDeg: 40, pitchDeg: -3 }; // Back, 5.5 km up the road
+    const { viewer, shots, now, run } = fakeViewer({ lat: from.eye.lat, lon: from.eye.lon, heightM: from.eye.heightM, headingDeg: from.headingDeg, pitchDeg: from.pitchDeg });
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
-    camera.show(view(40.6));
+
+    camera.follow(() => to, "jump");
     run(2);
 
-    // Ten metres further up the road each frame: about what On the road covers at the cruise.
+    expectShot(shots[shots.length - 1], to);
+    expect(Math.min(...shots.map((shot) => shot.heightM))).toBeGreaterThanOrEqual(12 - 1e-6); // never under either road
+    expect(Math.max(...shots.map((shot) => shot.heightM))).toBeGreaterThan(500); // up and over
+    // From 350° to 40° is 50° to the right, through north; the long way would pass through south.
+    const turned = shots.map((shot) => ((shot.headingDeg - 350 + 540) % 360) - 180);
+    expect(Math.min(...turned)).toBeGreaterThanOrEqual(-1e-6);
+    expect(Math.max(...turned)).toBeLessThanOrEqual(50 + 1e-6);
+  });
+
+  it("follows a Ride under way exactly, frame by frame, with no lag, however far a late frame carries the view", () => {
+    const { viewer, shots, now, run } = fakeViewer();
+    const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
+    camera.follow(() => view(40.6), "jump");
+    run(2);
+
+    // From above, a frame a tenth of a second late moves the view nearly 200 m. It is still the Ride
+    // moving on, not a jump: no glide starts in the middle of plain playing.
     for (let frame = 1; frame <= 5; frame += 1) {
-      const next = view(40.6 + frame * 0.00009);
-      camera.show(next);
+      const next = view(40.6 + frame * 0.0018);
+      camera.follow(() => next, "riding");
       run(1 / 60);
       expectShot(shots[shots.length - 1], next);
     }
@@ -109,59 +126,99 @@ describe("the Ride's camera in the scene", () => {
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
 
     let latest = view(40.6);
+    camera.follow(() => latest, "jump");
     for (let frame = 0; frame < 120; frame += 1) {
       latest = view(40.6 + frame * 0.00009); // the Ride moves on, ten metres a frame, for two seconds
-      camera.show(latest);
+      camera.follow(() => latest, "riding");
       run(1 / 60);
     }
 
     expectShot(shots[shots.length - 1], latest);
   });
 
-  it("cuts straight to the view when reduced motion is asked for: nothing in between", () => {
-    const { viewer, shots, now, run } = fakeViewer();
-    const camera = createRideCamera(viewer, { reducedMotion: () => true, now });
-
-    camera.show(view(40.6));
-    run(1);
-
-    expect(shots).toHaveLength(1);
-    expectShot(shots[0], view(40.6));
-  });
-
-  it("leaves the camera alone whenever the Ride isn't moving it, so paused, the map is the runner's", () => {
+  it("starts a new glide from where it has got to when the Ride jumps again: Back pressed twice, a drag along the strip", () => {
     const { viewer, shots, now, run } = fakeViewer();
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
-    camera.show(view(40.6));
+    camera.follow(() => view(40.6), "jump");
+    run(0.3);
+
+    camera.follow(() => view(40.7), "jump");
     run(2);
-    const told = shots.length;
 
-    run(5); // paused: the runner orbits, pans and zooms, and nothing pulls the camera back
-
-    expect(shots).toHaveLength(told);
+    expectShot(shots[shots.length - 1], view(40.7));
   });
 
-  it("lets go at once when the runner takes hold of the map: a glide under way stops where it is", () => {
+  it("cuts straight to the view when reduced motion is asked for, even if it was asked for in the middle of a glide", () => {
+    const motion = { reduced: false };
+    const { viewer, shots, now, run } = fakeViewer();
+    const camera = createRideCamera(viewer, { reducedMotion: () => motion.reduced, now });
+    camera.follow(() => view(40.6), "jump");
+    run(0.2);
+
+    motion.reduced = true;
+    camera.follow(() => view(40.7), "jump");
+    run(1 / 60);
+
+    expectShot(shots[shots.length - 1], view(40.7)); // there in one frame: nothing in between
+  });
+
+  it("glides round when the runner has only turned their head: Play after looking around On the road is not a snap", () => {
+    const wanted = view(40.6);
+    const { viewer, shots, now, run } = fakeViewer({ lat: 40.6, lon: -74.05, heightM: 28, headingDeg: 220, pitchDeg: -30 }); // same place, looking back and down
+    const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
+
+    camera.follow(() => wanted, "jump");
+    run(0.1);
+    const onTheWay = shots[shots.length - 1];
+    expect(onTheWay.pitchDeg).toBeLessThan(-4);
+    expect(onTheWay.pitchDeg).toBeGreaterThan(-30);
+
+    run(2);
+    expectShot(shots[shots.length - 1], wanted);
+  });
+
+  it("holds the camera on every frame while the Ride has it, asking afresh where that is", () => {
     const { viewer, shots, now, run } = fakeViewer();
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
-    camera.show(view(40.6));
+    const road = { heightM: 5 }; // what coarse, far-off terrain says the road's height is
+    camera.follow(() => view(40.6, road.heightM + 3), "jump");
+    run(2);
+
+    // Paused. The finer terrain arrives and the road turns out to be higher: the camera goes with it.
+    road.heightM = 19;
+    run(1 / 60);
+    expectShot(shots[shots.length - 1], view(40.6, 22));
+
+    // And whatever else moves the camera meanwhile is undone before the frame is drawn. (CesiumJS lifts
+    // a camera it finds under a photographed surface: under the Queensboro's upper deck, a tree.)
+    viewer.camera.positionCartographic = Cartographic.fromDegrees(-74.05, 40.6, 60);
+    run(1 / 60);
+    expectShot(shots[shots.length - 1], view(40.6, 22));
+  });
+
+  it("lets go at once when the runner takes hold of the map, even in the middle of a glide: from then on the map is theirs", () => {
+    const { viewer, shots, now, run } = fakeViewer();
+    const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
+    camera.follow(() => view(40.6), "jump");
     run(0.2); // part of the way there
 
     camera.letGo();
     const told = shots.length;
-    run(2);
+    viewer.camera.positionCartographic = Cartographic.fromDegrees(-74.2, 40.9, 9000); // the runner orbits, pans and zooms
+    run(5);
 
-    expect(shots).toHaveLength(told); // nothing pulls against the runner's drag
+    expect(shots).toHaveLength(told); // nothing pulls against them, and nothing pulls the camera back
   });
 
   it("glides back from wherever the runner left the camera when the Ride resumes", () => {
     const { viewer, shots, now, run } = fakeViewer();
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
-    camera.show(view(40.6));
+    camera.follow(() => view(40.6), "jump");
     run(2);
+    camera.letGo();
     viewer.camera.positionCartographic = Cartographic.fromDegrees(-74.2, 40.9, 9000); // the runner looked around
 
-    camera.show(view(40.6001));
+    camera.follow(() => view(40.6001), "jump");
     run(0.1);
     expect(shots[shots.length - 1].heightM).toBeGreaterThan(1000);
     run(2);
@@ -172,8 +229,18 @@ describe("the Ride's camera in the scene", () => {
 describe("the road's height on the keyless map", () => {
   const place: RoadPosition = { lat: 40.6, lon: -74.05, ellipsoidHeightM: 28, bearingDeg: 40 };
 
-  it("is the open terrain's, where the terrain has arrived: the course is draped on it", () => {
-    expect(roadHeightOnTheMap({ getHeight: () => -31.5 })(place)).toBe(-31.5);
+  it("is the open terrain's at that very place, where the terrain has arrived: the course is draped on it", () => {
+    const asked: { latDeg: number; lonDeg: number }[] = [];
+    const globe = {
+      getHeight(where: Cartographic) {
+        asked.push({ latDeg: CesiumMath.toDegrees(where.latitude), lonDeg: CesiumMath.toDegrees(where.longitude) });
+        return -31.5;
+      },
+    };
+
+    expect(roadHeightOnTheMap(globe)(place)).toBe(-31.5);
+    expect(asked[0].latDeg).toBeCloseTo(40.6, 9);
+    expect(asked[0].lonDeg).toBeCloseTo(-74.05, 9);
   });
 
   it("is the Course Bundle's own where the terrain has no answer, so a failed tile never stops the Ride", () => {
@@ -189,7 +256,7 @@ describe("the road's height on the keyless map", () => {
 describe("the Ride with every tile failed", () => {
   it("rides New York from the start to the finish On the road, at the Course Bundle's own heights", () => {
     const nyc = parseCourseBundle(JSON.parse(readFileSync(new URL("../../data/derived/nyc/course-bundle.json", import.meta.url), "utf8")), "nyc");
-    const scene = { line: nyc.measured.course_line, stops: stopsFor(nyc) };
+    const scene = { line: nyc.measured.course_line, stops: stopsFor(nyc), notMeasured: nyc.measured.elevation_not_measured };
     const { viewer, shots, now, run } = fakeViewer();
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
     const heightAt = roadHeightOnTheMap({ getHeight: () => undefined }); // the terrain's tiles never arrived
@@ -201,7 +268,7 @@ describe("the Ride with every tile failed", () => {
       reducedMotion: () => false,
       onMove: (km) => {
         moves.push(km); // what moves the strip's cursor, the readout, the sentence and the layer's clause
-        camera.show(rideView(scene, km, ride.camera, { heightAt }));
+        camera.follow(() => rideView(scene, km, ride.camera, { heightAt }), "riding");
       },
       onChange: () => undefined,
     });

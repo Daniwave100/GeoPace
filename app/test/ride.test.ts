@@ -11,7 +11,7 @@ import { stopsFor } from "../src/core/stops";
 /** The course exactly as the app hands it to the Ride: its Stops, and its turns. */
 const courseFor = (id: string): RideCourse => {
   const bundle = parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${id}/course-bundle.json`, import.meta.url), "utf8")), id);
-  return rideCourseFor({ line: bundle.measured.course_line, stops: stopsFor(bundle) });
+  return rideCourseFor({ line: bundle.measured.course_line, stops: stopsFor(bundle), notMeasured: bundle.measured.elevation_not_measured });
 };
 const nyc = courseFor("nyc");
 const berlin = courseFor("berlin");
@@ -55,17 +55,20 @@ function rideOn(course: RideCourse, options: { reducedMotion?: boolean } = {}) {
   const clock = fakeFrames();
   const moves: number[] = [];
   let changes = 0;
-  const ride: Ride = createRide({ course, frames: clock.frames, reducedMotion: () => options.reducedMotion ?? false, onMove: (km) => moves.push(km), onChange: () => (changes += 1) });
-  /** Seconds of riding until the Ride stops of its own accord. */
+  // The runner's system setting, which can change while the app is open: a test can flip it mid-Ride.
+  const motion = { reduced: options.reducedMotion ?? false };
+  const ride: Ride = createRide({ course, frames: clock.frames, reducedMotion: () => motion.reduced, onMove: (km) => moves.push(km), onChange: () => (changes += 1) });
+  /** Seconds of riding until the Ride stops of its own accord. A Ride that never does is a failure, not a long Ride. */
   const secondsUntilItStops = (): number => {
     let seconds = 0;
-    while (ride.playing && seconds < 3600) {
+    while (ride.playing) {
+      if (seconds >= 3600) throw new Error(`The Ride was still playing after an hour, at km ${ride.km}`);
       clock.run(1);
       seconds += 1;
     }
     return seconds;
   };
-  return { ride, moves, run: clock.run, secondsUntilItStops, changes: () => changes };
+  return { ride, moves, motion, run: clock.run, runAtFramesPerSecond: clock.runAtFramesPerSecond, secondsUntilItStops, changes: () => changes };
 }
 
 describe("the Ride's time-lapse", () => {
@@ -83,7 +86,7 @@ describe("the Ride's time-lapse", () => {
 });
 
 describe("the Ride through a sharp turn", () => {
-  it("eases off so the view never whips round, and is never slower for it than at a Stop", () => {
+  it("eases off so the view never whips round, and however sharp the turn keeps moving", () => {
     const openRoad = { lengthKm: 40, stops: [{ km: 0 }, { km: 40 }] };
     // Two right-angled corners 100 m apart swing the On the road view 900 degrees for every km of road.
     const throughTheCorners = { ...openRoad, swingDegPerKm: () => 900 };
@@ -94,7 +97,8 @@ describe("the Ride through a sharp turn", () => {
 
     expect(eased).toBeLessThan(cruise / 2);
     expect(eased * 900).toBeLessThanOrEqual(45.001); // degrees a second
-    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBe(rideSpeedKmPerS(openRoad, 0, "on-the-road"));
+    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeGreaterThanOrEqual(0.003); // the pace of the run itself, not a standstill
+    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeLessThan(eased);
   });
 });
 
@@ -133,6 +137,44 @@ describe("Ride the course", () => {
     ride.playPause();
     run(1);
     expect(ride.km).toBeGreaterThan(pausedAt);
+  });
+
+  it("pauses when asked to, and asked again stays paused: a hand on the map never starts a Ride", () => {
+    const { ride, run } = rideOn(nyc);
+
+    ride.pause();
+    expect(ride.playing).toBe(false);
+    expect(ride.on).toBe(false);
+
+    ride.playPause();
+    run(1);
+    ride.pause();
+    ride.pause();
+    expect(ride.playing).toBe(false);
+  });
+
+  it("moves the runner no further in a late frame than a tenth of a second would: a tab left in the background doesn't leap", () => {
+    const { ride, run, runAtFramesPerSecond } = rideOn(nyc);
+    ride.seek(5); // open road: the cruise
+    ride.playPause();
+    run(0.5);
+    const before = ride.km;
+
+    runAtFramesPerSecond(30, 1 / 30); // one frame, thirty seconds late
+
+    expect(ride.km - before).toBeGreaterThan(0);
+    expect(ride.km - before).toBeLessThan(0.1); // not the 16 km that thirty seconds at the cruise would be
+  });
+
+  it("starts again from the start when played on the Finish, which in Berlin is listed 5 m short of the end of the line", () => {
+    const { ride, run } = rideOn(berlin);
+    ride.seek(42.28);
+
+    ride.playPause();
+    run(1);
+
+    expect(ride.playing).toBe(true);
+    expect(ride.km).toBeLessThan(1);
   });
 
   it("starts again from the start when played at the finish", () => {
@@ -194,6 +236,17 @@ describe("Back and Ride to the next stop", () => {
     expect(ride.playing).toBe(false);
   });
 
+  it("pressed while the Ride is playing straight through, still pauses at the next Stop", () => {
+    const { ride, run, secondsUntilItStops } = rideOn(nyc);
+    ride.playPause();
+    run(1);
+
+    ride.rideToNextStop();
+    secondsUntilItStops();
+
+    expect(ride.km).toBe(0.9);
+  });
+
   it("has nowhere to ride to from the finish", () => {
     const { ride } = rideOn(berlin);
     ride.seek(berlin.lengthKm);
@@ -240,9 +293,55 @@ describe("scrubbing during the Ride", () => {
     expect(ride.km).toBe(12.1); // the Barclays Center
   });
 
+  it("back behind an earlier Stop, rides to that one: never through a Stop it was asked to pause at", () => {
+    const { ride, run, secondsUntilItStops } = rideOn(nyc);
+    ride.seek(5);
+    ride.rideToNextStop(); // to the Barclays Center, km 12.1
+    run(1);
+
+    ride.seek(0.3);
+    secondsUntilItStops();
+
+    expect(ride.km).toBe(0.9); // the Verrazzano-Narrows Bridge, the next Stop from where the runner was put
+  });
+
+  it("wiggled round the Stop it was riding to, in one drag, still pauses at the next Stop from where it is let go", () => {
+    const { ride, secondsUntilItStops } = rideOn(nyc);
+    ride.seek(11.5);
+    ride.rideToNextStop();
+
+    ride.hold(true);
+    ride.seek(12.2);
+    ride.seek(11.9);
+    ride.hold(false);
+    secondsUntilItStops();
+
+    expect(ride.km).toBe(12.1); // the Barclays Center, not the climb after it
+  });
+
+  it("dragged to the finish and back in one hold, carries on from where it is let go: the Ride doesn't end under the pointer", () => {
+    for (const reducedMotion of [false, true]) {
+      const { ride, run } = rideOn(nyc, { reducedMotion });
+      ride.playPause();
+      run(2);
+
+      ride.hold(true);
+      ride.seek(nyc.lengthKm);
+      run(0.5);
+      expect(ride.playing, `reduced motion: ${reducedMotion}`).toBe(true);
+      ride.seek(30);
+      ride.hold(false);
+      run(0.5);
+
+      expect(ride.playing, `reduced motion: ${reducedMotion}`).toBe(true);
+      expect(ride.km).toBeGreaterThanOrEqual(30);
+    }
+  });
+
   it("waits while the runner holds the strip, so the cursor doesn't run out from under the pointer", () => {
     const { ride, run } = rideOn(nyc);
     ride.playPause();
+    run(1); // the Ride is under way when the runner takes the strip
 
     ride.hold(true);
     ride.seek(20);
@@ -302,6 +401,18 @@ describe("with reduced motion asked for", () => {
     expect(moves).toEqual([0.7, 12, 14.4]); // at once, then after 4 s and after 8 s
   });
 
+  it("switched on in the middle of a Ride to the next stop, still pauses at that Stop", () => {
+    const { ride, motion, run, secondsUntilItStops } = rideOn(nyc);
+    ride.seek(5);
+    ride.rideToNextStop(); // to the Barclays Center, km 12.1
+    run(2);
+
+    motion.reduced = true;
+    secondsUntilItStops();
+
+    expect(ride.km).toBe(12.1);
+  });
+
   it("makes Ride to the next stop a single step", () => {
     const { ride, moves } = rideOn(nyc, { reducedMotion: true });
 
@@ -327,7 +438,12 @@ describe("the Ride's two cameras", () => {
       onTheRoad.ride.playPause();
       const fromAbove = rideOn(course);
       fromAbove.ride.playPause();
-      expect(onTheRoad.secondsUntilItStops()).toBeGreaterThan(3 * fromAbove.secondsUntilItStops());
+      const secondsOnTheRoad = onTheRoad.secondsUntilItStops();
+
+      expect(onTheRoad.ride.km).toBe(course.lengthKm);
+      expect(onTheRoad.ride.playing).toBe(false);
+      expect(secondsOnTheRoad).toBeGreaterThan(3 * fromAbove.secondsUntilItStops());
+      expect(secondsOnTheRoad).toBeLessThan(15 * 60); // gentler, not endless
     }
   });
 
@@ -370,6 +486,62 @@ describe("the Ride as a mode of the screen", () => {
     expect(ride.playing).toBe(false);
     expect(ride.km).toBe(leftAt);
     expect(changes()).toBeGreaterThanOrEqual(4); // the controls were told each time
+  });
+
+  it("tells the controls whenever what they show changes, with no frame running to do it for them", () => {
+    const paused = rideOn(nyc);
+    paused.ride.playPause();
+    paused.ride.playPause();
+    const before = paused.changes();
+
+    paused.ride.useCamera("on-the-road");
+    expect(paused.changes()).toBe(before + 1);
+    paused.ride.useCamera("on-the-road"); // the same again is no news
+    expect(paused.changes()).toBe(before + 1);
+    paused.ride.leave(); // Back to the map from a paused Ride: the ordinary way out
+    expect(paused.changes()).toBe(before + 2);
+
+    const stepping = rideOn(nyc, { reducedMotion: true });
+    stepping.ride.rideToNextStop(); // one step, which also turns the Ride on
+    expect(stepping.changes()).toBeGreaterThanOrEqual(1);
+  });
+
+  it("stops where it is when left: the runner isn't sent back to the start", () => {
+    const { ride, run } = rideOn(nyc);
+    ride.seek(20);
+    ride.playPause();
+    run(1);
+
+    ride.leave();
+
+    expect(ride.km).toBeGreaterThan(20);
+  });
+
+  it("says of every move whether it rode there or jumped there, so the camera knows whether to follow or to glide", () => {
+    const clock = fakeFrames();
+    const hows: string[] = [];
+    const motion = { reduced: false };
+    const ride = createRide({ course: berlin, frames: clock.frames, reducedMotion: () => motion.reduced, onMove: (_km, how) => hows.push(how), onChange: () => undefined });
+
+    ride.seek(13);
+    ride.playPause();
+    clock.run(0.1);
+    expect(new Set(hows)).toEqual(new Set(["riding"])); // frame after frame
+
+    hows.length = 0;
+    ride.back(); // to Strausberger Platz
+    expect(hows).toEqual(["jump"]);
+
+    hows.length = 0;
+    motion.reduced = true;
+    ride.rideToNextStop(); // one step, to Moritzplatz
+    expect(hows).toEqual(["jump"]);
+
+    hows.length = 0;
+    motion.reduced = false;
+    ride.seek(berlin.lengthKm);
+    ride.playPause(); // played at the finish: back to the start
+    expect(hows).toEqual(["jump"]);
   });
 
   it("is not started by scrubbing: Explore stays Explore", () => {

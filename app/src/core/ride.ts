@@ -31,6 +31,8 @@ interface Pace {
   easeOverKm: number;
   /** The fastest the view may swing round, degrees a second: through a sharp turn the Ride eases off to keep to it. */
   mostSwingDegPerS: number;
+  /** However sharp the turn, the Ride keeps moving at least this fast: a view that must turn right round would otherwise stand still. */
+  slowestThroughATurnKmPerS: number;
 }
 
 /**
@@ -39,8 +41,12 @@ interface Pace {
  * so the time-lapse is gentler (PLAN.md D33, §6 "The ride"), and slows to a fast run at a Stop.
  */
 const PACE: Record<RideCamera, Pace> = {
-  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20 },
-  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.015, slowWithinKm: 0.04, easeOverKm: 0.3, mostSwingDegPerS: 45 },
+  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.08 },
+  // On the road the camera looks at the runner from 25 m behind, so a street corner swings the view
+  // a quarter turn in those 25 m: the Ride takes it as a vehicle would, in about two seconds. Round
+  // the sharpest turn of all (New York's, back on itself at Columbus Circle) it is down to 3 m/s for
+  // a moment, which is the pace of the run itself: the time-lapse is never slower than the race.
+  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.015, slowWithinKm: 0.04, easeOverKm: 0.3, mostSwingDegPerS: 45, slowestThroughATurnKmPerS: 0.003 },
 };
 
 /**
@@ -60,14 +66,15 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
  * How much course goes by in a second of the Ride at `km`: slow at a Stop, easing up to the cruise
  * away from one, and easing off through a turn sharp enough to whip the view round (at a
  * time-lapse's speed a city block's corner is one; New York's Bronx mile is five in a row).
- * Never slower for a turn than it is at a Stop.
  */
 export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
   const pace = PACE[camera];
   const paced = pace.slowKmPerS + (pace.cruiseKmPerS - pace.slowKmPerS) * cruising(course, km, camera);
   const swing = course.swingDegPerKm?.(km, camera) ?? 0;
-  return swing > 0 ? Math.max(Math.min(paced, pace.mostSwingDegPerS / swing), pace.slowKmPerS) : paced;
+  return swing > 0 ? Math.min(paced, Math.max(pace.mostSwingDegPerS / swing, pace.slowestThroughATurnKmPerS)) : paced;
 }
+
+export type HowItMoved = "riding" | "jump";
 
 /** The browser's animation frames, or a test's stand-in for them. */
 export interface Frames {
@@ -81,8 +88,12 @@ export interface RideOptions {
   frames: Frames;
   /** Asked again at every step: a runner can ask their system for reduced motion while the app is open. */
   reducedMotion(): boolean;
-  /** The Ride has moved the runner to `km`. */
-  onMove(km: number): void;
+  /**
+   * The Ride has moved the runner to `km`: "riding", it rode there, a frame's worth further on;
+   * "jump", it is somewhere else at once (Back, a step from Stop to Stop with reduced motion, the
+   * start again after the finish). Whoever moves a camera follows the one and glides to the other.
+   */
+  onMove(km: number, how: HowItMoved): void;
   /** Something the Ride's controls show has changed: whether it is on, whether it is playing, the camera. */
   onChange(): void;
 }
@@ -135,30 +146,38 @@ export function createRide(options: RideOptions): Ride {
   const onFrame = (nowMs: number) => {
     waitingFor = null;
     if (!playing) return;
-    // Time that went by while the strip was held is not ridden afterwards.
-    const sinceLastFrame = lastFrameMs === null || held ? 0 : (nowMs - lastFrameMs) / 1000;
+    const sinceLastFrame = lastFrameMs === null ? 0 : (nowMs - lastFrameMs) / 1000;
     const seconds = Math.min(sinceLastFrame, LONGEST_FRAME_SECONDS);
     lastFrameMs = nowMs;
+    if (held) {
+      // The runner has the strip: the Ride waits wherever they put it, the finish included, and the
+      // time that goes by is not ridden afterwards. It doesn't end under their pointer.
+      waitingFor = frames.request(onFrame);
+      return;
+    }
     if (options.reducedMotion()) {
       // No continuous movement: the Ride stands at a Stop, then is at the next one. Standing is
       // timed by the clock, not by capped frames: on a slow machine four seconds are still four.
       stoodSeconds += sinceLastFrame;
-      if (stoodSeconds >= SECONDS_AT_EACH_STOP) stepToNextStop();
-      if (atTheFinish()) setPlaying(false);
+      const arrived = stoodSeconds >= SECONDS_AT_EACH_STOP;
+      if (arrived) stepToNextStop();
+      // A Ride to the next stop ends at that Stop, however it got there: reduced motion can be
+      // asked for in the middle of one.
+      if (atTheFinish() || (arrived && untilKm !== null)) setPlaying(false);
       else waitingFor = frames.request(onFrame);
       return;
     }
     // A finish listed a hair past the end of the course line is still reached.
     const endKm = Math.min(untilKm ?? course.lengthKm, course.lengthKm);
-    if (seconds > 0) moveTo(Math.min(km + rideSpeedKmPerS(course, km, camera) * seconds, endKm));
+    if (seconds > 0) moveTo(Math.min(km + rideSpeedKmPerS(course, km, camera) * seconds, endKm), "riding");
     if (km >= endKm) setPlaying(false);
     else waitingFor = frames.request(onFrame);
   };
 
-  const moveTo = (next: number) => {
+  const moveTo = (next: number, how: HowItMoved) => {
     km = clamp(next, 0, course.lengthKm);
     stoodSeconds = 0;
-    options.onMove(km);
+    options.onMove(km, how);
   };
 
   /** On the last of the course: a Finish listed a few metres short of the end of the line is the end. */
@@ -166,7 +185,7 @@ export function createRide(options: RideOptions): Ride {
 
   const stepToNextStop = () => {
     const next = stopsAround(course.stops, km).next;
-    moveTo(next === null ? course.lengthKm : course.stops[next].km);
+    moveTo(next === null ? course.lengthKm : course.stops[next].km, "jump");
   };
 
   const setPlaying = (next: boolean) => {
@@ -199,7 +218,7 @@ export function createRide(options: RideOptions): Ride {
       // Played at the finish, it is the whole course again: there is nowhere further to ride.
       const fromTheStart = !playing && atTheFinish();
       setPlaying(!playing);
-      if (fromTheStart) moveTo(0);
+      if (fromTheStart) moveTo(0, "jump");
     },
     pause() {
       setPlaying(false);
@@ -222,15 +241,16 @@ export function createRide(options: RideOptions): Ride {
     back() {
       setPlaying(false);
       const back = stopsAround(course.stops, km).back;
-      if (back !== null) moveTo(course.stops[back].km);
+      if (back !== null) moveTo(course.stops[back].km, "jump");
     },
     seek(next) {
       km = clamp(next, 0, course.lengthKm);
       stoodSeconds = 0;
-      // Put past the Stop it was riding to, it rides to the next one from where it is now.
-      if (untilKm !== null && km >= untilKm) {
+      // A Ride to the next stop rides to the next Stop from wherever the runner is put: past the one
+      // it was aiming for, or back behind an earlier one, it never goes through a Stop without pausing.
+      if (untilKm !== null) {
         const following = stopsAround(course.stops, km).next;
-        untilKm = following === null ? null : course.stops[following].km;
+        untilKm = following === null ? course.lengthKm : course.stops[following].km;
       }
     },
     hold(next) {

@@ -14,7 +14,7 @@ import { stopsFor } from "../src/core/stops";
 
 const sceneFor = (id: string): RideScene => {
   const bundle = parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${id}/course-bundle.json`, import.meta.url), "utf8")), id);
-  return { line: bundle.measured.course_line, stops: stopsFor(bundle) };
+  return { line: bundle.measured.course_line, stops: stopsFor(bundle), notMeasured: bundle.measured.elevation_not_measured };
 };
 const nyc = sceneFor("nyc");
 const berlin = sceneFor("berlin");
@@ -37,7 +37,31 @@ function cornerCourse(): RideScene {
     difficulty: km.map(() => 1),
     bearing_deg: km.map((at) => (at < 2 ? 0 : 90)),
   };
-  return { line, stops: [{ km: 0 }, { km: 4 }] };
+  return { line, stops: [{ km: 0 }, { km: 4 }], notMeasured: [] };
+}
+
+/**
+ * 3 km due north: up at 2% for the first km, then a 1 km bridge whose deck nobody scanned, filled
+ * in as a straight level line, then down at 3%. A real bridge between those two grades crests over the fill.
+ */
+function bridgeCourse(): RideScene {
+  const km = Array.from({ length: 301 }, (_, i) => i / 100);
+  const grade = km.map((at) => (at < 1 ? 0.02 : at < 2 ? 0 : -0.03));
+  const height: number[] = [];
+  km.forEach((_, i) => height.push(i === 0 ? 100 : height[i - 1] + grade[i - 1] * 10));
+  const line: CourseLine = {
+    spacing_m: 10,
+    length_m: 3000,
+    km,
+    lat: km.map((at) => 52.5 + (at * 1000) / M_PER_DEG_LAT),
+    lon: km.map(() => 13.4),
+    elevation_m: height.map((h) => h - 39.5),
+    ellipsoid_height_m: height,
+    grade,
+    difficulty: grade.map(() => 1),
+    bearing_deg: km.map(() => 0),
+  };
+  return { line, stops: [{ km: 0 }, { km: 3 }], notMeasured: [{ km_start: 1, km_end: 2, reason: "The scan has a gap here." }] };
 }
 
 /** Metres north and east of `from` to `to`: good to a centimetre over the few hundred metres used here. */
@@ -99,12 +123,90 @@ describe("On the road", () => {
     }
   });
 
-  it("rides at the road's own height above the ellipsoid: on the Verrazzano's deck, not at sea level, and tens of metres up in Berlin", () => {
+  it("keeps the runner in the middle of the view round every corner, hairpin and loop of both courses", () => {
+    for (const scene of [cornerCourse(), nyc, berlin]) {
+      const lengthKm = scene.line.length_m / 1000;
+      for (let km = 0; km <= lengthKm; km += 0.01) {
+        const view = rideView(scene, km, "on-the-road");
+        const toRunner = metersFrom(view.eye, positionAtKm(scene.line, km));
+        const toRunnerDeg = (Math.atan2(toRunner.east, toRunner.north) * 180) / Math.PI;
+        // CesiumJS's view is 60° across: more than 30° off the way the camera faces is out of shot.
+        expect(Math.abs(relativeBearing(view.headingDeg, toRunnerDeg)), `km ${km.toFixed(2)}`).toBeLessThan(5);
+      }
+    }
+  });
+
+  it("stays on the road itself, so it is never inside a building on a corner", () => {
+    for (const scene of [nyc, berlin]) {
+      const { line } = scene;
+      for (let km = 0.05; km <= line.length_m / 1000; km += 0.01) {
+        const { eye } = rideView(scene, km, "on-the-road");
+        const behind = positionAtKm(line, km - 0.025); // where a vehicle 25 m behind the runner would be
+        const off = metersFrom(behind, eye);
+        expect(Math.hypot(off.north, off.east), `km ${km.toFixed(2)}`).toBeLessThan(1);
+      }
+    }
+  });
+
+  it("faces the way the road goes on every straight, whichever way that is, due north included", () => {
+    let straights = 0;
+    for (const scene of [nyc, berlin]) {
+      const { line } = scene;
+      for (let i = 10; i < line.km.length - 10; i += 1) {
+        const around = line.bearing_deg.slice(i - 6, i + 6);
+        if (around.some((bearing) => Math.abs(relativeBearing(line.bearing_deg[i], bearing)) > 1)) continue; // not a straight
+        straights += 1;
+        const view = rideView(scene, line.km[i], "on-the-road");
+        expect(Math.abs(relativeBearing(line.bearing_deg[i], view.headingDeg)), `km ${line.km[i]}`).toBeLessThan(3);
+      }
+    }
+    expect(straights).toBeGreaterThan(3000); // most of both courses, New York's northbound avenues among them
+  });
+
+  it("looks up a climb and down a descent: the road ahead is what it looks at", () => {
+    const scene = bridgeCourse();
+    const onTheFlat = rideView(cornerCourse(), 1, "on-the-road").pitchDeg;
+
+    expect(rideView(scene, 0.5, "on-the-road").pitchDeg).toBeGreaterThan(onTheFlat + 0.5); // climbing at 2%
+    expect(rideView(scene, 2.5, "on-the-road").pitchDeg).toBeLessThan(onTheFlat - 0.5); // coming down at 3%
+  });
+
+  it("rides higher where the height is filled in, by as much as a bridge between those two grades would crest over the fill", () => {
+    const scene = bridgeCourse();
+    const over = (km: number) => rideView(scene, km, "on-the-road").eye.heightM - positionAtKm(scene.line, km - 0.025).ellipsoidHeightM;
+
+    expect(over(0.5)).toBeCloseTo(ON_THE_ROAD_HEIGHT_M, 6); // measured road: the one setting
+    expect(over(2.5)).toBeCloseTo(ON_THE_ROAD_HEIGHT_M, 6);
+    // Up at 2%, down at 3%, 1000 m between: a road's curve between them crests (0.02 + 0.03) x 1000 / 8 = 6.25 m over the straight fill.
+    expect(over(1.525)).toBeCloseTo(ON_THE_ROAD_HEIGHT_M + 6.25, 1);
+    expect(over(1.275)).toBeCloseTo(ON_THE_ROAD_HEIGHT_M + 6.25 * 0.75, 1); // a quarter of the way: three quarters of the crest
+  });
+
+  it("never rides lower for a filled-in dip: down into it and up out of it, the fill is already the high line", () => {
+    const scene = bridgeCourse();
+    scene.line.grade = scene.line.grade.map((grade) => -grade);
+
+    const over = rideView(scene, 1.525, "on-the-road").eye.heightM - positionAtKm(scene.line, 1.5).ellipsoidHeightM;
+
+    expect(over).toBeCloseTo(ON_THE_ROAD_HEIGHT_M, 6);
+  });
+
+  it("clears the Verrazzano's unscanned main span, which the plan says is a few metres under the real deck", () => {
+    const midSpan = 1.065; // the middle of km 0.77 to 1.36
+    const eye = rideView(nyc, midSpan + 0.025, "on-the-road").eye.heightM;
+    const filledIn = positionAtKm(nyc.line, midSpan).ellipsoidHeightM;
+
+    expect(eye - filledIn).toBeGreaterThan(ON_THE_ROAD_HEIGHT_M + 2.5);
+    expect(eye - filledIn).toBeLessThan(ON_THE_ROAD_HEIGHT_M + 6);
+  });
+
+  it("rides at the road's own height above the ellipsoid: on the Verrazzano's measured approach, not at sea level, and tens of metres up in Berlin", () => {
     // Sea level is about 32.5 m below the ellipsoid in New York and 39.5 m above it in Berlin (PLAN.md D51).
-    const onTheBridge = rideView(nyc, 1.0, "on-the-road").eye.heightM;
+    // Km 0.6 is on the bridge's approach, where the LiDAR measured the deck (the unscanned span begins at km 0.77).
+    const onTheBridge = rideView(nyc, 0.6, "on-the-road").eye.heightM;
     const inBerlin = rideView(berlin, 10, "on-the-road").eye.heightM;
 
-    expect(onTheBridge).toBeGreaterThan(20); // the deck is some 60 m over the water: at sea level this would be about -30
+    expect(onTheBridge).toBeGreaterThan(20); // the deck is tens of metres over the water: at sea level this would be about -30
     expect(onTheBridge).toBeLessThan(50);
     expect(inBerlin).toBeGreaterThan(70); // streets 30 to 50 m above sea level, plus 39.5
     expect(inBerlin).toBeLessThan(95);

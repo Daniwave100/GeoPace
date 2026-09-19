@@ -8,7 +8,8 @@ import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
-import { createRide, type Ride, type RideCamera } from "./core/ride";
+import { createRide, type HowItMoved, type Ride, type RideCamera } from "./core/ride";
+import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
 import { rideCourseFor, type RideScene, rideView } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
@@ -135,10 +136,14 @@ async function start(): Promise<void> {
   // Esc is the way out of anything that has taken over the screen. (A dialog takes Esc for itself first.)
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && fullMap && !document.querySelector("dialog[open]")) useFullMap(false);
-    if (isSpaceForTheRide(event)) {
-      event.preventDefault(); // the space bar would otherwise scroll the page
-      if (!event.repeat) showing?.ride.playPause(); // held down, a key repeats: one press is one play or one pause
-    }
+    const forTheRide = spaceBarForTheRide(event, { rideOn: showing?.ride.on ?? false, dialogOpen: document.querySelector("dialog[open]") !== null, focus: focusIsOn(event.target) });
+    if (forTheRide === null) return;
+    event.preventDefault(); // or the space bar scrolls the page, or presses whichever of the player's buttons has the focus
+    if (forTheRide === "play-pause") showing?.ride.playPause();
+  });
+  // A button is pressed when the space bar comes up, not when it goes down: in the player that press is the Ride's.
+  document.addEventListener("keyup", (event) => {
+    if (event.key === " " && focusIsOn(event.target) === "player" && !document.querySelector("dialog[open]")) event.preventDefault();
   });
   systemDark.addEventListener("change", showTheme); // "Auto" keeps following the system while the app is open
   switches.show(units, themeChoice);
@@ -196,7 +201,7 @@ async function show(courseId: string): Promise<void> {
   const course = plannerCourse(bundle);
   const layers = layersFor(bundle);
   const stops = stopsFor(bundle);
-  const rideScene = { line: bundle.measured.course_line, stops };
+  const rideScene: RideScene = { line: bundle.measured.course_line, stops, notMeasured: bundle.measured.elevation_not_measured };
   showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, ride: startRide(rideScene) };
   wasRiding = false;
   showPlan();
@@ -302,7 +307,8 @@ function usePlacement(next: Placement): void {
   if (placement === next) return;
   placement = next;
   showLayers(); // the course line with its marks, the labels, and through showWhere the runner and the end dots
-  if (showing?.ride.on) followTheRide(); // the road the camera rides over has changed height with the course
+  // A camera the Ride is holding needs no telling: it asks where it should be before every frame,
+  // and the road it rides over has just changed height with the course.
 }
 
 /** The strip as it should be now: its rows, its key, and the size the runner has made it. */
@@ -348,7 +354,7 @@ function scrubTo(km: number): void {
   if (!showing) return;
   showing.ride.seek(km);
   showWhere(km);
-  if (showing.ride.on) followTheRide();
+  if (showing.ride.on) followTheRide("jump");
 }
 
 /** Where the runner is: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */
@@ -383,9 +389,9 @@ function startRide(scene: RideScene): Ride {
     course: rideCourseFor(scene),
     frames: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
     reducedMotion: () => reducedMotion.matches,
-    onMove: (km) => {
+    onMove: (km, how) => {
       showWhere(km);
-      followTheRide();
+      followTheRide(how);
     },
     onChange: showRide,
   });
@@ -397,10 +403,14 @@ function startRide(scene: RideScene): Ride {
 function showRide(): void {
   if (!showing) return;
   showWhere(showing.km); // paused, the strip says where that is; and the controls follow
-
-  if (showing.ride.on) followTheRide();
-  // Left: Explore gets the whole course back, as it opens.
-  else if (wasRiding) frameWholeCourse(flightSeconds());
+  // Started, resumed after the runner looked around, or given the other camera: the camera glides
+  // to where the Ride is. Paused, it is there already and stays the Ride's until the map is touched.
+  if (showing.ride.on) followTheRide("jump");
+  else if (wasRiding) {
+    // Left: the camera is the runner's again, and Explore gets the whole course back, as it opens.
+    rideCamera?.letGo();
+    frameWholeCourse(flightSeconds());
+  }
   wasRiding = showing.ride.on;
 }
 
@@ -420,14 +430,19 @@ function showRideControls(): void {
 }
 
 /**
- * Take the camera to where the Ride is. The road's height under it is the Course Bundle's own
- * where the course is drawn at road height, and our open terrain's where it is draped on the
- * keyless map; never anything read from photoreal imagery (PLAN.md D5).
+ * Hold the camera on the Ride (scene/ride-camera.ts). Where that is, is asked afresh before every
+ * frame, so it follows the runner, the camera the runner picked, and the road's height: the Course
+ * Bundle's own where the course is drawn at road height, our open terrain's where it is draped on
+ * the keyless map; never anything read from photoreal imagery (PLAN.md D5).
  */
-function followTheRide(): void {
+function followTheRide(how: HowItMoved): void {
   if (!showing || !viewer || !rideCamera) return;
-  const heightAt = placement === "draped" ? roadHeightOnTheMap(viewer.scene.globe) : undefined;
-  rideCamera.show(rideView(showing.rideScene, showing.km, showing.ride.camera, { heightAt, leftOfRunner: leftOfMiddle(viewer, coveredLeftPx()) }));
+  const riding = showing; // this course's Ride: where its runner is, is read again each frame
+  const map = viewer;
+  rideCamera.follow(() => {
+    const heightAt = placement === "draped" ? roadHeightOnTheMap(map.scene.globe) : undefined;
+    return rideView(riding.rideScene, riding.km, riding.ride.camera, { heightAt, leftOfRunner: leftOfMiddle(map, coveredLeftPx()) });
+  }, how);
 }
 
 /**
@@ -446,11 +461,14 @@ function pauseTheRideWhenTheMapIsMoved(): void {
   map.addEventListener("wheel", takeTheMap, { capture: true, passive: true });
 }
 
-/** The space bar plays and pauses the Ride, except where it already means something: in a button, a box, a dialog. */
-function isSpaceForTheRide(event: KeyboardEvent): boolean {
-  if (event.key !== " " || event.altKey || event.ctrlKey || event.metaKey) return false;
-  if (document.querySelector("dialog[open]")) return false;
-  return !(event.target instanceof Element && event.target.closest("button, input, select, textarea, summary, a[href]"));
+/** What has the keyboard's focus, as far as the space bar cares (core/ride-keys.ts). */
+function focusIsOn(target: EventTarget | null): WhereThePressLands["focus"] {
+  if (!(target instanceof Element)) return "page";
+  if (target.closest("#ride")) return "player";
+  if (target.closest("button, input, select, textarea, summary, a[href]")) return "control";
+  if (target.closest("#globe")) return "map";
+  if (target.closest("#strip")) return "strip";
+  return "page";
 }
 
 /** The small dots at the start and at the finish of the course. */

@@ -6,7 +6,7 @@
 // Every height here is the Course Bundle's own height above the ellipsoid, or, on the keyless
 // map, our own open terrain's (the caller says which, through `heightAt`). Nothing is ever read
 // from photoreal imagery, which is for looking at only (PLAN.md D5).
-import type { CourseLine } from "../bundle/types";
+import type { CourseLine, NotMeasuredSpan } from "../bundle/types";
 import { relativeBearing } from "./bearing";
 import { cruising, type RideCamera, type RideCourse } from "./ride";
 import { positionAtKm, type RoadPosition } from "./scrub";
@@ -20,18 +20,28 @@ import { positionAtKm, type RoadPosition } from "./scrub";
 export const ON_THE_ROAD_HEIGHT_M = 3;
 
 const ON_THE_ROAD = {
-  /** How far behind the runner the camera follows, along the road itself, so it is never inside a building on a corner. */
-  behindM: 25,
-  /** It looks at the road's height this far ahead of the runner: up a climb looks up, over a crest looks down. */
-  aheadM: 50,
   /**
-   * The stretch of road whose direction the camera faces, from behind the runner to ahead of them.
-   * The longer it is, the slower the view swings through a corner: a city block's 90° takes 200 m
-   * of road, which at the cruise is under two seconds. Mostly ahead, so the camera turns into a
-   * corner as the runner reaches it.
+   * How far behind the runner the camera follows, along the road itself: where a vehicle behind
+   * them would be. On the road, it is never inside a building on a corner. It looks at the runner,
+   * so they are always in the middle of the view, round any corner, hairpin or loop; how fast the
+   * view swings round is kept down by the Ride easing off through the turn (core/ride.ts), the way
+   * a vehicle slows into a corner.
    */
-  facing: { behindM: 60, aheadM: 140 },
+  behindM: 25,
 };
+
+/**
+ * Where the height is filled in, the road was not surveyed: the Course Bundle holds a straight
+ * line between the measured heights either side (PLAN.md D45), and a bridge that is climbed on
+ * to and descended from crests above that line (§5 says so of the Verrazzano's main span: "the
+ * real crest is a few meters higher"). Three metres over the fill would put the camera in the
+ * deck. So there the camera rides over an estimate of the crest: a road's curve between two grades
+ * is near enough a parabola, which rises (grade in - grade out) x length / 8 over the straight
+ * line at its middle. The grades are read this far outside the stretch, clear of the 50 m
+ * smoothing that blends the fill into its ends. It is an estimate for keeping the camera out of
+ * the road, and nothing else: never shown, and never where a height is measured.
+ */
+const GRADE_READ_KM = { from: 0.05, to: 0.15 };
 
 const FROM_ABOVE = {
   /** Degrees below the horizon: enough tilt for the city to read as 3D, enough height to read the course like a map. */
@@ -55,6 +65,8 @@ export interface RideScene {
   line: CourseLine;
   /** In course order (core/stops.ts). */
   stops: { km: number }[];
+  /** Where the height is filled in rather than measured (the Course Bundle's `elevation_not_measured`). */
+  notMeasured: NotMeasuredSpan[];
 }
 
 export interface RideView {
@@ -97,9 +109,9 @@ export function rideCourseFor(scene: RideScene): RideCourse {
   };
 }
 
-/** Which way a camera faces at `km`. */
+/** Which way a camera faces at `km`: On the road, at the runner from the road behind them; From above, the way the course is going. */
 function headingAt(line: CourseLine, km: number, camera: RideCamera): number {
-  if (camera === "on-the-road") return facingDeg(line, km, ON_THE_ROAD.facing);
+  if (camera === "on-the-road") return bearingDeg(placeAlong(line, km - ON_THE_ROAD.behindM / 1000), placeAlong(line, km));
   return bearingDeg(placeAlong(line, km - FROM_ABOVE.facing.behindM / 1000), placeAlong(line, km + FROM_ABOVE.facing.aheadM / 1000));
 }
 
@@ -110,10 +122,12 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
   const headingDeg = headingAt(line, km, camera);
 
   if (camera === "on-the-road") {
-    const eye = placeAlong(line, km - ON_THE_ROAD.behindM / 1000);
-    const heightM = heightAt(eye) + ON_THE_ROAD_HEIGHT_M;
-    const ahead = positionAtKm(line, km + ON_THE_ROAD.aheadM / 1000);
-    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(heightAt(ahead) - heightM, ON_THE_ROAD.behindM + ON_THE_ROAD.aheadM) / RAD };
+    const eyeKm = km - ON_THE_ROAD.behindM / 1000;
+    const eye = placeAlong(line, eyeKm);
+    const heightM = heightAt(eye) + crestOverTheFillM(scene, eyeKm) + ON_THE_ROAD_HEIGHT_M;
+    // It looks at the road where the runner is: up a climb it looks up, over a crest it looks down.
+    const roadAtRunnerM = heightAt(runner) + crestOverTheFillM(scene, km);
+    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadAtRunnerM - heightM, ON_THE_ROAD.behindM) / RAD };
   }
 
   const course = { lengthKm: line.length_m / 1000, stops: scene.stops };
@@ -152,41 +166,31 @@ function bearingDeg(from: { lat: number; lon: number }, to: { lat: number; lon: 
 }
 
 /**
- * The way the road is going around `km`: the mean of its heading from `behindM` behind to
- * `aheadM` ahead. A mean of headings, not the direction of the straight line between the two ends:
- * on a hairpin (New York has two, on and off the Queensboro Bridge) the two ends are side by side
- * and that line spins round in a few metres.
+ * How far above the Course Bundle's filled-in height the road is likely to be at `km`: nothing
+ * where the height is measured, and over a filled-in stretch the rise of a parabola between the
+ * grade the road arrives at and the grade it leaves at. Never less than nothing: into a dip and
+ * out of it, the straight line is already the high one.
  */
-function facingDeg(line: CourseLine, km: number, facing: { behindM: number; aheadM: number }): number {
-  const sums = headingSums(line);
-  const last = line.km.length - 1;
-  // In samples, which are evenly spaced; the stretch is cut off at the ends of the course.
-  const perKm = last / (line.km[last] - line.km[0]);
-  const from = Math.max((km - line.km[0] - facing.behindM / 1000) * perKm, 0);
-  const to = Math.min((km - line.km[0] + facing.aheadM / 1000) * perKm, last);
-  const sumTo = (at: number) => {
-    const whole = Math.min(Math.floor(at), last - 1);
-    return sums[whole] + (sums[whole + 1] - sums[whole]) * (at - whole);
-  };
-  const mean = to > from ? (sumTo(to) - sumTo(from)) / (to - from) : sums[1] - sums[0];
-  return ((mean % 360) + 360) % 360;
+function crestOverTheFillM(scene: RideScene, km: number): number {
+  const span = scene.notMeasured.find((candidate) => km > candidate.km_start && km < candidate.km_end);
+  if (!span) return 0;
+  const { line } = scene;
+  const gradeIn = meanGrade(line, span.km_start - GRADE_READ_KM.to, span.km_start - GRADE_READ_KM.from);
+  const gradeOut = meanGrade(line, span.km_end + GRADE_READ_KM.from, span.km_end + GRADE_READ_KM.to);
+  if (gradeIn === null || gradeOut === null) return 0; // the stretch runs to an end of the course: nothing to read a grade from
+  const crestM = Math.max(((gradeIn - gradeOut) * (span.km_end - span.km_start) * 1000) / 8, 0);
+  const along = (km - span.km_start) / (span.km_end - span.km_start);
+  return 4 * crestM * along * (1 - along);
 }
 
-/** For each course line, the running total of its heading sample by sample, so a mean over any stretch is two lookups. Worked out once. */
-const SUMS = new WeakMap<CourseLine, number[]>();
-
-function headingSums(line: CourseLine): number[] {
-  let sums = SUMS.get(line);
-  if (!sums) {
-    sums = [0];
-    // The heading with the turns added up rather than wrapped at 360: north by east by south is
-    // 0, 90, 180, and once more round is 360, so a mean across a turn is the way between.
-    let unwrapped = line.bearing_deg[0];
-    line.bearing_deg.forEach((bearing, i) => {
-      if (i > 0) unwrapped += ((((bearing - line.bearing_deg[i - 1]) % 360) + 540) % 360) - 180;
-      sums!.push(sums![i] + unwrapped);
-    });
-    SUMS.set(line, sums);
-  }
-  return sums;
+/** The mean grade of the course line's samples between two places; null where there are none. */
+function meanGrade(line: CourseLine, fromKm: number, toKm: number): number | null {
+  let sum = 0;
+  let count = 0;
+  line.km.forEach((km, i) => {
+    if (km < fromKm || km > toKm) return;
+    sum += line.grade[i];
+    count += 1;
+  });
+  return count > 0 ? sum / count : null;
 }

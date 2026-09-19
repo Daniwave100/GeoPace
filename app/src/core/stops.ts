@@ -7,8 +7,13 @@ import { hillStretches } from "./hills";
 import { plainName } from "./sentence";
 import { formatHeight, formatNearby, type Units } from "./units";
 
-/** Two Stops closer than this are one place: the Ride would arrive at the second before it had left the first. */
+/** A climb that begins this close to a Stop is not a Stop of its own: the Ride would arrive at it before it had left the other. */
 const SAME_PLACE_KM = 0.3;
+/**
+ * Closer to a Stop than this, the runner is on it. Half of the 50 m that a distance to the next
+ * Stop is rounded to (core/units.ts), so a runner who is not yet on a Stop is never told it is 0 m away.
+ */
+export const ON_THE_STOP_KM = 0.025;
 /**
  * A climb gets a Stop of its own when it gains at least this much. New York: the Verrazzano,
  * Lafayette Avenue, the Queensboro and Fifth Avenue, which are the ones runners talk about;
@@ -26,29 +31,26 @@ export interface Stop {
 
 /**
  * The Stops of a course, in course order: the start, every landmark, the big climbs, and the
- * finish. Both ends are always there, so Back and Ride to the next stop can reach them. Every
- * landmark is a Stop, however close to another; anything else gives way to a Stop that already
- * stands on its place (both courses list their finish as a landmark, and the Verrazzano's climb
- * begins at the start).
+ * finish. Every landmark is a Stop, however close to another. Both ends are always Stops, so Back
+ * and Ride to the next stop can reach them: an end is only left out where a landmark stands on
+ * it and so is that end already (both courses list their finish as a landmark). A climb gives way
+ * to any Stop near its foot (the Verrazzano's begins at the start).
  */
 export function stopsFor(bundle: CourseBundle): Stop[] {
   const lengthKm = bundle.measured.course_line.length_m / 1000;
   const stops = bundle.course.landmarks.map((landmark): Stop => ({ km: landmark.km, kind: "landmark", name: () => landmark.name }));
-  const add = (stop: Stop) => {
-    if (!stops.some((other) => Math.abs(other.km - stop.km) < SAME_PLACE_KM)) stops.push(stop);
+  const add = (stop: Stop, withinKm: number) => {
+    if (!stops.some((other) => Math.abs(other.km - stop.km) <= withinKm)) stops.push(stop);
   };
-  add({ km: 0, kind: "start", name: () => "Start" });
-  add({ km: lengthKm, kind: "finish", name: () => "Finish" });
+  add({ km: 0, kind: "start", name: () => "Start" }, ON_THE_STOP_KM);
+  add({ km: lengthKm, kind: "finish", name: () => "Finish" }, ON_THE_STOP_KM);
   for (const hill of hillStretches(bundle)) {
     // A Stop named "Climb of 40 m" is a claim about height. Where any of that height is filled in
     // rather than measured, the number is a guess, and a guess names nothing (PLAN.md D45).
-    if (hill.kind === "climb" && hill.gainM >= CLIMB_WORTH_A_STOP_M && hill.notMeasuredKm === 0) add({ km: hill.fromKm, kind: "climb", name: (units) => `Climb of ${formatHeight(hill.gainM, units)}` });
+    if (hill.kind === "climb" && hill.gainM >= CLIMB_WORTH_A_STOP_M && hill.notMeasuredKm === 0) add({ km: hill.fromKm, kind: "climb", name: (units) => `Climb of ${formatHeight(hill.gainM, units)}` }, SAME_PLACE_KM);
   }
   return stops.sort((a, b) => a.km - b.km);
 }
-
-/** Closer to a Stop than this, the runner is on it: two samples of the course line, not a distance anyone rides. */
-export const ON_THE_STOP_KM = 0.02;
 
 /** The Stops around a place on the course, by their position in the list; null where there is none. */
 export interface StopsAround {

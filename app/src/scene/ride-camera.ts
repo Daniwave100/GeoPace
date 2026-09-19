@@ -1,15 +1,22 @@
 // The Ride's camera in the 3D scene (issue #8). Where it should be is worked out in
 // core/ride-view.ts from the course line alone; this file only takes CesiumJS's camera there.
 //
-// While the Ride moves, the camera is put exactly where the view says, frame by frame. A view that
-// is far from where the camera is (the start of the Ride, Back, a switch of cameras, the runner
-// having looked around while paused) is reached in a moment's glide rather than a cut, except
-// with reduced motion asked for, when it is a cut. Whenever the Ride isn't asking for a new view
-// the camera is left alone, so paused, the map is the runner's to orbit, pan and zoom.
+// From the moment the Ride takes the camera until the runner takes the map, the camera is the
+// Ride's, and it is put where the Ride wants it before every frame is drawn, playing or paused:
+//  - the view is asked for afresh each frame, so the road's height under it follows our terrain as
+//    finer tiles arrive, and the imagery as it comes and goes, with nobody having to say so;
+//  - and whatever else moves the camera in between is undone before anyone sees it. CesiumJS
+//    lifts a camera it finds under a surface it may collide with, which in photoreal is the top of
+//    whatever stands over the road (a tree, the Queensboro's upper deck): left to it, a Ride paused
+//    On the road would pop up onto the bridge. The Ride's height comes from our own data (PLAN.md D5).
+// The Ride says whether it simply rode on, in which case the camera is put there, or is somewhere
+// else (its start, Back, the other camera, a scrub, Play after the runner looked around), in which
+// case the camera gets there in a moment's glide rather than a cut; with reduced motion asked
+// for, it is a cut. Paused, the map is the runner's the instant they touch it: `letGo`.
 //
 // Nothing here waits for a tile. On the keyless map the road's height is asked of our own open
-// terrain, and where that has no answer yet (or never will: its tiles failed) the Course
-// Bundle's own height is used. Photoreal imagery is never asked anything (PLAN.md D5).
+// terrain, and where that has no answer the Course Bundle's own height is used. Photoreal imagery
+// is never asked anything.
 import { Cartesian3, Cartographic, type Event, Math as CesiumMath } from "cesium";
 import { relativeBearing } from "../core/bearing";
 import type { HeightAt, RideView } from "../core/ride-view";
@@ -34,44 +41,39 @@ export interface RideCameraOptions {
 }
 
 export interface RideCamera {
-  /** Take the camera to this view: at once if it is a frame's ride away, in a moment's glide if it is further. */
-  show(view: RideView): void;
-  /** The runner has taken hold of the map: the camera is theirs from this moment, even in the middle of a glide. */
+  /**
+   * Hold the camera on the Ride. `view` is asked again before every frame until the next `follow`
+   * or `letGo`. `how` is what the Ride just did: "riding", it moved on and the camera is put there;
+   * "jump", it is somewhere else and the camera glides there (or cuts, with reduced motion).
+   */
+  follow(view: () => RideView, how: "riding" | "jump"): void;
+  /** The runner has taken hold of the map, or the Ride is over: the camera is theirs from this moment, even in the middle of a glide. */
   letGo(): void;
 }
 
-/** How long the glide to a far-off view takes: the map's own flights take the same (main.ts). */
+/** How long a glide takes: the map's own flights take the same (main.ts). */
 const GLIDE_SECONDS = 0.8;
-/** Further than a frame of the Ride can carry the camera (55 m, from above at the cruise): a view this far off is glided to. */
-const FAR_OFF_M = 150;
-/** A long glide rises in the middle, so that between two places at road height it goes over the city and not through it. */
+/** A long glide rises in the middle, by this much of the ground it covers, so that between two places at road height it goes over the city and not through it. */
 const RISE_PER_M = 0.25;
 const MOST_RISE_M = 1200;
+/** Closer to the view than this, in metres and in degrees, the camera is there already: nothing to glide. */
+const THERE = { meters: 1, degrees: 1 };
 
 export function createRideCamera(viewer: SceneForRide, options: RideCameraOptions): RideCamera {
   const { camera } = viewer;
-  /** The view still to be shown; null once it has been, and the camera is the runner's again. */
-  let wanted: RideView | null = null;
-  /** The view last asked for, to tell a Ride moving on from a jump to somewhere else. */
-  let lastAsked: RideView | null = null;
+  /** Where the Ride wants the camera, asked each frame; null while the camera is the runner's. */
+  let wanted: (() => RideView) | null = null;
   let glide: { from: RideView; startedMs: number; riseM: number } | null = null;
 
   viewer.scene.preRender.addEventListener(() => {
     if (!wanted) return;
-    if (!glide) {
-      put(wanted);
-      wanted = null; // until the Ride asks again, the camera is the runner's
-      return;
-    }
+    const view = wanted();
+    if (!glide) return put(view);
     const t = Math.min((options.now() - glide.startedMs) / (GLIDE_SECONDS * 1000), 1);
     // Quick away and soft to land: dragging the strip starts a new glide with every move of the
     // pointer, and one that was slow to start would never get going.
-    const eased = 1 - (1 - t) ** 3;
-    put(between(glide.from, wanted, eased, glide.riseM));
-    if (t >= 1) {
-      glide = null;
-      wanted = null;
-    }
+    put(between(glide.from, view, 1 - (1 - t) ** 3, glide.riseM));
+    if (t >= 1) glide = null;
   });
 
   function put(view: RideView): void {
@@ -82,19 +84,17 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
   }
 
   return {
-    show(view) {
-      const from = whereItIs(camera);
-      const awayM = metersApart(from, view);
-      // A new glide when the Ride has jumped somewhere else, or when the camera isn't where the Ride
-      // left it (the runner looked around). A Ride that simply moves on while a glide is under way
-      // doesn't start another: the glide ends on wherever the Ride has got to.
-      const jumped = lastAsked !== null && metersApart(lastAsked, view) > FAR_OFF_M;
+    follow(view, how) {
+      wanted = view;
       if (options.reducedMotion()) glide = null;
-      else if (jumped || (!glide && awayM > FAR_OFF_M)) {
-        camera.cancelFlight();
-        glide = { from, startedMs: options.now(), riseM: Math.min(awayM * RISE_PER_M, MOST_RISE_M) };
+      else if (how === "jump") {
+        const from = whereItIs(camera);
+        const to = view();
+        // A Ride that simply moves on while a glide is under way doesn't start another: the glide
+        // ends on wherever the Ride has got to. A jump does, from wherever the camera has got to.
+        glide = isThere(from, to) ? null : { from, startedMs: options.now(), riseM: Math.min(groundBetweenM(from, to) * RISE_PER_M, MOST_RISE_M) };
+        if (glide) camera.cancelFlight();
       }
-      wanted = lastAsked = view;
     },
     letGo() {
       wanted = null;
@@ -112,8 +112,15 @@ function whereItIs(camera: SceneForRide["camera"]): RideView {
   };
 }
 
-function metersApart(a: RideView, b: RideView): number {
-  return Cartesian3.distance(Cartesian3.fromDegrees(a.eye.lon, a.eye.lat, a.eye.heightM), Cartesian3.fromDegrees(b.eye.lon, b.eye.lat, b.eye.heightM));
+/** Whether a camera at `from` is, to the eye, already at `to`: the place, and the way it faces. */
+function isThere(from: RideView, to: RideView): boolean {
+  const apartM = Cartesian3.distance(Cartesian3.fromDegrees(from.eye.lon, from.eye.lat, from.eye.heightM), Cartesian3.fromDegrees(to.eye.lon, to.eye.lat, to.eye.heightM));
+  return apartM < THERE.meters && Math.abs(relativeBearing(from.headingDeg, to.headingDeg)) < THERE.degrees && Math.abs(from.pitchDeg - to.pitchDeg) < THERE.degrees;
+}
+
+/** How much ground lies between two views, whatever their heights. */
+function groundBetweenM(a: RideView, b: RideView): number {
+  return Cartesian3.distance(Cartesian3.fromDegrees(a.eye.lon, a.eye.lat, 0), Cartesian3.fromDegrees(b.eye.lon, b.eye.lat, 0));
 }
 
 /** The view `t` of the way from one to another (0 to 1), turning the short way round, and `riseM` higher in the middle. */
