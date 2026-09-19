@@ -34,6 +34,16 @@ Drag the strip's **top edge** to make its rows taller or to give the map the roo
 **Full map** (or F) gives it the whole screen and **Straight down** (or B) looks from directly above
 like a paper map.
 
+Press **Ride the course**, on the map, and the runner is carried from the start to the finish as a
+time-lapse: quick along the open road and slow at each **Stop** (the start, every landmark, the big
+climbs, the finish), a couple of minutes for the whole course. The button becomes a player: **Back** and
+**Ride to the next stop** move between Stops and pause on arrival, the **space bar** plays and pauses,
+and the strip is the seek bar. Two cameras, switched whenever you like: **From above**, and **On the
+road**, which follows a few metres up and behind like the lead vehicle's camera, at a gentler
+time-lapse. The readout, the sentence, the layer that is on and the sun keep up. Paused, the map is
+yours to look around; touching the map pauses. If your system asks for reduced motion, nothing glides:
+the Ride steps from Stop to Stop. **Back to the map** returns to Explore.
+
 **Your race plan** opens from the banner: the edition, your start wave, and a goal as a finish time
 or a pace, with a table of splits whose rows jump the runner there. The banner also switches between
 **km and miles** (everything follows: feet, pace per mile, splits per mile) and between **light and
@@ -46,7 +56,8 @@ start time nobody has published is never filled with a guess: pick it and type i
 time**, from your start card. You can do the same on any wave, and your own time always wins.
 
 The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
-app needs an internet connection.
+app needs an internet connection to show them. If they can't be reached, the course, the strip, the
+layers and the Ride all still work, over a plain grey ground.
 
 ### Make it photoreal (optional)
 

@@ -4,9 +4,13 @@
 // What must hold (issue #8): the camera follows the Ride exactly, gets to a far-off view in a
 // moment rather than in a cut, cuts when reduced motion is asked for, is the runner's own again
 // whenever the Ride isn't moving it, and never needs a terrain or imagery tile to have arrived.
+import { readFileSync } from "node:fs";
 import { Cartesian3, Cartographic, Event, Math as CesiumMath } from "cesium";
 import { describe, expect, it } from "vitest";
-import type { RideView } from "../src/core/ride-view";
+import { parseCourseBundle } from "../src/bundle/loader";
+import { createRide } from "../src/core/ride";
+import { rideCourseFor, rideView, type RideView } from "../src/core/ride-view";
+import { stopsFor } from "../src/core/stops";
 import type { RoadPosition } from "../src/core/scrub";
 import { createRideCamera, roadHeightOnTheMap } from "../src/scene/ride-camera";
 
@@ -164,3 +168,47 @@ describe("the road's height on the keyless map", () => {
     expect(roadHeightOnTheMap({ getHeight: () => Number.NaN })(place)).toBe(28);
   });
 });
+
+// Issue #8: "Simulated tile failure leaves the course, the strip and the layers working." The
+// course, the strip and the layers are made from the Course Bundle alone, and the Ride moves them
+// through scrubbing; what could depend on a tile is the camera. Here every tile has failed: the
+// open terrain never answers, and no imagery is ever asked anything.
+describe("the Ride with every tile failed", () => {
+  it("rides New York from the start to the finish On the road, at the Course Bundle's own heights", () => {
+    const nyc = parseCourseBundle(JSON.parse(readFileSync(new URL("../../data/derived/nyc/course-bundle.json", import.meta.url), "utf8")), "nyc");
+    const scene = { line: nyc.measured.course_line, stops: stopsFor(nyc) };
+    const { viewer, shots, now, run } = fakeViewer();
+    const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
+    const heightAt = roadHeightOnTheMap({ getHeight: () => undefined }); // the terrain's tiles never arrived
+    let frame: ((nowMs: number) => void) | null = null;
+    const moves: number[] = [];
+    const ride = createRide({
+      course: rideCourseFor(scene),
+      frames: { request: (callback) => ((frame = callback), 1), cancel: () => (frame = null) },
+      reducedMotion: () => false,
+      onMove: (km) => {
+        moves.push(km); // what moves the strip's cursor, the readout, the sentence and the layer's clause
+        camera.show(rideView(scene, km, ride.camera, { heightAt }));
+      },
+      onChange: () => undefined,
+    });
+    ride.useCamera("on-the-road");
+
+    ride.playPause();
+    for (let ms = 0; ride.playing && ms < 3_600_000; ms += 100) {
+      const callback = frame as ((nowMs: number) => void) | null;
+      frame = null;
+      callback?.(ms);
+      run(1 / 60);
+    }
+
+    expect(ride.km).toBe(scene.line.length_m / 1000);
+    expect(moves.length).toBeGreaterThan(1000);
+    expect(shots.every((shot) => [shot.lat, shot.lon, shot.heightM, shot.headingDeg, shot.pitchDeg].every(Number.isFinite))).toBe(true);
+    // On the Verrazzano's deck, tens of metres over the water, not at the sea level a missing terrain might suggest.
+    const onTheBridge = shots.filter((shot) => shot.lat > 40.603 && shot.lat < 40.609 && shot.lon < -74.03 && shot.heightM < 200);
+    expect(onTheBridge.length).toBeGreaterThan(10);
+    expect(Math.min(...onTheBridge.map((shot) => shot.heightM))).toBeGreaterThan(20);
+  });
+});
+

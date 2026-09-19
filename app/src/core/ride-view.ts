@@ -13,8 +13,9 @@ import { positionAtKm, type RoadPosition } from "./scrub";
 
 /**
  * On the road: how far above the road the camera rides. The one setting issue #8 asks for. A lead
- * vehicle's camera height: the imagery sets no floor (PLAN.md D33), and the Queensboro's lower
- * deck, which runners use, has only about 4 m of room under the upper one.
+ * vehicle's camera height: the imagery sets no floor (PLAN.md D33), and it has to fit under the
+ * Queensboro's upper deck, which the LiDAR puts 6.4 m above the lower one runners use (D23),
+ * its own structure included.
  */
 export const ON_THE_ROAD_HEIGHT_M = 3;
 
