@@ -76,6 +76,12 @@ export interface CameraInTheScene {
   lookAround(runner: () => ScenePlace): void;
   /** The Ride is over, or the map is someone else's to fly: the camera is untied and left where it is, even in the middle of a glide. */
   letGo(): void;
+  /**
+   * Whether the camera is the Ride's or the runner's in free look, rather than the map's own. What
+   * the map's bounds ask before they move it (scene/map-bounds.ts): both of those are tied to the
+   * runner on the course, and neither is ever outside the vicinity the map is held to.
+   */
+  holdsTheCamera(): boolean;
 }
 
 /** How long a glide takes: the map's own flights take the same (main.ts). */
@@ -203,6 +209,9 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
       untie();
       wanted = null;
       glide = null;
+    },
+    holdsTheCamera() {
+      return wanted !== null || tied !== null;
     },
   };
 }
