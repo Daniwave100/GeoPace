@@ -38,7 +38,7 @@ A named, sourced place on the course.
 _Avoid_: point of interest, marker
 
 **Stop**:
-A place the Ride slows down for: a landmark, or a stretch where something happens.
+A place the Ride slows down for: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). For a stretch, the Ride arrives where it begins, and stays slow to where it ends.
 _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 
 ### The runner's plan
@@ -84,6 +84,21 @@ _Avoid_: flyover, tour, playback, video, walkthrough
 **From above** / **On the road**:
 The Ride's two cameras. From above looks down on the runner from the air; On the road follows from a few metres up and behind, the way a lead vehicle films a race.
 _Avoid_: bird's-eye mode, drive cam, runner's-eye, first-person
+
+**Time-lapse**:
+How the Ride passes the course: far quicker than any runner, quick between Stops and slow at them, and gentler On the road than From above.
+_Avoid_: fast-forward, speed-up, animation
+
+**Cruise**:
+The time-lapse's speed on the open road between Stops.
+
+**Player**:
+The Ride's controls, on the top of the map: Back, play or pause, Ride to the next stop, the two cameras, and Back to the map. In Explore the same place holds the one button, "Ride the course".
+_Avoid_: transport bar, toolbar, media controls
+
+**Glide**:
+The moment's move the camera makes when the Ride jumps somewhere else (its start, Back, the other camera, a scrub, Play after the runner has looked around), instead of a cut. With reduced motion asked for, it is a cut.
+_Avoid_: flight (a flight is the map's own move to the whole course or to the runner), transition
 
 **Map**:
 The city seen from above with the course drawn on it. It is the same scene the Ride moves through, not a separate thing.

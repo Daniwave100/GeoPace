@@ -6,11 +6,11 @@
 // gets there, and never drifts from the readout.
 import {
   BoundingSphere,
-  Cartesian2,
   Cartesian3,
   Cartesian4,
   Cartographic,
   CesiumTerrainProvider,
+  Color,
   Credit,
   HeadingPitchRange,
   ImageryLayer,
@@ -30,6 +30,9 @@ import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
 import { registerCourseRibbon } from "./course-ribbon";
+import { groundUnderM } from "./ground-under";
+import { middleOfTheMap } from "./map-middle";
+import { plainGroundIfTerrainFails } from "./plain-ground";
 import { BASEMAP, TERRAIN } from "./providers";
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -47,6 +50,7 @@ export function createGlobe(container: HTMLElement): Viewer {
   Ion.defaultAccessToken = "";
   registerCourseRibbon();
 
+  const terrain = new Terrain(CesiumTerrainProvider.fromUrl(TERRAIN.url));
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
       new OpenStreetMapImageryProvider({
@@ -55,7 +59,7 @@ export function createGlobe(container: HTMLElement): Viewer {
         credit: new Credit(BASEMAP.creditHtml, true),
       }),
     ),
-    terrain: new Terrain(CesiumTerrainProvider.fromUrl(TERRAIN.url)),
+    terrain,
     // Everything below would otherwise reach for Cesium ion (which needs a key) or add clutter.
     baseLayerPicker: false,
     geocoder: false,
@@ -68,6 +72,8 @@ export function createGlobe(container: HTMLElement): Viewer {
     infoBox: false,
     selectionIndicator: false,
   });
+
+  plainGroundIfTerrainFails(terrain, viewer.scene.globe);
 
   // Light the ground from wherever the sun is at the scene's clock, which the race clock sets.
   // Cesium normally fades this lighting out once the camera is within ~10,000 km of the ground,
@@ -119,6 +125,15 @@ export function isStillFramed(viewer: Viewer): boolean {
   return from !== undefined && Cartesian3.equalsEpsilon(from, viewer.camera.positionWC, 0, 0.5);
 }
 
+/**
+ * How far to the left of something the camera has to be, as a fraction of its distance from it,
+ * for that thing to be in the middle of the part of the map that `coveredLeftPx` leaves clear. The
+ * Ride's From above camera keeps the runner there, as the framing of the whole course does the course.
+ */
+export function leftOfMiddle(viewer: Viewer, coveredLeftPx: number): number {
+  return sidewaysShiftM({ fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx, rangeM: 1 });
+}
+
 function horizontalFov(viewer: Viewer): number {
   const frustum = viewer.camera.frustum;
   if (!(frustum instanceof PerspectiveFrustum) || frustum.fov === undefined) return CesiumMath.toRadians(60);
@@ -150,9 +165,9 @@ export function isLookingStraightDown(viewer: Viewer): boolean {
  * like a map.
  */
 export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
-  const canvas = viewer.canvas;
-  const middle = viewer.camera.pickEllipsoid(new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
-  if (!middle) return; // looking at the sky: there is no place to keep in the middle
+  // On the ground under the camera, not on the ellipsoid, which a camera over a New York street is inside of (map-middle.ts).
+  const middle = middleOfTheMap(viewer.camera, viewer.canvas, viewer.camera.positionCartographic.height - heightAboveGround(viewer));
+  if (!middle) return;
   const rangeM = Math.max(Cartesian3.distance(viewer.camera.positionWC, middle), 300);
   const tiltRad = isLookingStraightDown(viewer) ? CAMERA_TILT_RAD : CesiumMath.PI_OVER_TWO;
   viewer.camera.flyToBoundingSphere(new BoundingSphere(middle, 1), { offset: new HeadingPitchRange(0, -tiltRad, rangeM), duration: seconds });
@@ -164,6 +179,10 @@ export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
  * basemap layer is touched. Photoreal imagery is Google's and is shown as it comes.
  */
 export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
+  // The ground under the basemap: what is on screen where a map tile hasn't arrived, or can't
+  // (PLAN.md D16: the map service is best-effort). A quiet grey the course's blue reads on, in
+  // place of CesiumJS's deep blue, which is the course's own colour.
+  viewer.scene.globe.baseColor = Color.fromCssColorString(theme === "dark" ? "#33332f" : "#deded8");
   const basemap = viewer.imageryLayers.get(0);
   if (!basemap) return;
   basemap.brightness = theme === "dark" ? 0.55 : 1;
@@ -171,10 +190,18 @@ export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
   basemap.saturation = theme === "dark" ? 0.15 : 1;
 }
 
-/** How far the camera is above the plain ground under it, or above the ellipsoid where no ground is loaded. */
+/** For each map, how high the road is where the runner is, from the Course Bundle: the ground while photoreal has hidden the globe (ground-under.ts). */
+const roadWhenHidden = new WeakMap<Viewer, () => number | undefined>();
+
+/** Say where to ask for the road's own height. Asked only while the plain ground is hidden, each time it is needed. */
+export function useRoadAsGroundWhenHidden(viewer: Viewer, roadM: () => number | undefined): void {
+  roadWhenHidden.set(viewer, roadM);
+}
+
+/** How far the camera is above the ground under it (never less than a metre, so the ground is always under the camera). */
 function heightAboveGround(viewer: Viewer): number {
   const eye = viewer.camera.positionCartographic;
-  return Math.max(eye.height - (viewer.scene.globe.getHeight(eye) ?? 0), 1);
+  return Math.max(eye.height - groundUnderM(viewer.scene.globe, eye, roadWhenHidden.get(viewer)), 1);
 }
 
 /** Move the map a quarter of a screen: `right` and `up` are -1, 0 or 1, as on the arrow keys. */
@@ -223,10 +250,21 @@ export function watchCameraHeight(viewer: Viewer, onHeight: (meters: number | nu
     }
     if (mine === asked) onHeight(meters);
   };
-  const stopListening = viewer.camera.moveEnd.addEventListener(() => void measure());
+  // CesiumJS says the camera has come to rest before the frame is drawn, and before the Ride, if it
+  // is holding the camera, has put it where that frame is drawn from (scene/ride-camera.ts): read
+  // then, it is the camera CesiumJS nudged, a view nobody sees. It is read once that frame is drawn.
+  let waitingForTheFrame: (() => void) | undefined;
+  const stopListening = viewer.camera.moveEnd.addEventListener(() => {
+    waitingForTheFrame ??= viewer.scene.postRender.addEventListener(() => {
+      waitingForTheFrame?.();
+      waitingForTheFrame = undefined;
+      void measure();
+    });
+  });
   void measure();
   return () => {
     asked += 1; // an answer still on its way is no longer wanted
     stopListening();
+    waitingForTheFrame?.();
   };
 }

@@ -3,8 +3,10 @@
 //
 // It is the poster's band of rows on one axis, drawn the instrument's way (D31): each row is a
 // thin trace with a light fill and a labelled scale, and the value under the cursor is printed
-// in the row's header. Collapsed, it is the landmarks, the height and the blue line with where
+// in the row's header. Collapsed, it is the Stops' names, the height and the blue line with where
 // you are on it. A layer that is switched on adds its rows; "Show everything" adds every row.
+// The names along the top are the Ride's Stops (core/stops.ts): every landmark, the start, and
+// the climbs worth stopping for. Scrubbing the strip moves the Ride, as it moves the runner in Explore.
 //
 // To a screen reader it is a slider, which is what it is: one value between two ends. All the
 // arithmetic lives in core/ (scrub.ts, trace.ts, layout.ts, units.ts), where it is tested; this
@@ -21,10 +23,10 @@ import { html } from "../dom";
 import { drawToFit, svg } from "../svg";
 
 const RIGHT_PAD = 28;
-const LANDMARKS_HEIGHT = 58;
-const LANDMARK_LANE = 12.5;
+const STOPS_HEIGHT = 58;
+const STOP_LANE = 12.5;
 /** Archivo at 11.5px and 78% width: its average advance, for keeping names off each other. */
-const LANDMARK_CHAR = 6;
+const STOP_NAME_CHAR = 6;
 const BASE_ROW_HEIGHT = 62;
 const LAYER_ROW_HEIGHT = 48;
 const LINE_HEIGHT = 40;
@@ -35,7 +37,8 @@ const PIXELS_PER_BIN = 3;
 
 export interface StripContent {
   lengthKm: number;
-  landmarks: { name: string; km: number }[];
+  /** The Ride's Stops, named in the runner's units: every landmark is one. */
+  stops: { name: string; km: number }[];
   /** The strip's own row, there whatever the layers are doing: the height of the course. */
   baseRow: StripRow;
   /** The rows of the layers that are on (or of all of them, with "Show everything"). */
@@ -59,14 +62,25 @@ export function rowsHeightAtSizeOne(content: Pick<StripContent, "layerRows">): n
 
 export interface Strip {
   show(content: StripContent): void;
-  /** Put the cursor at `km`. `spoken` is what a screen reader says: "kilometre 21.1, 11:10, 2:00:00 elapsed". */
-  setKm(km: number, spoken: string): void;
+  /**
+   * Put the cursor at `km`. `spoken` is what a screen reader says: "kilometre 21.1, 11:10, 2:00:00
+   * elapsed". `quietly` keeps it from being said now: a Ride that is playing moves the cursor sixty
+   * times a second, and that many sentences is noise. It is still what the slider says the moment
+   * the keyboard comes to it.
+   */
+  setKm(km: number, spoken: string, quietly?: boolean): void;
 }
 
-/** `onScrub` is called with the km the runner asked for; the caller decides and calls `setKm` back. */
-export function createStrip(container: HTMLElement, onScrub: (km: number) => void): Strip {
+/**
+ * `onScrub` is called with the km the runner asked for; the caller decides and calls `setKm` back.
+ * `onHold` is told when the runner takes hold of the strip with the pointer, and when they let go:
+ * a Ride that is playing waits in between, so the cursor doesn't run out from under the pointer.
+ */
+export function createStrip(container: HTMLElement, onScrub: (km: number) => void, onHold: (held: boolean) => void): Strip {
   let content: StripContent | undefined;
   let km = 0;
+  /** What the slider says of where the runner is; written to it by `sayWhere`. */
+  let said = "";
   let moveCursor: (() => void) | undefined;
 
   const rowsBox = html("div", { class: "strip-rows" });
@@ -74,6 +88,13 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-valuemin": 0 }, rowsBox, heads);
   const key = html("p", { class: "strip-key" });
   container.replaceChildren(slider, key);
+
+  const sayWhere = () => {
+    if (content) slider.setAttribute("aria-valuenow", distanceNumber(km, content.units));
+    slider.setAttribute("aria-valuetext", said);
+  };
+  // Moved quietly while a Ride plays, the slider may be a whole course behind: it catches up as the keyboard arrives.
+  slider.addEventListener("focus", sayWhere);
 
   /** How far along the strip's km axis the pointer is: the axis starts after the row headers. */
   const scrubToPointer = (event: PointerEvent) => {
@@ -86,8 +107,11 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
     if (event.button !== 0) return;
     slider.setPointerCapture(event.pointerId); // keep following the pointer if it leaves the strip
     slider.focus();
+    onHold(true);
     scrubToPointer(event);
   });
+  // However the hold ends: the button comes up, the touch is cancelled, the browser takes the pointer away.
+  slider.addEventListener("lostpointercapture", () => onHold(false));
   slider.addEventListener("pointermove", (event) => {
     if (slider.hasPointerCapture(event.pointerId)) scrubToPointer(event);
   });
@@ -124,23 +148,23 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
       key.replaceChildren(...next.key.map((entry) => html("span", {}, html("b", { text: `${entry.name} ` }), entry.meaning)));
       redraw();
     },
-    setKm(value, spoken) {
+    setKm(value, spoken, quietly = false) {
       km = value;
-      if (content) slider.setAttribute("aria-valuenow", distanceNumber(value, content.units));
-      slider.setAttribute("aria-valuetext", spoken);
+      said = spoken;
+      if (!quietly) sayWhere();
       moveCursor?.();
     },
   };
 }
 
-/** The rows are what resizes; the landmarks' lane and the blue line keep their height, since they are type, not traces. */
+/** The rows are what resizes; the Stops' lane and the blue line keep their height, since they are type, not traces. */
 function rowHeight(row: StripRow, content: StripContent): number {
   return Math.round((row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT) * content.size);
 }
 
-/** The landmarks' lane, every row, and the blue line. */
+/** The Stops' lane, every row, and the blue line. */
 function stripHeight(content: StripContent): number {
-  return LANDMARKS_HEIGHT + [content.baseRow, ...content.layerRows].reduce((sum, row) => sum + rowHeight(row, content), 0) + LINE_HEIGHT;
+  return STOPS_HEIGHT + [content.baseRow, ...content.layerRows].reduce((sum, row) => sum + rowHeight(row, content), 0) + LINE_HEIGHT;
 }
 
 interface HeadCell {
@@ -170,12 +194,12 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
 
   const marks = axisMarks(content.lengthKm, content.units);
   const chartBottom = height - LINE_HEIGHT;
-  for (const mark of marks) drawing.append(svg("line", { x1: x(mark.km), x2: x(mark.km), y1: LANDMARKS_HEIGHT, y2: chartBottom, class: "strip-grid" }));
+  for (const mark of marks) drawing.append(svg("line", { x1: x(mark.km), x2: x(mark.km), y1: STOPS_HEIGHT, y2: chartBottom, class: "strip-grid" }));
 
-  drawing.append(landmarkLane(content, x));
+  drawing.append(stopLane(content, x));
 
   const headCells: HeadCell[] = [];
-  let top = LANDMARKS_HEIGHT;
+  let top = STOPS_HEIGHT;
   for (const row of rows) {
     const rowH = rowHeight(row, content);
     drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }), traceGroup(row, binCount, x, top, rowH));
@@ -216,29 +240,29 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   };
 }
 
-/** Landmark names in stacked lanes over the rows, each tied to its place by a hairline. */
-function landmarkLane(content: StripContent, x: Scale): SVGGElement {
+/** The Stops' names in stacked lanes over the rows, each tied to its place by a hairline. */
+function stopLane(content: StripContent, x: Scale): SVGGElement {
   const group = svg("g", {});
-  const laneCount = Math.max(1, Math.floor((LANDMARKS_HEIGHT - 6) / LANDMARK_LANE));
-  const names = content.landmarks.map((landmark) => shorten(plainName(landmark.name)));
-  const widths = names.map((name) => 8 + name.length * LANDMARK_CHAR);
+  const laneCount = Math.max(1, Math.floor((STOPS_HEIGHT - 6) / STOP_LANE));
+  const names = content.stops.map((stop) => shorten(plainName(stop.name)));
+  const widths = names.map((name) => 8 + name.length * STOP_NAME_CHAR);
   // Names near the finish are set to the left of their tick, so they stay on the strip.
-  const flipped = content.landmarks.map((landmark, i) => x(landmark.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
-  const spans = content.landmarks.map((landmark, i) => (flipped[i] ? { start: x(landmark.km) - widths[i], end: x(landmark.km) } : { start: x(landmark.km), end: x(landmark.km) + widths[i] }));
+  const flipped = content.stops.map((stop, i) => x(stop.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
+  const spans = content.stops.map((stop, i) => (flipped[i] ? { start: x(stop.km) - widths[i], end: x(stop.km) } : { start: x(stop.km), end: x(stop.km) + widths[i] }));
   // Where names crowd (New York's last 2 km), the last one gets its room first: it is the finish.
   const order = spans.map((_, i) => i);
   order.unshift(...order.splice(-1));
   const inOrder = assignFreeLanes(order.map((i) => spans[i]), laneCount, 6);
   const lanes = new Array<number | null>(spans.length).fill(null);
   order.forEach((i, position) => (lanes[i] = inOrder[position]));
-  content.landmarks.forEach((landmark, i) => {
-    const at = x(landmark.km);
+  content.stops.forEach((stop, i) => {
+    const at = x(stop.km);
     const lane = lanes[i];
     // No free lane (a narrow screen, a crowded finish): the tick stays, with the name in its tooltip.
-    const baseline = lane === null ? LANDMARKS_HEIGHT - 6 : 12 + lane * LANDMARK_LANE;
-    group.append(svg("line", { x1: at, x2: at, y1: baseline - 9, y2: LANDMARKS_HEIGHT, class: "strip-landmark-tick" }, svg("title", { text: landmark.name })));
+    const baseline = lane === null ? STOPS_HEIGHT - 6 : 12 + lane * STOP_LANE;
+    group.append(svg("line", { x1: at, x2: at, y1: baseline - 9, y2: STOPS_HEIGHT, class: "strip-stop-tick" }, svg("title", { text: stop.name })));
     if (lane === null) return;
-    group.append(svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-landmark", text: names[i] }, svg("title", { text: landmark.name })));
+    group.append(svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-stop", text: names[i] }, svg("title", { text: stop.name })));
   });
   return group;
 }

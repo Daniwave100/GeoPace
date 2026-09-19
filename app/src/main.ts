@@ -8,8 +8,12 @@ import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
+import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera, rideSpeedKmPerS } from "./core/ride";
+import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
+import { rideCourseFor, type RideScene, rideView } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
+import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
 import { loadStripSize, saveStripSize } from "./core/strip-size";
 import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
 import { distanceNumber, type Units, unitName } from "./core/units";
@@ -26,15 +30,17 @@ import { createSwitches } from "./explore/switches";
 import { createPhotoreal, type Photoreal } from "./photoreal/photoreal";
 import { createPhotorealPanel, type PhotorealPanel } from "./photoreal/photoreal-panel";
 import { createPlanPanel } from "./plan/plan-panel";
+import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isStillFramed, showMapTheme, showMoment, toggleStraightDown, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isStillFramed, leftOfMiddle, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import type { Placement } from "./scene/placement";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
+import { type CameraInTheScene, createRideCamera, roadHeightOnTheMap } from "./scene/ride-camera";
 import { createStrip, type KeyEntry, rowsHeightAtSizeOne } from "./strip/strip";
 import type { Viewer } from "cesium";
 
@@ -50,6 +56,12 @@ interface Showing {
   screen: OnScreen;
   /** The strip's own row, there whatever the layers are doing. */
   baseRow: StripRow;
+  /** The places the Ride slows down for, which the strip names along its top (core/stops.ts). */
+  stops: Stop[];
+  /** What the Ride's camera needs of the course: the course line and the Stops. */
+  rideScene: RideScene;
+  /** The Ride through this course: off until the runner rides, and then a mode of this same screen (PLAN.md D34). */
+  ride: Ride;
 }
 
 /** The layers a course has. Each later ticket adds its own here, and gets its switch, its rows, its marks and its clause. */
@@ -68,6 +80,15 @@ let stripSize = loadStripSize(storage);
 let fullMap = false;
 /** How the course is drawn on the map now: draped over the keyless map, at road height over photoreal imagery (issue #22). */
 let placement: Placement = "draped";
+/** The camera the runner last chose for the Ride: kept from one course to the next. */
+let rideCameraChoice: RideCamera = "from-above";
+/** Whether the screen was in the Ride when its controls were last shown: leaving it gives the whole course back. */
+let wasRiding = false;
+/** Whether the Ride was playing then: a pause is not a jump, and the camera must not be told it is one. */
+let wasPlaying = false;
+/** How much of the map's left side the readout block covers; null until it is next measured (`coveredLeftPx`). */
+let coveredLeft: number | null = null;
+let rideCamera: CameraInTheScene | undefined;
 let viewer: Viewer | undefined;
 let mapControls: MapControls | undefined;
 let mapLabels: MapLabels | undefined;
@@ -78,7 +99,10 @@ let showing: Showing | undefined;
 let loading = "";
 
 const planDialog = byId("plan-dialog") as HTMLDialogElement;
-const planSummary = createPlanSummary(byId("plan-summary"), () => planDialog.showModal());
+const planSummary = createPlanSummary(byId("plan-summary"), () => {
+  showing?.ride.pause(); // a Ride doesn't play on behind the plan
+  planDialog.showModal();
+});
 const planPanel = createPlanPanel(byId("plan"), usePlan);
 const splitsTable = createSplitsTable(byId("splits"), (km) => {
   planDialog.close(); // the runner picked a split to look at: get the plan out of the way of it
@@ -86,7 +110,17 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
 const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
-const strip = createStrip(byId("strip"), scrubTo);
+const strip = createStrip(byId("strip"), scrubTo, (held) => showing?.ride.hold(held));
+const rideControls = createRideControls(byId("ride"), {
+  playPause: () => showing?.ride.playPause(),
+  back: () => showing?.ride.back(),
+  rideToNextStop: () => showing?.ride.rideToNextStop(),
+  useCamera: (camera) => {
+    rideCameraChoice = camera;
+    showing?.ride.useCamera(camera);
+  },
+  leave: () => showing?.ride.leave(),
+});
 const stripEdge = createStripEdge(byId("strip-edge"), {
   rowsHeightAtSizeOne: () => rowsHeightAtSizeOne({ layerRows: showing?.screen.rows ?? [] }),
   onSize: (size) => useStripSize(size),
@@ -106,6 +140,14 @@ async function start(): Promise<void> {
   // Esc is the way out of anything that has taken over the screen. (A dialog takes Esc for itself first.)
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && fullMap && !document.querySelector("dialog[open]")) useFullMap(false);
+    const forTheRide = spaceBarForTheRide(event, { rideOn: showing?.ride.on ?? false, dialogOpen: document.querySelector("dialog[open]") !== null, focus: focusIsOn(event.target) });
+    if (forTheRide === null) return;
+    event.preventDefault(); // or the space bar scrolls the page, or presses the play button a second time
+    if (forTheRide === "play-pause") showing?.ride.playPause();
+  });
+  // A button is pressed when the space bar comes up, not when it goes down: on the play button that press is already made.
+  document.addEventListener("keyup", (event) => {
+    if (event.key === " " && focusIsOn(event.target) === "play" && !document.querySelector("dialog[open]")) event.preventDefault();
   });
   systemDark.addEventListener("change", showTheme); // "Auto" keeps following the system while the app is open
   switches.show(units, themeChoice);
@@ -147,18 +189,28 @@ async function show(courseId: string): Promise<void> {
     mapDots = createMapDots(viewer, byId("map-dots"));
     const map = viewer;
     mapControls = createMapControls(byId("map-controls"), byId("globe"), map, {
+      takesTheMap: takeTheMap,
       wholeCourse: () => frameWholeCourse(flightSeconds()),
       whereIAm: goToRunner,
       straightDown: () => toggleStraightDown(map, flightSeconds()),
       fullMap: () => useFullMap(!fullMap),
     });
+    // While photoreal hides the plain ground, the map's own moves count heights from the road where the runner is.
+    useRoadAsGroundWhenHidden(map, () => (showing ? positionAtKm(showing.bundle.measured.course_line, showing.km).ellipsoidHeightM : undefined));
+    rideCamera = createRideCamera(map, { reducedMotion: () => reducedMotion.matches, now: () => performance.now() });
+    pauseTheRideWhenTheMapIsMoved();
     showTheme();
   }
   photoreal ??= startPhotoreal(viewer);
 
+  showing?.ride.leave(); // a Ride through the course that is going away stops asking for frames
   const course = plannerCourse(bundle);
   const layers = layersFor(bundle);
-  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle) };
+  const stops = stopsFor(bundle);
+  const rideScene: RideScene = { line: bundle.measured.course_line, stops, notMeasured: bundle.measured.elevation_not_measured };
+  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, ride: startRide(rideScene) };
+  wasRiding = false;
+  wasPlaying = false;
   showPlan();
   // Framed last: the strip has just taken its height, and the map is whatever is left.
   frameWholeCourse(0);
@@ -219,6 +271,7 @@ function useStripSize(size: number): void {
 function useFullMap(on: boolean): void {
   const untouched = viewer !== undefined && isStillFramed(viewer);
   fullMap = on;
+  coveredLeft = null; // the readout block has stepped aside, or come back
   byId("explore").toggleAttribute("data-full-map", on);
   // The credits fold to one word, one press away; the map's own credits stay on the map.
   (byId("credits-more") as HTMLDetailsElement).open = !on;
@@ -249,7 +302,7 @@ function showLayers(): void {
   showStrip();
   showCourseLine(viewer, bundle, screen.lineMarks, placement);
   mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))], placement);
-  scrubTo(showing.km);
+  showWhere(showing.km);
 }
 
 /**
@@ -260,14 +313,16 @@ function showLayers(): void {
 function usePlacement(next: Placement): void {
   if (placement === next) return;
   placement = next;
-  showLayers(); // the course line with its marks, the labels, and through scrubTo the runner and the end dots
+  showLayers(); // the course line with its marks, the labels, and through showWhere the runner and the end dots
+  // A camera the Ride is holding needs no telling: it asks where it should be before every frame,
+  // and the road it rides over has just changed height with the course.
 }
 
 /** The strip as it should be now: its rows, its key, and the size the runner has made it. */
 function showStrip(): void {
   if (!showing) return;
-  const { bundle, baseRow, screen } = showing;
-  strip.show({ lengthKm: showing.planner.lengthKm, landmarks: bundle.course.landmarks, baseRow, layerRows: screen.rows, key: keyFor(bundle, screen), size: stripSize, units });
+  const { bundle, baseRow, screen, stops } = showing;
+  strip.show({ lengthKm: showing.planner.lengthKm, stops: stops.map((stop) => ({ name: stop.name(units), km: stop.km })), baseRow, layerRows: screen.rows, key: keyFor(bundle, screen), size: stripSize, units });
   stripEdge.show(stripSize);
 }
 
@@ -298,8 +353,22 @@ function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
   return { ...at, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
 }
 
-/** Scrubbing: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */
+/**
+ * Scrubbing: the runner asked to be somewhere, from the strip, a split, or a label on the map.
+ * In the Ride it moves the Ride, which carries on from there, and the camera comes along.
+ */
 function scrubTo(km: number): void {
+  if (!showing) return;
+  showing.ride.scrubbedTo(km);
+  showWhere(km, true);
+  if (showing.ride.on) followTheRide("jump");
+}
+
+/**
+ * Where the runner is: the strip's cursor, the readout, the sentence, the runner on the map and the
+ * sun, moved as one. `byHand` when the runner put themselves there, which is always worth saying.
+ */
+function showWhere(km: number, byHand = false): void {
   if (!showing || !viewer) return;
   const { planner, bundle } = showing;
   const readout = planner.at(km);
@@ -308,12 +377,116 @@ function scrubTo(km: number): void {
   const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: showing.screen.clause });
 
   // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
+  // A Ride that is playing moves the strip quietly: sixty new sentences a second is noise, and the
+  // Ride says each Stop as it arrives (ride-controls.ts). A scrub by hand during it is said.
   const carriedOver = planner.carriedOver ? `, from the ${planner.carriedOver.fromEdition} start time, carried over` : "";
-  strip.setKm(readout.km, `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`);
+  const spoken = `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`;
+  strip.setKm(readout.km, spoken, showing.ride.playing && !byHand);
   readoutView.show(planner, readout, units);
   sentenceView.show(sentence);
   mapDots?.show([...endDots(bundle), { id: "runner", look: "runner", place }], placement);
   showMoment(viewer, readout.instant);
+  showRideControls();
+}
+
+/**
+ * The Ride through a course (core/ride.ts). It moves the runner through `showWhere`, exactly as
+ * scrubbing does, so the strip, the readout, the sentence, the layer and the sun keep up with it;
+ * and it needs nothing from the map, so it carries on whatever happens to the map's tiles.
+ */
+function startRide(scene: RideScene): Ride {
+  const course = rideCourseFor(scene);
+  // How fast the Ride goes at every metre is worked out the first time it is asked, about 30 ms a
+  // camera: done now, while nothing is moving, rather than in the frame that follows the first Play.
+  setTimeout(() => RIDE_CAMERAS.forEach((camera) => rideSpeedKmPerS(course, 0, camera)), 0);
+  const ride = createRide({
+    course,
+    frames: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
+    reducedMotion: () => reducedMotion.matches,
+    onMove: (km, how) => {
+      showWhere(km);
+      followTheRide(how);
+    },
+    onChange: showRide,
+  });
+  ride.useCamera(rideCameraChoice);
+  return ride;
+}
+
+/** The Ride was started, paused, left, or given the other camera. */
+function showRide(): void {
+  if (!showing) return;
+  showWhere(showing.km); // paused, the strip says where that is; and the controls follow
+  // Started, resumed after the runner looked around, or given the other camera: the camera glides
+  // to where the Ride is. A pause is none of those. The camera is a frame behind the Ride when it
+  // comes (CesiumJS draws before the Ride's own frame runs), and told "jump" it would glide those
+  // last two metres with a rise in the middle: On the road, a nod of the whole view at every pause.
+  const paused = wasPlaying && !showing.ride.playing;
+  if (showing.ride.on) followTheRide(paused ? "riding" : "jump");
+  else if (wasRiding) {
+    // Left: the camera is the runner's again, and Explore gets the whole course back, as it opens.
+    rideCamera?.letGo();
+    frameWholeCourse(flightSeconds());
+  }
+  wasRiding = showing.ride.on;
+  wasPlaying = showing.ride.playing;
+}
+
+function showRideControls(): void {
+  if (!showing) return;
+  const { ride, stops } = showing;
+  const around = stopsAround(stops, ride.km);
+  rideControls.show({
+    on: ride.on,
+    playing: ride.playing,
+    camera: ride.camera,
+    stopLine: stopLine(stops, ride.km, units),
+    arrivedAt: around.on === null ? null : stopLine(stops, stops[around.on].km, units),
+    canGoBack: around.back !== null,
+    canRideOn: around.next !== null,
+  });
+}
+
+/**
+ * Hold the camera on the Ride (scene/ride-camera.ts). Where that is, is asked afresh before every
+ * frame, so it follows the runner, the camera the runner picked, and the road's height: the Course
+ * Bundle's own where the course is drawn at road height, our open terrain's where it is draped on
+ * the keyless map; never anything read from photoreal imagery (PLAN.md D5).
+ */
+function followTheRide(how: HowItMoved): void {
+  if (!showing || !viewer || !rideCamera) return;
+  const riding = showing; // this course's Ride: where its runner is, is read again each frame
+  const map = viewer;
+  rideCamera.follow(() => {
+    const heightAt = placement === "draped" ? roadHeightOnTheMap(map.scene.globe) : undefined;
+    return rideView(riding.rideScene, riding.km, riding.ride.camera, { heightAt, leftOfRunner: leftOfMiddle(map, coveredLeftPx()) });
+  }, how);
+}
+
+/**
+ * A hand on the map outranks the Ride: dragging it, scrolling it, and the map's own keys and
+ * buttons that move it pause a Ride that is playing, and stop a glide where it is. The map is
+ * then the runner's to orbit, pan and zoom until they ride on.
+ */
+function takeTheMap(): void {
+  showing?.ride.pause();
+  rideCamera?.letGo(); // after the pause, which asks for one last view of its own
+}
+
+function pauseTheRideWhenTheMapIsMoved(): void {
+  const map = byId("globe");
+  map.addEventListener("pointerdown", takeTheMap, { capture: true });
+  map.addEventListener("wheel", takeTheMap, { capture: true, passive: true });
+}
+
+/** What has the keyboard's focus, as far as the space bar cares (core/ride-keys.ts). */
+function focusIsOn(target: EventTarget | null): WhereThePressLands["focus"] {
+  if (!(target instanceof Element)) return "page";
+  if (target.closest(".ride-play, .ride-start, .ride-cameras")) return "play";
+  if (target.closest("button, input, select, textarea, summary, a[href]")) return "control";
+  if (target.closest("#globe")) return "map";
+  if (target.closest("#strip")) return "strip";
+  return "page";
 }
 
 /** The small dots at the start and at the finish of the course. */
@@ -338,10 +511,22 @@ function goToRunner(): void {
 /** The whole course, in the part of the map that the readout block leaves clear. */
 function frameWholeCourse(seconds: number): void {
   if (!showing || !viewer) return;
-  const block = document.querySelector<HTMLElement>(".where");
-  const overTheMap = block && getComputedStyle(block).position === "absolute";
-  frameCourse(viewer, showing.bundle.measured.course_line, overTheMap ? block.offsetWidth : 0, seconds);
+  frameCourse(viewer, showing.bundle.measured.course_line, coveredLeftPx(), seconds);
 }
+
+/**
+ * How much of the map's left side is under the readout block: none where the blocks stack under
+ * the map, or with the map on the full screen. Measured once per layout, not on every frame of
+ * the Ride: asking the page for a size in the middle of a frame makes it lay itself out again.
+ */
+function coveredLeftPx(): number {
+  if (coveredLeft === null) {
+    const block = document.querySelector<HTMLElement>(".where");
+    coveredLeft = block && getComputedStyle(block).position === "absolute" ? block.offsetWidth : 0;
+  }
+  return coveredLeft;
+}
+window.addEventListener("resize", () => (coveredLeft = null));
 
 /**
  * Photoreal is an extra on top of the scene, made once. Nothing else in the app waits for it or
@@ -349,7 +534,8 @@ function frameWholeCourse(seconds: number): void {
  */
 function startPhotoreal(globe: Viewer): Photoreal {
   const controller = createPhotoreal({ storage, loadTiles: (key) => loadPhotorealTiles(globe, key, (inPlace) => usePlacement(inPlace ? "road-height" : "draped")) });
-  const panel = (photorealPanel = createPhotorealPanel(byId("photoreal"), controller));
+  // A Ride doesn't play on behind the key panel, any more than behind the plan.
+  const panel = (photorealPanel = createPhotorealPanel(byId("photoreal"), controller, () => showing?.ride.pause()));
   panel.showUnits(units);
   // The camera's height is only wanted, and only asked of the terrain service, while photoreal is showing.
   let stopWatchingHeight: (() => void) | undefined;

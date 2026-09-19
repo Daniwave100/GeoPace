@@ -2,7 +2,7 @@
 // buttons drawn as blocks, so the arrow keys move between the choices with no code of ours.
 import { THEME_CHOICES, type ThemeChoice } from "../core/theme";
 import { unitName, UNITS, type Units } from "../core/units";
-import { html } from "../dom";
+import { segmented } from "../segmented";
 
 export interface Switches {
   show(units: Units, theme: ThemeChoice): void;
@@ -28,24 +28,4 @@ export function createSwitches(container: HTMLElement, onUnits: (units: Units) =
       theme.check(nextTheme);
     },
   };
-}
-
-interface Choice {
-  value: string;
-  label: string;
-  /** Said after the label by a screen reader, when the label on screen is an abbreviation: "km (kilometres)". */
-  explained: string;
-}
-
-function segmented(legend: string, name: string, choices: Choice[], onPick: (value: string) => void): { box: HTMLElement; check(value: string): void } {
-  const inputs = choices.map((choice) => html("input", { type: "radio", name, value: choice.value }));
-  const box = html(
-    "fieldset",
-    { class: "segmented" },
-    html("legend", { class: "visually-hidden", text: legend }),
-    // The name a screen reader says starts with the words on screen, so voice control can find it.
-    ...choices.map((choice, index) => html("label", {}, inputs[index], choice.label, ...(choice.explained ? [html("span", { class: "visually-hidden", text: ` (${choice.explained})` })] : []))),
-  );
-  for (const input of inputs) input.addEventListener("change", () => input.checked && onPick(input.value));
-  return { box, check: (value) => inputs.forEach((input) => (input.checked = input.value === value)) };
 }
