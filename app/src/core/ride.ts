@@ -96,6 +96,8 @@ export interface Ride {
   readonly camera: RideCamera;
   /** Play, or pause: what the button and the space bar do. Played, the Ride goes straight through to the finish. */
   playPause(): void;
+  /** Pause, if it is playing: what a hand on the map does. */
+  pause(): void;
   /** Ride to the next Stop and pause on arriving. */
   rideToNextStop(): void;
   /** Go back to the Stop just passed (from a Stop, to the one before it) and pause there. */
@@ -196,6 +198,9 @@ export function createRide(options: RideOptions): Ride {
       const fromTheStart = !playing && atTheFinish();
       setPlaying(!playing);
       if (fromTheStart) moveTo(0);
+    },
+    pause() {
+      setPlaying(false);
     },
     rideToNextStop() {
       const next = stopsAround(course.stops, km).next;

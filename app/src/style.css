@@ -363,6 +363,128 @@ input {
   text-wrap: pretty;
 }
 
+/* ── The Ride's controls, under the sentence (PLAN.md D34) ──────────────────────────────── */
+
+/* In Explore it is one solid block, "Ride the course": the one thing on the screen that asks to
+   be pressed. In the Ride the same block plays and pauses, with the player's other buttons under it. */
+.ride {
+  padding: 0 16px 14px;
+}
+
+.ride-play {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 18px;
+  font-weight: 900;
+  font-stretch: 75%;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.ride-play:hover {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.ride-player {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Where the Ride is among the Stops. Its height is kept, so the buttons don't jump as it changes. */
+.ride-stop {
+  min-height: 2.6em;
+  font-size: 13px;
+  font-weight: 700;
+  font-stretch: 88%;
+  line-height: 1.3;
+}
+
+.ride-buttons {
+  display: flex;
+}
+
+.ride-buttons .button + .button {
+  border-left: 0;
+}
+
+.ride-next {
+  flex: 1 1 auto;
+}
+
+.ride .button:disabled {
+  color: var(--grey-text);
+  border-color: var(--grey);
+  cursor: default;
+}
+
+.ride .button:disabled:hover {
+  background: var(--paper);
+}
+
+/* The two cameras: real radio buttons drawn as blocks, like the banner's switches, in ink on paper. */
+.ride-cameras {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--ink);
+}
+
+.ride-cameras label {
+  position: relative;
+  flex: 1 1 0;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-stretch: 88%;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ride-cameras label + label {
+  border-left: 2px solid var(--ink);
+}
+
+.ride-cameras input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ride-cameras label:has(input:checked) {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.ride-cameras label:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ride-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--grey-text);
+}
+
+.ride-leave {
+  padding: 0;
+  font-weight: 800;
+  color: var(--ink);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 /* Rests on a carried-over start time, or isn't confirmed: greyed, never blended in with the rest. */
 .carried-over {
   color: var(--grey-text);

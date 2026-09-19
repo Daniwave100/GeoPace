@@ -5,6 +5,8 @@
 // thin trace with a light fill and a labelled scale, and the value under the cursor is printed
 // in the row's header. Collapsed, it is the landmarks, the height and the blue line with where
 // you are on it. A layer that is switched on adds its rows; "Show everything" adds every row.
+// The names along the top are the Ride's Stops (core/stops.ts): every landmark, the start, and
+// the climbs worth stopping for. The strip is the Ride's seek bar as much as it is Explore's.
 //
 // To a screen reader it is a slider, which is what it is: one value between two ends. All the
 // arithmetic lives in core/ (scrub.ts, trace.ts, layout.ts, units.ts), where it is tested; this
@@ -35,7 +37,8 @@ const PIXELS_PER_BIN = 3;
 
 export interface StripContent {
   lengthKm: number;
-  landmarks: { name: string; km: number }[];
+  /** The Ride's Stops, named in the runner's units: every landmark is one. */
+  stops: { name: string; km: number }[];
   /** The strip's own row, there whatever the layers are doing: the height of the course. */
   baseRow: StripRow;
   /** The rows of the layers that are on (or of all of them, with "Show everything"). */
@@ -63,8 +66,12 @@ export interface Strip {
   setKm(km: number, spoken: string): void;
 }
 
-/** `onScrub` is called with the km the runner asked for; the caller decides and calls `setKm` back. */
-export function createStrip(container: HTMLElement, onScrub: (km: number) => void): Strip {
+/**
+ * `onScrub` is called with the km the runner asked for; the caller decides and calls `setKm` back.
+ * `onHold` is told when the runner takes hold of the strip with the pointer, and when they let go:
+ * a Ride that is playing waits in between, so the cursor doesn't run out from under the pointer.
+ */
+export function createStrip(container: HTMLElement, onScrub: (km: number) => void, onHold: (held: boolean) => void = () => undefined): Strip {
   let content: StripContent | undefined;
   let km = 0;
   let moveCursor: (() => void) | undefined;
@@ -86,8 +93,11 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
     if (event.button !== 0) return;
     slider.setPointerCapture(event.pointerId); // keep following the pointer if it leaves the strip
     slider.focus();
+    onHold(true);
     scrubToPointer(event);
   });
+  // However the hold ends: the button comes up, the touch is cancelled, the browser takes the pointer away.
+  slider.addEventListener("lostpointercapture", () => onHold(false));
   slider.addEventListener("pointermove", (event) => {
     if (slider.hasPointerCapture(event.pointerId)) scrubToPointer(event);
   });
@@ -216,29 +226,29 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   };
 }
 
-/** Landmark names in stacked lanes over the rows, each tied to its place by a hairline. */
+/** The Stops' names in stacked lanes over the rows, each tied to its place by a hairline. */
 function landmarkLane(content: StripContent, x: Scale): SVGGElement {
   const group = svg("g", {});
   const laneCount = Math.max(1, Math.floor((LANDMARKS_HEIGHT - 6) / LANDMARK_LANE));
-  const names = content.landmarks.map((landmark) => shorten(plainName(landmark.name)));
+  const names = content.stops.map((stop) => shorten(plainName(stop.name)));
   const widths = names.map((name) => 8 + name.length * LANDMARK_CHAR);
   // Names near the finish are set to the left of their tick, so they stay on the strip.
-  const flipped = content.landmarks.map((landmark, i) => x(landmark.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
-  const spans = content.landmarks.map((landmark, i) => (flipped[i] ? { start: x(landmark.km) - widths[i], end: x(landmark.km) } : { start: x(landmark.km), end: x(landmark.km) + widths[i] }));
+  const flipped = content.stops.map((stop, i) => x(stop.km) + widths[i] > x(content.lengthKm) + RIGHT_PAD - 4);
+  const spans = content.stops.map((stop, i) => (flipped[i] ? { start: x(stop.km) - widths[i], end: x(stop.km) } : { start: x(stop.km), end: x(stop.km) + widths[i] }));
   // Where names crowd (New York's last 2 km), the last one gets its room first: it is the finish.
   const order = spans.map((_, i) => i);
   order.unshift(...order.splice(-1));
   const inOrder = assignFreeLanes(order.map((i) => spans[i]), laneCount, 6);
   const lanes = new Array<number | null>(spans.length).fill(null);
   order.forEach((i, position) => (lanes[i] = inOrder[position]));
-  content.landmarks.forEach((landmark, i) => {
-    const at = x(landmark.km);
+  content.stops.forEach((stop, i) => {
+    const at = x(stop.km);
     const lane = lanes[i];
     // No free lane (a narrow screen, a crowded finish): the tick stays, with the name in its tooltip.
     const baseline = lane === null ? LANDMARKS_HEIGHT - 6 : 12 + lane * LANDMARK_LANE;
-    group.append(svg("line", { x1: at, x2: at, y1: baseline - 9, y2: LANDMARKS_HEIGHT, class: "strip-landmark-tick" }, svg("title", { text: landmark.name })));
+    group.append(svg("line", { x1: at, x2: at, y1: baseline - 9, y2: LANDMARKS_HEIGHT, class: "strip-landmark-tick" }, svg("title", { text: stop.name })));
     if (lane === null) return;
-    group.append(svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-landmark", text: names[i] }, svg("title", { text: landmark.name })));
+    group.append(svg("text", { x: flipped[i] ? at - 4 : at + 4, y: baseline, "text-anchor": flipped[i] ? "end" : "start", class: "strip-landmark", text: names[i] }, svg("title", { text: stop.name })));
   });
   return group;
 }

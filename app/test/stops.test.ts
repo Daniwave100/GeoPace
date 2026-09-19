@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { CourseBundle } from "../src/bundle/types";
-import { stopsAround, stopsFor } from "../src/core/stops";
+import { stopLine, stopsAround, stopsFor } from "../src/core/stops";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -96,5 +96,21 @@ describe("the Stops around the runner", () => {
   it("at the two ends there is nothing further", () => {
     expect(stopsAround(stops, 0)).toEqual({ on: 0, back: null, next: 1 });
     expect(stopsAround(stops, 42.688)).toEqual({ on: 3, back: 2, next: null });
+  });
+});
+
+describe("the line that says where the Ride is among the Stops", () => {
+  const stops = stopsFor(nyc);
+
+  it("names the Stop the runner is on, and counts it", () => {
+    expect(stopLine(stops, 0, "km")).toBe("Stop 1 of 18: Start");
+    expect(stopLine(stops, 25.1, "km")).toBe("Stop 9 of 18: Ed Koch Queensboro Bridge");
+    expect(stopLine(stops, 42.688, "mi")).toBe("Stop 18 of 18: Finish");
+  });
+
+  it("between Stops, names the next one and how far it is, in the runner's units", () => {
+    expect(stopLine(stops, 5, "km")).toBe("Next stop: Barclays Center, in 7.1 km");
+    expect(stopLine(stops, 5, "mi")).toBe("Next stop: Barclays Center, in 4.4 mi");
+    expect(stopLine(stops, 23, "mi")).toBe("Next stop: Climb of 125 ft, in 0.3 mi");
   });
 });

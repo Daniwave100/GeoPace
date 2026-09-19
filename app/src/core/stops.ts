@@ -4,7 +4,8 @@
 // all ask this module, so they can't disagree about where the Stops are.
 import type { CourseBundle } from "../bundle/types";
 import { hillStretches } from "./hills";
-import { formatHeight, type Units } from "./units";
+import { plainName } from "./sentence";
+import { formatHeight, formatNearby, type Units } from "./units";
 
 /** Two Stops closer than this are one place: the Ride would arrive at the second before it had left the first. */
 const SAME_PLACE_KM = 0.3;
@@ -65,4 +66,12 @@ export function stopsAround(stops: { km: number }[], km: number): StopsAround {
   // The Stops are in course order, so every Stop before the first one ahead or underfoot is behind.
   const back = (on >= 0 ? on : next >= 0 ? next : stops.length) - 1;
   return { on: on < 0 ? null : on, back: back < 0 ? null : back, next: next < 0 ? null : next };
+}
+
+/** Where the Ride is among the Stops, in a line: "Stop 9 of 18: Ed Koch Queensboro Bridge", or "Next stop: Barclays Center, in 7.1 km". */
+export function stopLine(stops: Stop[], km: number, units: Units): string {
+  const { on, next } = stopsAround(stops, km);
+  if (on !== null) return `Stop ${on + 1} of ${stops.length}: ${plainName(stops[on].name(units))}`;
+  if (next !== null) return `Next stop: ${plainName(stops[next].name(units))}, in ${formatNearby(stops[next].km - km, units)}`;
+  return "";
 }
