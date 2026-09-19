@@ -31,10 +31,11 @@ const NO_RULE_NEEDED = new Set(["readout-km-whole", "photoreal-camera"]);
 
 /**
  * Classes handed to a helper as an argument, where `classesIn` can't see them: the segmented
- * control's own and the look passed to it (segmented.ts, ride-controls.ts), and the player's way
- * back to the map. Without these, the banner's switches could lose their rules and nothing would fail.
+ * control's own and the look passed to it (segmented.ts, ride-controls.ts), the player's way back
+ * to the map, and its way out of free look. Without these, the banner's switches could lose their
+ * rules and nothing would fail.
  */
-const PASSED_AS_ARGUMENTS = ["segmented", "ride-cameras", "ride-leave"];
+const PASSED_AS_ARGUMENTS = ["segmented", "ride-cameras", "ride-leave", "ride-back-to-cinematic"];
 
 describe("the stylesheet", () => {
   const used = new Set([...appFiles(SRC).flatMap((file) => classesIn(readFileSync(file, "utf8"))), ...classesIn(page), ...PASSED_AS_ARGUMENTS]);

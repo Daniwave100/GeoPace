@@ -118,12 +118,11 @@ const strip = createStrip(byId("strip"), scrubTo, (held) => showing?.ride.hold(h
 const rideControls = createRideControls(byId("ride"), {
   playPause: () => showing?.ride.playPause(),
   back: () => showing?.ride.back(),
-  rideToNextStop: () => showing?.ride.rideToNextStop(),
   useCamera: (camera) => {
     rideCameraChoice = camera;
     showing?.ride.useCamera(camera); // and out of free look: the camera is the Ride's again
   },
-  lookAround: () => showing?.ride.lookAround(),
+  handTheCameraBack: () => showing?.ride.handTheCameraBack(),
   leave: () => showing?.ride.leave(),
 });
 const stripEdge = createStripEdge(byId("strip-edge"), {

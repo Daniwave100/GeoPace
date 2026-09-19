@@ -452,8 +452,8 @@ input {
   gap: 6px 12px;
 }
 
-/* Narrower than the three side by side, "Ride to the next stop" takes a line of its own. The
-   buttons share one 2px rule with each neighbour, across and down, however the row wraps. */
+/* Back and play, side by side. They share one 2px rule with each neighbour, across and down,
+   however the row wraps. */
 .ride-buttons {
   display: flex;
   flex: 1 1 auto;
@@ -467,7 +467,7 @@ input {
   white-space: nowrap;
 }
 
-/* Play and pause: the solid one of the three, and wide enough that "Pause" and "Ride on" don't move its neighbours. */
+/* Play and pause: the solid one of the two, and wide enough that "Pause" and "Ride on" don't move its neighbour. */
 .ride-play {
   min-width: 8.5em;
   color: var(--paper);
@@ -489,9 +489,8 @@ input {
   background: var(--paper);
 }
 
-/* The two cameras and Look around: the banner's segmented control (segmented.ts), in ink on paper
-   instead of paper on black. Three of them are wider than the buttons beside them on a narrow
-   screen, where the player's row wraps and they take a line of their own. */
+/* The two cameras: the banner's segmented control (segmented.ts), in ink on paper instead of paper
+   on black. On a narrow screen the player's row wraps and they take a line of their own. */
 .ride-cameras {
   flex: 1 1 auto;
   --segmented-line: var(--ink);
@@ -504,6 +503,15 @@ input {
   flex: 1 1 0;
   place-items: center;
   font-stretch: 88%;
+  white-space: nowrap;
+}
+
+/* The way out of free look (issue #32, PLAN.md D54). It stands exactly where the two cameras
+   stand, and takes the room they take: the player gains nothing for free look, and is one control
+   shorter while the camera is the runner's. */
+.ride-back-to-cinematic {
+  flex: 1 1 auto;
+  font-size: 13px;
   white-space: nowrap;
 }
 

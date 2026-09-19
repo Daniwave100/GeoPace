@@ -1,15 +1,17 @@
 // The Ride's controls, laid on the top of the map (PLAN.md D34, D53; issue #8). In Explore they
 // are one button, "Ride the course". Pressed, it becomes, in the same place, the player a runner
-// already knows from any video: Back, play or pause, Ride to the next stop; which of the two
-// cameras; and the way back to the map. On the map rather than in the readout block, so they are
-// there whatever height the strip leaves the map, and still there with the map on the full
-// screen; at the top, because the bottom of the map is the map's own credits, the near end of the
-// course, and, On the road, the road. What the Ride does is decided in core/ride.ts; this only
-// shows it and passes the presses on.
+// already knows from any video: Back, play or pause; which of the two cameras; and the way back to
+// the map. On the map rather than in the readout block, so they are there whatever height the strip
+// leaves the map, and still there with the map on the full screen; at the top, because the bottom
+// of the map is the map's own credits, the near end of the course, and, On the road, the road.
+// What the Ride does is decided in core/ride.ts; this only shows it and passes the presses on.
 //
-// The two cameras are three choices (issue #28, PLAN.md D54): the Ride's two, and Look around, the
-// camera the runner turns themselves. A hand on the map chooses that one, and choosing either of
-// the others is how the camera is handed back to the Ride.
+// Free look (issue #28, PLAN.md D54) costs the player no control of its own (issue #32). While the
+// camera is the runner's to turn, the two cameras are replaced, in the same place, by one wide
+// button: "Go back to cinematic" — *cinematic* is the owner's word for the Ride's own camera, both
+// of its two. So the player has as many things on it as it had before free look was built, and one
+// fewer while a hand is on the map. There is no way in from the player: a hand on the map is the
+// way in, and that is the whole of it.
 import { type RideCamera, RIDE_CAMERAS } from "../core/ride";
 import { html } from "../dom";
 import { type Choice, segmented } from "../segmented";
@@ -17,10 +19,9 @@ import { type Choice, segmented } from "../segmented";
 export interface RideActions {
   playPause(): void;
   back(): void;
-  rideToNextStop(): void;
   useCamera(camera: RideCamera): void;
-  /** The camera is the runner's to turn: what a hand on the map does, and what this says out loud for anyone not using one. */
-  lookAround(): void;
+  /** Out of free look: the camera is the Ride's own again, the one it was already riding. */
+  handTheCameraBack(): void;
   leave(): void;
 }
 
@@ -44,13 +45,9 @@ export interface RideControls {
   show(showing: RideShowing): void;
 }
 
-/** The third choice beside the two cameras: not one of the Ride's, so not a `RideCamera`. */
-const LOOK_AROUND = "look-around";
-
 const CAMERAS: Choice[] = [
   { value: "from-above", label: "From above", explained: "" },
   { value: "on-the-road", label: "On the road", explained: "" },
-  { value: LOOK_AROUND, label: "Look around", explained: "drag the map to turn the camera round yourself; the Ride plays on" },
 ];
 
 export function createRideControls(dock: HTMLElement, actions: RideActions): RideControls {
@@ -62,15 +59,15 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   /**
    * One of the player's other buttons. Pressed with a pointer, it hands the keyboard's focus to
    * the play button, so the space bar still plays and pauses afterwards instead of pressing this
-   * one again (it went Back again, or rode to the next stop again, and never paused). Pressed from
-   * the keyboard (a click with no pointer behind it has `detail` 0) the focus stays where the
-   * runner put it: the space bar is how a keyboard presses a button.
+   * one again (it went Back again, and never paused). Pressed from the keyboard (a click with no
+   * pointer behind it has `detail` 0) the focus stays where the runner put it: the space bar is
+   * how a keyboard presses a button.
    */
   const button = (className: string, text: string, onPress: () => void) => {
     const node = html("button", { type: "button", class: className, text });
     node.addEventListener("click", (event) => {
-      // Greyed out (there is no Stop to go back to, or to ride on to), it does nothing. It is
-      // `aria-disabled` rather than `disabled` so that it keeps the focus it has (see `show`).
+      // Greyed out (there is no Stop to go back to), it does nothing. It is `aria-disabled` rather
+      // than `disabled` so that it keeps the focus it has (see `show`).
       if (node.getAttribute("aria-disabled") !== "true") onPress();
       if (event.detail > 0 && !player.hidden) play.focus();
     });
@@ -78,8 +75,10 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   };
   const back = button("button", "Back", actions.back);
   back.title = "Back to the stop before";
-  const next = button("button", "Ride to the next stop", actions.rideToNextStop);
   const leave = button("ride-leave", "Back to the map", actions.leave);
+  const backToCinematic = button("button ride-back-to-cinematic", "Go back to cinematic", actions.handTheCameraBack);
+  backToCinematic.title = "Give the camera back to the Ride, on the camera it was riding";
+  backToCinematic.hidden = true; // a Ride begins on the Ride's own camera, so the cameras are what stands there
 
   const stopLine = html("p", { class: "ride-stop" });
   const cameras = segmented(
@@ -89,7 +88,6 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
     (value) => {
       const picked = RIDE_CAMERAS.find((camera) => camera === value);
       if (picked) actions.useCamera(picked);
-      else actions.lookAround();
     },
     "ride-cameras",
   );
@@ -97,7 +95,7 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
     "div",
     { class: "ride-player", role: "group", "aria-label": "The Ride" },
     html("div", { class: "ride-player-head" }, stopLine, leave),
-    html("div", { class: "ride-player-row" }, html("div", { class: "ride-buttons" }, back, play, next), cameras.box),
+    html("div", { class: "ride-player-row" }, html("div", { class: "ride-buttons" }, back, play), cameras.box, backToCinematic),
   );
   player.hidden = true;
   // What a screen reader is told, and only that: arriving at a Stop is the Ride's news. The line in
@@ -108,6 +106,7 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   dock.replaceChildren(ride, player, arrived);
 
   let wasOn = false;
+  let wasFreeLook = false;
   return {
     show(showing) {
       // Whoever had the focus keeps a control under their hands when the two swap places.
@@ -124,8 +123,25 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
       if (arrived.textContent !== said) arrived.textContent = said;
       // A button that stops applying keeps the focus it has: `aria-disabled`, not `disabled`, which would drop it.
       back.setAttribute("aria-disabled", String(!showing.canGoBack));
-      next.setAttribute("aria-disabled", String(!showing.canRideOn));
-      cameras.check(showing.freeLook ? LOOK_AROUND : showing.camera);
+      // The camera the Ride is riding stays lit under free look: it is the one the way back returns to.
+      cameras.check(showing.camera);
+
+      // The way back stands where the two cameras stand, so only ever one of them is on the player.
+      // Whoever had their hands on the one that goes is put on the one that arrives: the way back,
+      // or the camera the Ride is on, where the space bar still plays and pauses (core/ride-keys.ts).
+      // Where the focus is has to be read before either is hidden, because an element that is
+      // hidden hands the focus it has back to the page.
+      if (wasFreeLook !== showing.freeLook) {
+        const theFocusIsOnTheOneThatGoes =
+          cameras.box.contains(document.activeElement) || document.activeElement === backToCinematic;
+        cameras.box.hidden = showing.freeLook;
+        backToCinematic.hidden = !showing.freeLook;
+        if (showing.on && theFocusIsOnTheOneThatGoes) {
+          if (showing.freeLook) backToCinematic.focus();
+          else cameras.focusChosen();
+        }
+        wasFreeLook = showing.freeLook;
+      }
     },
   };
 }
