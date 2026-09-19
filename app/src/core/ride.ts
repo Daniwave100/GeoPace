@@ -229,9 +229,9 @@ export interface Ride {
   /** The runner has taken hold of the strip, or let it go: while they hold it, the Ride waits where they put it. */
   hold(held: boolean): void;
   /**
-   * A hand on the map during the Ride, or "Look around" in the player: the camera is the runner's
-   * to turn from now on, tied to the runner wherever they go, and the Ride plays on. In Explore it
-   * does nothing: there, the map is the map.
+   * A hand on the map during the Ride: the camera is the runner's to turn from now on, tied to the
+   * runner wherever they go, and the Ride plays on. The only way in, and the player has no control
+   * of its own for it (issue #32). In Explore it does nothing: there, the map is the map.
    */
   lookAround(): void;
   /** Out of free look: the camera is the Ride's own again, the one it already had. What the map's own buttons do before they take it. */
@@ -392,9 +392,8 @@ export function createRide(options: RideOptions): Ride {
       options.onChange();
     },
     useCamera(next) {
-      // The camera the Ride is already on is the commonest way back out of free look, and the
-      // player's own way: a radio that is already chosen can't be chosen again, so free look is a
-      // third choice beside the two, and pressing either of them is news even when neither changes.
+      // Out of free look, the camera the Ride is already on is news even though nothing changes:
+      // the player's own way back is "Go back to cinematic", and this is the same landing.
       if (camera === next && !freeLook) return;
       camera = next;
       freeLook = false;

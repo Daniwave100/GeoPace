@@ -13,6 +13,8 @@ export interface Choice {
 export interface Segmented {
   box: HTMLElement;
   check(value: string): void;
+  /** Put the keyboard on the choice that is made: for a control that has just come back onto the screen. */
+  focusChosen(): void;
 }
 
 /** `className` adds to the look: the banner's is paper on black, a block on the map is ink on paper. */
@@ -33,5 +35,6 @@ export function segmented(legend: string, name: string, choices: Choice[], onPic
       inputs.forEach((input) => {
         if (input.checked !== (input.value === value)) input.checked = input.value === value;
       }),
+    focusChosen: () => (inputs.find((input) => input.checked) ?? inputs[0]).focus(),
   };
 }

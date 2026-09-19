@@ -11,7 +11,7 @@ const exploring = { rideOn: false, dialogOpen: false };
 describe("the space bar", () => {
   it("plays and pauses from the play button, from \"Ride the course\", and from a camera, where it would otherwise do nothing", () => {
     // A press of the player's buttons with a pointer hands the focus to the play button
-    // (ride-controls.ts), so after "Ride to the next stop" or Back the space bar still pauses.
+    // (ride-controls.ts), so after Back, or the way out of free look, the space bar still pauses.
     expect(spaceBarForTheRide(space(), { ...riding, focus: "play" })).toBe("play-pause");
     expect(spaceBarForTheRide(space(), { ...exploring, focus: "play" })).toBe("play-pause"); // on "Ride the course"
   });

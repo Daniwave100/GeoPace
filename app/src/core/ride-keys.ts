@@ -30,8 +30,8 @@ export interface WhereThePressLands {
  *
  * The space bar presses whichever button has the focus, the player's included: a runner who Tabs
  * to "Back to the map" and presses it must leave the Ride, not pause it. What keeps the space bar
- * pausing after a pointer has pressed Back or "Ride to the next stop" is that the player hands the
- * focus to its play button then (ride-controls.ts). In Explore the space bar is the Ride's only
+ * pausing after a pointer has pressed Back, or the way out of free look, is that the player hands
+ * the focus to its play button then (ride-controls.ts). In Explore the space bar is the Ride's only
  * from the map, the strip or "Ride the course": on a page that scrolls (a phone, where the blocks
  * stack under the map) it still pages down.
  */
