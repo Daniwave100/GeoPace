@@ -65,8 +65,19 @@ export interface RideView {
   pitchDeg: number;
 }
 
-/** The road's height in the scene at a place on the course: by default the Course Bundle's own. */
+/** The road's height in the scene at a place on the course. */
 export type HeightAt = (place: RoadPosition) => number;
+
+export interface RideViewOptions {
+  /** The road's height in the scene: left out, the Course Bundle's own height above the ellipsoid. */
+  heightAt?: HeightAt;
+  /**
+   * From above: how far to the runner's left the camera looks, as a fraction of its distance from
+   * them. The readout block covers the left of the map, so the middle of the map is not the middle
+   * of what the runner can see (core/framing.ts); looking a little left puts them there.
+   */
+  leftOfRunner?: number;
+}
 
 /** The spacing of the course line's samples, near enough: a view's swing is measured from one to the next. */
 const SWING_OVER_KM = 0.01;
@@ -91,8 +102,9 @@ function headingAt(line: CourseLine, km: number, camera: RideCamera): number {
   return bearingDeg(placeAlong(line, km - FROM_ABOVE.facing.behindM / 1000), placeAlong(line, km + FROM_ABOVE.facing.aheadM / 1000));
 }
 
-export function rideView(scene: RideScene, km: number, camera: RideCamera, heightAt: HeightAt = (place) => place.ellipsoidHeightM): RideView {
+export function rideView(scene: RideScene, km: number, camera: RideCamera, options: RideViewOptions = {}): RideView {
   const { line } = scene;
+  const heightAt = options.heightAt ?? ((place: RoadPosition) => place.ellipsoidHeightM);
   const runner = positionAtKm(line, km);
   const headingDeg = headingAt(line, km, camera);
 
@@ -105,8 +117,10 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, heigh
 
   const course = { lengthKm: line.length_m / 1000, stops: scene.stops };
   const rangeM = FROM_ABOVE.rangeAtAStopM + (FROM_ABOVE.rangeAtTheCruiseM - FROM_ABOVE.rangeAtAStopM) * cruising(course, km, camera);
-  // Back from the runner the way the camera faces, and up: the runner is in the middle of the view.
-  const eye = moved(runner, headingDeg + 180, rangeM * Math.cos(FROM_ABOVE.tiltDeg * RAD));
+  // Back from the runner the way the camera faces, and up: the runner is in the middle of the view,
+  // or, with the camera moved to its own left, as far right of the middle as was asked for.
+  const behind = moved(runner, headingDeg + 180, rangeM * Math.cos(FROM_ABOVE.tiltDeg * RAD));
+  const eye = moved(behind, headingDeg - 90, rangeM * (options.leftOfRunner ?? 0));
   return { eye: { ...eye, heightM: heightAt(runner) + rangeM * Math.sin(FROM_ABOVE.tiltDeg * RAD) }, headingDeg, pitchDeg: -FROM_ABOVE.tiltDeg };
 }
 

@@ -31,6 +31,15 @@ function fakeFrames() {
   };
   return {
     frames,
+    /** Let `seconds` go by with only `perSecond` frames in each. */
+    runAtFramesPerSecond(seconds: number, perSecond: number) {
+      for (let frame = 0; frame < Math.round(seconds * perSecond); frame += 1) {
+        nowMs += 1000 / perSecond;
+        const callback = waiting;
+        waiting = null;
+        callback?.(nowMs);
+      }
+    },
     run(seconds: number) {
       for (let frame = 0; frame < Math.round(seconds * 60); frame += 1) {
         nowMs += 1000 / 60;
@@ -280,6 +289,17 @@ describe("with reduced motion asked for", () => {
     run(2);
 
     expect(moves).toEqual([0]);
+  });
+
+  it("gives a Stop its seconds by the clock, however slowly the frames come", () => {
+    const slow = fakeFrames();
+    const moves: number[] = [];
+    const ride = createRide({ course: berlin, frames: slow.frames, reducedMotion: () => true, onMove: (km) => moves.push(km), onChange: () => undefined });
+    ride.playPause();
+
+    slow.runAtFramesPerSecond(9, 2); // a weak GPU: two frames a second, for nine seconds
+
+    expect(moves).toEqual([0.7, 12, 14.4]); // at once, then after 4 s and after 8 s
   });
 
   it("makes Ride to the next stop a single step", () => {

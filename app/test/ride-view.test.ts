@@ -111,7 +111,7 @@ describe("On the road", () => {
   });
 
   it("takes the road's height from whoever is asked for it: on the keyless map, the open terrain", () => {
-    const view = rideView(cornerCourse(), 1, "on-the-road", () => 12);
+    const view = rideView(cornerCourse(), 1, "on-the-road", { heightAt: () => 12 });
 
     expect(view.eye.heightM).toBeCloseTo(12 + ON_THE_ROAD_HEIGHT_M, 6);
   });
@@ -131,6 +131,26 @@ describe("From above", () => {
     const toRunnerDeg = (Math.atan2(-back.east, -back.north) * 180) / Math.PI;
     expect(Math.abs(relativeBearing(view.headingDeg, toRunnerDeg))).toBeLessThan(0.5);
     expect(Math.hypot(back.north, back.east)).toBeCloseTo((view.eye.heightM - 100) / Math.tan((-view.pitchDeg * Math.PI) / 180), 0);
+  });
+
+  it("can look to the runner's left, so the runner lands in the middle of the part of the map the readout block leaves clear", () => {
+    const scene = cornerCourse();
+    const runner = positionAtKm(scene.line, 1);
+    const centred = rideView(scene, 1, "from-above");
+    const fromTheRunner = metersFrom(runner, centred.eye);
+    const range = Math.hypot(fromTheRunner.north, fromTheRunner.east, centred.eye.heightM - 100);
+
+    const shifted = rideView(scene, 1, "from-above", { leftOfRunner: 0.1 });
+
+    // The camera moves a tenth of its distance from the runner, square to the way it faces, to its own left, and turns nowhere.
+    const moved = metersFrom(centred.eye, shifted.eye);
+    const facing = (centred.headingDeg * Math.PI) / 180;
+    const ahead = moved.north * Math.cos(facing) + moved.east * Math.sin(facing);
+    const toTheRight = moved.east * Math.cos(facing) - moved.north * Math.sin(facing);
+    expect(toTheRight).toBeCloseTo(-0.1 * range, 0);
+    expect(Math.abs(ahead)).toBeLessThan(0.5);
+    expect(shifted.headingDeg).toBeCloseTo(centred.headingDeg, 9);
+    expect(shifted.eye.heightM).toBeCloseTo(centred.eye.heightM, 9);
   });
 
   it("comes down for a closer look at a Stop, and goes up again between Stops", () => {

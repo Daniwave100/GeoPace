@@ -1,7 +1,11 @@
-// The Ride's controls, under the sentence (PLAN.md D34, D46; issue #8). In Explore they are one
-// button, "Ride the course". In the Ride they are the player a runner already knows: Back, play
-// or pause, Ride to the next stop; which of the two cameras; and the way back to the map. What
-// the Ride does is decided in core/ride.ts; this only shows it and passes the presses on.
+// The Ride's controls, laid on the top of the map (PLAN.md D34, D53; issue #8). In Explore they
+// are one button, "Ride the course". Pressed, it becomes, in the same place, the player a runner
+// already knows from any video: Back, play or pause, Ride to the next stop; which of the two
+// cameras; and the way back to the map. On the map rather than in the readout block, so they are
+// there whatever height the strip leaves the map, and still there with the map on the full
+// screen; at the top, because the bottom of the map is the map's own credits, the near end of the
+// course, and, On the road, the road. What the Ride does is decided in core/ride.ts; this only
+// shows it and passes the presses on.
 import type { RideCamera } from "../core/ride";
 import { html } from "../dom";
 
@@ -34,40 +38,56 @@ const CAMERAS: { camera: RideCamera; label: string }[] = [
   { camera: "on-the-road", label: "On the road" },
 ];
 
-export function createRideControls(container: HTMLElement, actions: RideActions): RideControls {
-  const button = (className: string, onPress: () => void) => {
-    const node = html("button", { type: "button", class: className });
+export function createRideControls(dock: HTMLElement, actions: RideActions): RideControls {
+  const button = (className: string, text: string, onPress: () => void) => {
+    const node = html("button", { type: "button", class: className, text });
     node.addEventListener("click", onPress);
     return node;
   };
-  // One button starts the Ride and then plays and pauses it, so the space bar, which presses
-  // whatever button has the focus, does the same thing before and after the first press.
-  const play = button("button ride-play", actions.playPause);
-  const back = button("button", actions.back);
-  back.textContent = "Back";
+  const ride = button("button ride-start", "Ride the course", actions.playPause);
+  const play = button("button ride-play", "Pause", actions.playPause);
+  play.title = "Play or pause (space bar)";
+  const back = button("button", "Back", actions.back);
   back.title = "Back to the stop before";
-  const next = button("button ride-next", actions.rideToNextStop);
-  next.textContent = "Ride to the next stop";
-  const leave = button("ride-leave", actions.leave);
-  leave.textContent = "Back to the map";
+  const next = button("button", "Ride to the next stop", actions.rideToNextStop);
+  const leave = button("ride-leave", "Back to the map", actions.leave);
 
-  const stopLine = html("p", { class: "ride-stop" });
+  // Said aloud when it changes: arriving at a Stop is the Ride's news. Between Stops it changes
+  // only when the distance to the next one rounds to a new number, not sixty times a second.
+  const stopLine = html("p", { class: "ride-stop", role: "status" });
   const inputs = CAMERAS.map(({ camera }) => html("input", { type: "radio", name: "ride-camera", value: camera }));
   inputs.forEach((input, index) => input.addEventListener("change", () => input.checked && actions.useCamera(CAMERAS[index].camera)));
   const cameras = html("fieldset", { class: "ride-cameras" }, html("legend", { class: "visually-hidden", text: "Camera" }), ...CAMERAS.map(({ label }, index) => html("label", {}, inputs[index], label)));
-  const player = html("div", { class: "ride-player" }, stopLine, html("div", { class: "ride-buttons" }, back, next), cameras, html("p", { class: "ride-foot" }, leave, html("span", { text: "Space bar: play or pause." })));
-  container.replaceChildren(play, player);
 
+  const bar = html(
+    "div",
+    { class: "ride-bar", role: "group", "aria-label": "The Ride" },
+    html("div", { class: "ride-bar-head" }, stopLine, leave),
+    html("div", { class: "ride-bar-row" }, html("div", { class: "ride-buttons" }, back, play, next), cameras),
+  );
+  bar.hidden = true;
+  dock.replaceChildren(ride, bar);
+
+  let wasOn = false;
   return {
     show(showing) {
-      container.toggleAttribute("data-riding", showing.on);
-      play.textContent = !showing.on ? "Ride the course" : showing.playing ? "Pause" : showing.canRideOn ? "Ride on" : "Ride it again";
-      player.hidden = !showing.on;
-      // Only set when it changes: the Ride calls this sixty times a second.
+      // Whoever had the focus keeps a control under their hands when the two swap places.
+      const hadFocus = dock.contains(document.activeElement);
+      ride.hidden = showing.on;
+      bar.hidden = !showing.on;
+      if (hadFocus && wasOn !== showing.on) (showing.on ? play : ride).focus();
+      wasOn = showing.on;
+
+      play.textContent = showing.playing ? "Pause" : showing.canRideOn ? "Ride on" : "Ride it again";
+      // Only set when it changes: the Ride calls this on every frame.
       if (stopLine.textContent !== showing.stopLine) stopLine.textContent = showing.stopLine;
-      back.disabled = !showing.canGoBack;
-      next.disabled = !showing.canRideOn;
-      inputs.forEach((input, index) => (input.checked = CAMERAS[index].camera === showing.camera));
+      // A button that stops applying keeps the focus it has: `aria-disabled`, not `disabled`, which would drop it.
+      back.setAttribute("aria-disabled", String(!showing.canGoBack));
+      next.setAttribute("aria-disabled", String(!showing.canRideOn));
+      inputs.forEach((input, index) => {
+        const checked = CAMERAS[index].camera === showing.camera;
+        if (input.checked !== checked) input.checked = checked;
+      });
     },
   };
 }

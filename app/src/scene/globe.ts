@@ -11,6 +11,7 @@ import {
   Cartesian4,
   Cartographic,
   CesiumTerrainProvider,
+  Color,
   Credit,
   HeadingPitchRange,
   ImageryLayer,
@@ -30,6 +31,7 @@ import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
 import { registerCourseRibbon } from "./course-ribbon";
+import { plainGroundIfTerrainFails } from "./plain-ground";
 import { BASEMAP, TERRAIN } from "./providers";
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -47,6 +49,7 @@ export function createGlobe(container: HTMLElement): Viewer {
   Ion.defaultAccessToken = "";
   registerCourseRibbon();
 
+  const terrain = new Terrain(CesiumTerrainProvider.fromUrl(TERRAIN.url));
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
       new OpenStreetMapImageryProvider({
@@ -55,7 +58,7 @@ export function createGlobe(container: HTMLElement): Viewer {
         credit: new Credit(BASEMAP.creditHtml, true),
       }),
     ),
-    terrain: new Terrain(CesiumTerrainProvider.fromUrl(TERRAIN.url)),
+    terrain,
     // Everything below would otherwise reach for Cesium ion (which needs a key) or add clutter.
     baseLayerPicker: false,
     geocoder: false,
@@ -68,6 +71,8 @@ export function createGlobe(container: HTMLElement): Viewer {
     infoBox: false,
     selectionIndicator: false,
   });
+
+  plainGroundIfTerrainFails(terrain, viewer.scene.globe);
 
   // Light the ground from wherever the sun is at the scene's clock, which the race clock sets.
   // Cesium normally fades this lighting out once the camera is within ~10,000 km of the ground,
@@ -119,6 +124,15 @@ export function isStillFramed(viewer: Viewer): boolean {
   return from !== undefined && Cartesian3.equalsEpsilon(from, viewer.camera.positionWC, 0, 0.5);
 }
 
+/**
+ * How far to the left of something the camera has to be, as a fraction of its distance from it,
+ * for that thing to be in the middle of the part of the map that `coveredLeftPx` leaves clear. The
+ * Ride's From above camera keeps the runner there, as the framing of the whole course does the course.
+ */
+export function leftOfMiddle(viewer: Viewer, coveredLeftPx: number): number {
+  return sidewaysShiftM({ fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx, rangeM: 1 });
+}
+
 function horizontalFov(viewer: Viewer): number {
   const frustum = viewer.camera.frustum;
   if (!(frustum instanceof PerspectiveFrustum) || frustum.fov === undefined) return CesiumMath.toRadians(60);
@@ -164,6 +178,10 @@ export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
  * basemap layer is touched. Photoreal imagery is Google's and is shown as it comes.
  */
 export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
+  // The ground under the basemap: what is on screen where a map tile hasn't arrived, or can't
+  // (PLAN.md D16: the map service is best-effort). A quiet grey the course's blue reads on, in
+  // place of CesiumJS's deep blue, which is the course's own colour.
+  viewer.scene.globe.baseColor = Color.fromCssColorString(theme === "dark" ? "#33332f" : "#deded8");
   const basemap = viewer.imageryLayers.get(0);
   if (!basemap) return;
   basemap.brightness = theme === "dark" ? 0.55 : 1;

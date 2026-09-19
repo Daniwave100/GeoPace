@@ -136,11 +136,13 @@ export function createRide(options: RideOptions): Ride {
     waitingFor = null;
     if (!playing) return;
     // Time that went by while the strip was held is not ridden afterwards.
-    const seconds = lastFrameMs === null || held ? 0 : Math.min((nowMs - lastFrameMs) / 1000, LONGEST_FRAME_SECONDS);
+    const sinceLastFrame = lastFrameMs === null || held ? 0 : (nowMs - lastFrameMs) / 1000;
+    const seconds = Math.min(sinceLastFrame, LONGEST_FRAME_SECONDS);
     lastFrameMs = nowMs;
     if (options.reducedMotion()) {
-      // No continuous movement: the Ride stands at a Stop, then is at the next one.
-      stoodSeconds += seconds;
+      // No continuous movement: the Ride stands at a Stop, then is at the next one. Standing is
+      // timed by the clock, not by capped frames: on a slow machine four seconds are still four.
+      stoodSeconds += sinceLastFrame;
       if (stoodSeconds >= SECONDS_AT_EACH_STOP) stepToNextStop();
       if (atTheFinish()) setPlaying(false);
       else waitingFor = frames.request(onFrame);

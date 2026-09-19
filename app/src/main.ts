@@ -33,7 +33,7 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isStillFramed, showMapTheme, showMoment, toggleStraightDown, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isStillFramed, leftOfMiddle, showMapTheme, showMoment, toggleStraightDown, watchCameraHeight } from "./scene/globe";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
@@ -410,7 +410,7 @@ function showRideControls(): void {
 function followTheRide(): void {
   if (!showing || !viewer || !rideCamera) return;
   const heightAt = placement === "draped" ? roadHeightOnTheMap(viewer.scene.globe) : undefined;
-  rideCamera.show(rideView(showing.rideScene, showing.km, showing.ride.camera, heightAt));
+  rideCamera.show(rideView(showing.rideScene, showing.km, showing.ride.camera, { heightAt, leftOfRunner: leftOfMiddle(viewer, coveredLeftPx()) }));
 }
 
 /**
@@ -456,9 +456,13 @@ function goToRunner(): void {
 /** The whole course, in the part of the map that the readout block leaves clear. */
 function frameWholeCourse(seconds: number): void {
   if (!showing || !viewer) return;
+  frameCourse(viewer, showing.bundle.measured.course_line, coveredLeftPx(), seconds);
+}
+
+/** How much of the map's left side is under the readout block: none where the blocks stack under the map, or with the map on the full screen. */
+function coveredLeftPx(): number {
   const block = document.querySelector<HTMLElement>(".where");
-  const overTheMap = block && getComputedStyle(block).position === "absolute";
-  frameCourse(viewer, showing.bundle.measured.course_line, overTheMap ? block.offsetWidth : 0, seconds);
+  return block && getComputedStyle(block).position === "absolute" ? block.offsetWidth : 0;
 }
 
 /**

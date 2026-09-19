@@ -363,21 +363,95 @@ input {
   text-wrap: pretty;
 }
 
-/* ── The Ride's controls, under the sentence (PLAN.md D34) ──────────────────────────────── */
+/* ── The Ride: its button, and its player, on the top of the map (PLAN.md D34, D53) ─────── */
 
-/* In Explore it is one solid block, "Ride the course": the one thing on the screen that asks to
-   be pressed. In the Ride the same block plays and pauses, with the player's other buttons under it. */
-.ride {
-  padding: 0 16px 14px;
+/* In the middle of the part of the map that the readout block and "Make it photoreal" leave
+   clear. At the top: the bottom of the map belongs to the map's own credits, to the near end of
+   the course, and, On the road, to the road. */
+.ride-dock {
+  position: absolute;
+  top: 12px;
+  left: max(300px, calc(var(--col) * 3));
+  right: 170px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none; /* only the block itself takes the pointer: the map beside it still drags */
 }
 
-.ride-play {
-  display: block;
-  width: 100%;
-  padding: 10px 12px;
+.explore[data-full-map] .ride-dock {
+  left: 0;
+}
+
+/* In Explore: one solid block, "Ride the course", the one thing on the screen that asks to be pressed. */
+.ride-start {
+  padding: 9px 22px;
   font-size: 18px;
   font-weight: 900;
   font-stretch: 75%;
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--paper);
+  pointer-events: auto;
+}
+
+.ride-start:hover {
+  color: var(--ink);
+  background: var(--paper);
+  border-color: var(--ink);
+}
+
+/* In the Ride: the player, an opaque block like every other block on the map. */
+.ride-bar {
+  display: grid;
+  gap: 6px;
+  box-sizing: border-box;
+  max-width: calc(100% - 24px);
+  padding: 8px 10px 10px;
+  color: var(--ink);
+  background: var(--paper);
+  border: var(--rule) solid var(--ink);
+  pointer-events: auto;
+}
+
+.ride-bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Where the Ride is among the Stops. */
+.ride-stop {
+  font-size: 14px;
+  font-weight: 800;
+  font-stretch: 88%;
+  line-height: 1.25;
+}
+
+.ride-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px 12px;
+}
+
+.ride-buttons {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+.ride-buttons .button {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.ride-buttons .button + .button {
+  border-left: 0;
+}
+
+/* Play and pause: the solid one of the three, and wide enough that "Pause" and "Ride on" don't move its neighbours. */
+.ride-play {
+  min-width: 8.5em;
   color: var(--paper);
   background: var(--ink);
 }
@@ -387,46 +461,20 @@ input {
   background: var(--paper);
 }
 
-.ride-player {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-/* Where the Ride is among the Stops. Its height is kept, so the buttons don't jump as it changes. */
-.ride-stop {
-  min-height: 2.6em;
-  font-size: 13px;
-  font-weight: 700;
-  font-stretch: 88%;
-  line-height: 1.3;
-}
-
-.ride-buttons {
-  display: flex;
-}
-
-.ride-buttons .button + .button {
-  border-left: 0;
-}
-
-.ride-next {
-  flex: 1 1 auto;
-}
-
-.ride .button:disabled {
+.ride-buttons .button[aria-disabled="true"] {
   color: var(--grey-text);
-  border-color: var(--grey);
   cursor: default;
 }
 
-.ride .button:disabled:hover {
+.ride-buttons .button[aria-disabled="true"]:hover {
+  color: var(--grey-text);
   background: var(--paper);
 }
 
 /* The two cameras: real radio buttons drawn as blocks, like the banner's switches, in ink on paper. */
 .ride-cameras {
   display: flex;
+  flex: 1 1 auto;
   margin: 0;
   padding: 0;
   border: 2px solid var(--ink);
@@ -434,12 +482,14 @@ input {
 
 .ride-cameras label {
   position: relative;
+  display: grid;
   flex: 1 1 0;
-  padding: 4px 8px;
+  place-items: center;
+  padding: 4px 10px;
   font-size: 13px;
   font-weight: 700;
   font-stretch: 88%;
-  text-align: center;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -465,19 +515,11 @@ input {
   outline-offset: 2px;
 }
 
-.ride-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-  font-size: 12px;
-  color: var(--grey-text);
-}
-
 .ride-leave {
   padding: 0;
+  font-size: 13px;
   font-weight: 800;
+  white-space: nowrap;
   color: var(--ink);
   text-decoration: underline;
   background: none;
@@ -1336,8 +1378,27 @@ button.map-label {
     order: 1;
   }
 
+  /* "Ride the course", and the Ride's player, come straight under the map, ahead of the readout block. */
+  .ride-dock {
+    position: static;
+    display: block;
+    order: 1;
+  }
+
+  .ride-start {
+    display: block;
+    width: 100%;
+    border-width: var(--rule) 0 0;
+  }
+
+  .ride-bar {
+    max-width: none;
+    border-width: var(--rule) 0 0;
+  }
+
+  /* Six buttons, ending above the map's own credits: the map is 56vh tall, and never under 300px. */
   .map-controls {
-    top: calc(56vh - 150px);
+    top: calc(max(56vh, 300px) - 228px);
     bottom: auto;
   }
 }
