@@ -117,17 +117,19 @@ function headingAt(line: CourseLine, km: number, camera: RideCamera): number {
 
 export function rideView(scene: RideScene, km: number, camera: RideCamera, options: RideViewOptions = {}): RideView {
   const { line } = scene;
-  const heightAt = options.heightAt ?? ((place: RoadPosition) => place.ellipsoidHeightM);
+  // The road's height at a place on the course: whatever the caller says it is (the open terrain the
+  // course is draped on, which has no bridge in it to crest), or else the Course Bundle's own, and
+  // over a stretch where that is filled in, our estimate of how far the real road crests above it.
+  const roadM = (place: RoadPosition, atKm: number) => options.heightAt?.(place) ?? place.ellipsoidHeightM + crestOverTheFillM(scene, atKm);
   const runner = positionAtKm(line, km);
   const headingDeg = headingAt(line, km, camera);
 
   if (camera === "on-the-road") {
     const eyeKm = km - ON_THE_ROAD.behindM / 1000;
     const eye = placeAlong(line, eyeKm);
-    const heightM = heightAt(eye) + crestOverTheFillM(scene, eyeKm) + ON_THE_ROAD_HEIGHT_M;
+    const heightM = roadM(eye, eyeKm) + ON_THE_ROAD_HEIGHT_M;
     // It looks at the road where the runner is: up a climb it looks up, over a crest it looks down.
-    const roadAtRunnerM = heightAt(runner) + crestOverTheFillM(scene, km);
-    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadAtRunnerM - heightM, ON_THE_ROAD.behindM) / RAD };
+    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, ON_THE_ROAD.behindM) / RAD };
   }
 
   const course = { lengthKm: line.length_m / 1000, stops: scene.stops };
@@ -136,7 +138,7 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
   // or, with the camera moved to its own left, as far right of the middle as was asked for.
   const behind = moved(runner, headingDeg + 180, rangeM * Math.cos(FROM_ABOVE.tiltDeg * RAD));
   const eye = moved(behind, headingDeg - 90, rangeM * (options.leftOfRunner ?? 0));
-  return { eye: { ...eye, heightM: heightAt(runner) + rangeM * Math.sin(FROM_ABOVE.tiltDeg * RAD) }, headingDeg, pitchDeg: -FROM_ABOVE.tiltDeg };
+  return { eye: { ...eye, heightM: roadM(runner, km) + rangeM * Math.sin(FROM_ABOVE.tiltDeg * RAD) }, headingDeg, pitchDeg: -FROM_ABOVE.tiltDeg };
 }
 
 /**
@@ -174,13 +176,23 @@ function bearingDeg(from: { lat: number; lon: number }, to: { lat: number; lon: 
 function crestOverTheFillM(scene: RideScene, km: number): number {
   const span = scene.notMeasured.find((candidate) => km > candidate.km_start && km < candidate.km_end);
   if (!span) return 0;
-  const { line } = scene;
-  const gradeIn = meanGrade(line, span.km_start - GRADE_READ_KM.to, span.km_start - GRADE_READ_KM.from);
-  const gradeOut = meanGrade(line, span.km_end + GRADE_READ_KM.from, span.km_end + GRADE_READ_KM.to);
-  if (gradeIn === null || gradeOut === null) return 0; // the stretch runs to an end of the course: nothing to read a grade from
-  const crestM = Math.max(((gradeIn - gradeOut) * (span.km_end - span.km_start) * 1000) / 8, 0);
   const along = (km - span.km_start) / (span.km_end - span.km_start);
-  return 4 * crestM * along * (1 - along);
+  return 4 * crestM(scene.line, span) * along * (1 - along);
+}
+
+/** How far over the straight fill a road's curve crests at the middle of a filled-in stretch. Worked out once for each: the camera asks on every frame. */
+const CRESTS = new WeakMap<NotMeasuredSpan, number>();
+
+function crestM(line: CourseLine, span: NotMeasuredSpan): number {
+  let crest = CRESTS.get(span);
+  if (crest === undefined) {
+    const gradeIn = meanGrade(line, span.km_start - GRADE_READ_KM.to, span.km_start - GRADE_READ_KM.from);
+    const gradeOut = meanGrade(line, span.km_end + GRADE_READ_KM.from, span.km_end + GRADE_READ_KM.to);
+    // A stretch that runs to an end of the course has no grade to read on that side: no estimate.
+    crest = gradeIn === null || gradeOut === null ? 0 : Math.max(((gradeIn - gradeOut) * (span.km_end - span.km_start) * 1000) / 8, 0);
+    CRESTS.set(span, crest);
+  }
+  return crest;
 }
 
 /** The mean grade of the course line's samples between two places; null where there are none. */

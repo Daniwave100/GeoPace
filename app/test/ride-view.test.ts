@@ -216,6 +216,9 @@ describe("On the road", () => {
     const view = rideView(cornerCourse(), 1, "on-the-road", { heightAt: () => 12 });
 
     expect(view.eye.heightM).toBeCloseTo(12 + ON_THE_ROAD_HEIGHT_M, 6);
+    // And exactly that, even over a filled-in stretch: the crest is a guess about our own survey's
+    // gap, and the terrain the course is draped on has no bridge in it to crest.
+    expect(rideView(bridgeCourse(), 1.525, "on-the-road", { heightAt: () => 12 }).eye.heightM).toBeCloseTo(12 + ON_THE_ROAD_HEIGHT_M, 6);
   });
 });
 

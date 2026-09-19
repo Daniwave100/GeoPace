@@ -97,7 +97,7 @@ The Ride's controls, on the top of the map: Back, play or pause, Ride to the nex
 _Avoid_: transport bar, toolbar, media controls
 
 **Glide**:
-The moment's move the camera makes to a view that is far from where it is, instead of a cut. With reduced motion asked for, it is a cut.
+The moment's move the camera makes when the Ride jumps somewhere else (its start, Back, the other camera, a scrub, Play after the runner has looked around), instead of a cut. With reduced motion asked for, it is a cut.
 _Avoid_: flight (a flight is the map's own move to the whole course or to the runner), transition
 
 **Map**:
