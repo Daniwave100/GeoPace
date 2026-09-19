@@ -489,7 +489,9 @@ input {
   background: var(--paper);
 }
 
-/* The two cameras: the banner's segmented control (segmented.ts), in ink on paper instead of paper on black. */
+/* The two cameras and Look around: the banner's segmented control (segmented.ts), in ink on paper
+   instead of paper on black. Three of them are wider than the buttons beside them on a narrow
+   screen, where the player's row wraps and they take a line of their own. */
 .ride-cameras {
   flex: 1 1 auto;
   --segmented-line: var(--ink);

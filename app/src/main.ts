@@ -10,7 +10,7 @@ import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type Ra
 import { formatElapsed } from "./core/race-clock";
 import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera, rideSpeedKmPerS } from "./core/ride";
 import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
-import { rideCourseFor, type RideScene, rideView } from "./core/ride-view";
+import { rideCourseFor, type RideScene, rideView, runnerInTheScene } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
@@ -117,8 +117,9 @@ const rideControls = createRideControls(byId("ride"), {
   rideToNextStop: () => showing?.ride.rideToNextStop(),
   useCamera: (camera) => {
     rideCameraChoice = camera;
-    showing?.ride.useCamera(camera);
+    showing?.ride.useCamera(camera); // and out of free look: the camera is the Ride's again
   },
+  lookAround: () => showing?.ride.lookAround(),
   leave: () => showing?.ride.leave(),
 });
 const stripEdge = createStripEdge(byId("strip-edge"), {
@@ -198,7 +199,7 @@ async function show(courseId: string): Promise<void> {
     // While photoreal hides the plain ground, the map's own moves count heights from the road where the runner is.
     useRoadAsGroundWhenHidden(map, () => (showing ? positionAtKm(showing.bundle.measured.course_line, showing.km).ellipsoidHeightM : undefined));
     rideCamera = createRideCamera(map, { reducedMotion: () => reducedMotion.matches, now: () => performance.now() });
-    pauseTheRideWhenTheMapIsMoved();
+    watchForAHandOnTheMap();
     showTheme();
   }
   photoreal ??= startPhotoreal(viewer);
@@ -444,6 +445,7 @@ function showRideControls(): void {
     on: ride.on,
     playing: ride.playing,
     camera: ride.camera,
+    freeLook: ride.freeLook,
     stopLine: stopLine(stops, ride.km, units),
     arrivedAt: around.on === null ? null : stopLine(stops, stops[around.on].km, units),
     canGoBack: around.back !== null,
@@ -452,35 +454,52 @@ function showRideControls(): void {
 }
 
 /**
- * Hold the camera on the Ride (scene/ride-camera.ts). Where that is, is asked afresh before every
- * frame, so it follows the runner, the camera the runner picked, and the road's height: the Course
- * Bundle's own where the course is drawn at road height, our open terrain's where it is draped on
- * the keyless map; never anything read from photoreal imagery (PLAN.md D5).
+ * Keep the camera on the runner (scene/ride-camera.ts), either as the Ride's own camera or, in
+ * free look, as the runner's to turn round them. Both are asked afresh before every frame, so they
+ * follow the runner, the camera the runner picked, and the road's height: the Course Bundle's own
+ * where the course is drawn at road height, our open terrain's where it is draped on the keyless
+ * map; never anything read from photoreal imagery (PLAN.md D5).
  */
 function followTheRide(how: HowItMoved): void {
   if (!showing || !viewer || !rideCamera) return;
   const riding = showing; // this course's Ride: where its runner is, is read again each frame
   const map = viewer;
-  rideCamera.follow(() => {
-    const heightAt = placement === "draped" ? roadHeightOnTheMap(map.scene.globe) : undefined;
-    return rideView(riding.rideScene, riding.km, riding.ride.camera, { heightAt, leftOfRunner: leftOfMiddle(map, coveredLeftPx()) });
-  }, how);
+  const roadHeight = () => (placement === "draped" ? roadHeightOnTheMap(map.scene.globe) : undefined);
+  if (riding.ride.freeLook) {
+    rideCamera.lookAround(() => runnerInTheScene(riding.rideScene, riding.km, { heightAt: roadHeight() }));
+    return;
+  }
+  rideCamera.follow(() => rideView(riding.rideScene, riding.km, riding.ride.camera, { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) }), how);
 }
 
 /**
- * A hand on the map outranks the Ride: dragging it, scrolling it, and the map's own keys and
- * buttons that move it pause a Ride that is playing, and stop a glide where it is. The map is
- * then the runner's to orbit, pan and zoom until they ride on.
+ * A hand on the map: in the Ride the camera becomes the runner's to turn round themselves, and the
+ * Ride plays on (PLAN.md D54, issue #28). In Explore nothing of ours happens: the map is the map,
+ * and dragging, scrolling and Ctrl + drag are CesiumJS's own.
  */
-function takeTheMap(): void {
-  showing?.ride.pause();
-  rideCamera?.letGo(); // after the pause, which asks for one last view of its own
+function handOnTheMap(): void {
+  showing?.ride.lookAround();
 }
 
-function pauseTheRideWhenTheMapIsMoved(): void {
+/**
+ * The map's own buttons and keys still outrank the Ride: zoom, Whole course, Where I am, Straight
+ * down and the arrow keys pause a Ride that is playing, end free look, and stop a glide where it
+ * is. The map is then the runner's to orbit, pan and zoom until they ride on. (Whole course can
+ * only mean leaving the runner; whether zoom should move the free camera in and out instead is the
+ * owner's to judge on the built thing, issue #28.)
+ */
+function takeTheMap(): void {
+  if (!showing) return;
+  const { ride } = showing;
+  ride.pause();
+  ride.useCamera(ride.camera); // out of free look: what the map flies to is the map's own, not the runner's
+  rideCamera?.letGo(); // after both, each of which asks for one last view of its own
+}
+
+function watchForAHandOnTheMap(): void {
   const map = byId("globe");
-  map.addEventListener("pointerdown", takeTheMap, { capture: true });
-  map.addEventListener("wheel", takeTheMap, { capture: true, passive: true });
+  map.addEventListener("pointerdown", handOnTheMap, { capture: true });
+  map.addEventListener("wheel", handOnTheMap, { capture: true, passive: true });
 }
 
 /** What has the keyboard's focus, as far as the space bar cares (core/ride-keys.ts). */

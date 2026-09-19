@@ -40,8 +40,9 @@ smooth pace, about a minute and a half for the whole course. The button becomes 
 **Ride to the next stop** move between Stops and pause on arrival, the **space bar** plays and pauses,
 and scrubbing the strip moves the Ride. Two cameras, switched whenever you like: **From above**, and **On the
 road**, which follows a few metres up and behind like the lead vehicle's camera, at a gentler
-time-lapse that slows at each Stop and into corners: ten to twelve minutes for the whole course. The readout, the sentence, the layer that is on and the sun keep up. Paused, the map is
-yours to look around; touching the map pauses. If your system asks for reduced motion, nothing glides:
+time-lapse that slows at each Stop and into corners: ten to twelve minutes for the whole course. The readout, the sentence, the layer that is on and the sun keep up. **Drag the map and the camera is
+yours to turn**: it orbits the runner, scrolling moves in and out, and the Ride plays on — the player
+shows **Look around**, and picking a camera again hands it back to the Ride. If your system asks for reduced motion, nothing glides:
 the Ride steps from Stop to Stop. **Back to the map** returns to Explore.
 
 **Your race plan** opens from the banner: the edition, your start wave, and a goal as a finish time

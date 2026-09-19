@@ -13,7 +13,8 @@ export const MAP_HELP = "Drag to move, scroll to zoom, Ctrl + drag to tilt. With
 export interface MapActions {
   /**
    * Called before any of these buttons or keys moves the map: a Ride that is playing gives way to
-   * it (issue #8). Full map moves nothing, so it isn't one of them: the Ride plays on.
+   * it, free look included (issues #8, #28). Full map moves nothing, so it isn't one of them: the
+   * Ride plays on.
    */
   takesTheMap(): void;
   wholeCourse(): void;

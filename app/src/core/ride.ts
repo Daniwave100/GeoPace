@@ -210,9 +210,15 @@ export interface Ride {
   /** Where the runner is: km from the start. */
   readonly km: number;
   readonly camera: RideCamera;
+  /**
+   * Whether the camera is the runner's to turn rather than the Ride's (PLAN.md D54): a hand on the
+   * map turns it round the runner, and the Ride plays on. The camera above is still the one whose
+   * time-lapse the Ride keeps, and the one it goes back to.
+   */
+  readonly freeLook: boolean;
   /** Play, or pause: what the button and the space bar do. Played, the Ride goes straight through to the finish. */
   playPause(): void;
-  /** Pause, if it is playing: what a hand on the map does. */
+  /** Pause, if it is playing: what the map's own buttons and keys do, and the plan and the photoreal panel opening over it. */
   pause(): void;
   /** Ride to the next Stop and pause on arriving. */
   rideToNextStop(): void;
@@ -222,7 +228,13 @@ export interface Ride {
   scrubbedTo(km: number): void;
   /** The runner has taken hold of the strip, or let it go: while they hold it, the Ride waits where they put it. */
   hold(held: boolean): void;
-  /** Switch cameras, in the middle of the Ride or not. The time-lapse follows: gentler On the road. */
+  /**
+   * A hand on the map during the Ride, or "Look around" in the player: the camera is the runner's
+   * to turn from now on, tied to the runner wherever they go, and the Ride plays on. In Explore it
+   * does nothing: there, the map is the map.
+   */
+  lookAround(): void;
+  /** Switch cameras, in the middle of the Ride or not, and give the camera back to the Ride if it was the runner's. The time-lapse follows: gentler On the road. */
   useCamera(camera: RideCamera): void;
   /** Back to Explore: the Ride stops where it is. */
   leave(): void;
@@ -240,6 +252,7 @@ export function createRide(options: RideOptions): Ride {
   let on = false;
   let playing = false;
   let camera: RideCamera = "from-above";
+  let freeLook = false;
   /** Where a Ride to the next stop ends; null while riding straight through. */
   let untilKm: number | null = null;
   let held = false;
@@ -320,6 +333,9 @@ export function createRide(options: RideOptions): Ride {
     get camera() {
       return camera;
     },
+    get freeLook() {
+      return freeLook;
+    },
     playPause() {
       // Played at the finish, it is the whole course again: there is nowhere further to ride.
       const fromTheStart = !playing && atTheFinish();
@@ -363,14 +379,24 @@ export function createRide(options: RideOptions): Ride {
     hold(next) {
       held = next;
     },
+    lookAround() {
+      if (!on || freeLook) return; // dragged again and again, the camera is already the runner's: nothing begins afresh
+      freeLook = true;
+      options.onChange();
+    },
     useCamera(next) {
-      if (camera === next) return;
+      // The camera the Ride is already on is the commonest way back out of free look, and the
+      // player's own way: a radio that is already chosen can't be chosen again, so free look is a
+      // third choice beside the two, and pressing either of them is news even when neither changes.
+      if (camera === next && !freeLook) return;
       camera = next;
+      freeLook = false;
       options.onChange();
     },
     leave() {
       if (!on) return;
       on = false;
+      freeLook = false; // the camera is the map's own again, and the next Ride begins on the Ride's
       if (playing) setPlaying(false);
       else options.onChange();
     },

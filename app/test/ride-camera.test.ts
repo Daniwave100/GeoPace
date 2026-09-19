@@ -5,14 +5,14 @@
 // moment rather than in a cut, cuts when reduced motion is asked for, is the runner's own again
 // whenever the Ride isn't moving it, and never needs a terrain or imagery tile to have arrived.
 import { readFileSync } from "node:fs";
-import { Cartesian3, Cartographic, Event, Math as CesiumMath } from "cesium";
+import { Camera, Cartesian3, Cartographic, Event, GeographicProjection, Math as CesiumMath, Matrix4 } from "cesium";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { createRide } from "../src/core/ride";
-import { rideCourseFor, rideView, type RideView } from "../src/core/ride-view";
+import { rideCourseFor, type RideScene, rideView, type RideView, runnerInTheScene, type ScenePlace } from "../src/core/ride-view";
 import { stopsFor } from "../src/core/stops";
 import type { RoadPosition } from "../src/core/scrub";
-import { createRideCamera, roadHeightOnTheMap } from "../src/scene/ride-camera";
+import { createRideCamera, FREE_LOOK, roadHeightOnTheMap } from "../src/scene/ride-camera";
 
 interface Shot {
   lat: number;
@@ -26,6 +26,13 @@ function fakeViewer(start: Shot = { lat: 40.7, lon: -74, heightM: 30_000, headin
   const shots: Shot[] = [];
   const camera = {
     positionCartographic: Cartographic.fromDegrees(start.lon, start.lat, start.heightM),
+    // Free look ties the camera to a frame on the runner, and what that does to a camera is
+    // CesiumJS's own arithmetic: those tests below drive the real CesiumJS camera instead.
+    position: new Cartesian3(),
+    ties: [] as Matrix4[],
+    lookAtTransform(transform: Matrix4) {
+      camera.ties.push(Matrix4.clone(transform, new Matrix4()));
+    },
     heading: CesiumMath.toRadians(start.headingDeg),
     pitch: CesiumMath.toRadians(start.pitchDeg),
     flightsCancelled: 0,
@@ -292,3 +299,194 @@ describe("the Ride with every tile failed", () => {
   });
 });
 
+
+// Free look (issue #28): in the Ride a hand on the map turns the camera round the runner and the
+// Ride plays on. The camera is tied to a frame of reference that sits on the runner, and before
+// every frame that frame is moved to where the runner now is while the camera keeps its place
+// within it; CesiumJS's own mouse controls, finding a camera tied to a frame, orbit the frame's
+// origin rather than the globe. So these tests drive the real CesiumJS camera, not a stand-in:
+// what is ours here is the frame, the bounds and the untying, and all three are CesiumJS's
+// arithmetic to carry out.
+const nycBundle = parseCourseBundle(JSON.parse(readFileSync(new URL("../../data/derived/nyc/course-bundle.json", import.meta.url), "utf8")), "nyc");
+const nycScene: RideScene = { line: nycBundle.measured.course_line, stops: stopsFor(nycBundle), notMeasured: nycBundle.measured.elevation_not_measured };
+
+/** A real CesiumJS camera in an empty scene, looking at `start`. */
+function cesiumViewer(start: RideView) {
+  const scene = { canvas: { clientWidth: 1200, clientHeight: 800 }, drawingBufferWidth: 1200, drawingBufferHeight: 800, mapProjection: new GeographicProjection() };
+  const camera = new Camera(scene as never);
+  camera.setView({
+    destination: Cartesian3.fromDegrees(start.eye.lon, start.eye.lat, start.eye.heightM),
+    orientation: { heading: CesiumMath.toRadians(start.headingDeg), pitch: CesiumMath.toRadians(start.pitchDeg), roll: 0 },
+  });
+  const preRender = new Event();
+  let nowMs = 0;
+  return {
+    viewer: { camera, scene: { preRender } },
+    camera,
+    now: () => nowMs,
+    run(seconds: number) {
+      for (let frame = 0; frame < Math.round(seconds * 60); frame += 1) {
+        nowMs += 1000 / 60;
+        preRender.raiseEvent();
+      }
+    },
+    /** What the runner's own hand does to the camera through CesiumJS's controls: it moves within the frame it is tied to. */
+    drag(eastM: number, northM: number, upM: number) {
+      Cartesian3.clone(new Cartesian3(eastM, northM, upM), camera.position);
+    },
+  };
+}
+
+const placeOf = (at: ScenePlace) => Cartesian3.fromDegrees(at.lon, at.lat, at.heightM);
+/** How far off the middle of the view a place is, in degrees. */
+const offTheMiddleDeg = (camera: Camera, at: ScenePlace) => CesiumMath.toDegrees(Cartesian3.angleBetween(camera.directionWC, Cartesian3.subtract(placeOf(at), camera.positionWC, new Cartesian3())));
+const KM = 10;
+
+describe("free look: the camera the runner turns", () => {
+  /** The Ride From above at km 10 of New York, with the runner held off the middle of the map as the readout block asks. */
+  const fromAbove = () => rideView(nycScene, KM, "from-above", { leftOfRunner: 0.14 });
+  const runnerAt = (km: number) => runnerInTheScene(nycScene, km);
+
+  it("goes wherever the runner goes, at the distance and the way round the runner has turned it to", () => {
+    const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
+    const ride = { km: KM };
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+
+    free.lookAround(() => runnerAt(ride.km));
+    run(1); // the view settles on the runner
+    drag(700, -400, 500); // the runner turns the camera round to the south-east and brings it in
+
+    ride.km = KM + 0.45; // and the Ride plays on: a second from above
+    run(1);
+
+    // The camera keeps its place within the frame, and the frame is where the runner now is.
+    expect(camera.position.x).toBeCloseTo(700, 3);
+    expect(camera.position.y).toBeCloseTo(-400, 3);
+    expect(camera.position.z).toBeCloseTo(500, 3);
+    expect(Cartesian3.distance(camera.positionWC, placeOf(runnerAt(ride.km)))).toBeCloseTo(Math.hypot(700, 400, 500), 0);
+    expect(offTheMiddleDeg(camera, runnerAt(ride.km))).toBeLessThan(0.05); // and it is looking at them
+  });
+
+  it("asks where the runner is before every frame, so the road's height follows our terrain as it arrives", () => {
+    const { viewer, camera, now, run } = cesiumViewer(fromAbove());
+    const road = { heightM: 5 }; // what coarse, far-off terrain says the road's height is
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+
+    free.lookAround(() => ({ ...runnerAt(KM), heightM: road.heightM }));
+    run(1);
+    const was = camera.positionCartographic.height;
+
+    road.heightM = 40; // the finer terrain arrives and the road turns out to be 35 m higher
+    run(1 / 60);
+
+    expect(camera.positionCartographic.height - was).toBeCloseTo(35, 1); // the camera goes up with it, at the same distance
+  });
+
+  it("brings the runner to the middle of the view by turning, not by moving: From above holds them off it", () => {
+    const { viewer, camera, now, run } = cesiumViewer(fromAbove());
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+    const was = Cartographic.toCartesian(Cartographic.clone(camera.positionCartographic));
+
+    free.lookAround(() => runnerAt(KM));
+    run(1 / 60);
+
+    // The readout block covers the left of the map, so From above holds the runner off its middle
+    // (core/framing.ts); free look orbits them, so entering it takes them to the middle. Not in
+    // the first frame, and never by carrying the camera there: it stands still and turns.
+    expect(offTheMiddleDeg(camera, runnerAt(KM))).toBeGreaterThan(3);
+    for (let frame = 0; frame < 30; frame += 1) {
+      run(1 / 60);
+      expect(Cartesian3.distance(camera.positionWC, was)).toBeLessThan(1);
+    }
+
+    run(0.5);
+    expect(offTheMiddleDeg(camera, runnerAt(KM))).toBeLessThan(0.05);
+    expect(Cartesian3.distance(camera.positionWC, was)).toBeLessThan(1);
+  });
+
+  it("is the runner's hand's even in the middle of that turn: a drag then is kept whole", () => {
+    const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+
+    free.lookAround(() => runnerAt(KM));
+    run(0.25); // half way into the turn, the runner drags the camera round to the north-west of themselves
+    drag(-1200, 900, 800);
+    run(1 / 60);
+    const where = Cartesian3.clone(camera.positionWC, new Cartesian3());
+
+    run(1);
+
+    expect(Cartesian3.distance(camera.positionWC, where)).toBeLessThan(1); // the rest of the turn doesn't take the camera back
+    expect(camera.position.x).toBeLessThan(-1000); // it is where the hand left it, and now counted from the runner
+    expect(camera.position.y).toBeGreaterThan(800);
+    expect(offTheMiddleDeg(camera, runnerAt(KM))).toBeLessThan(0.05);
+  });
+
+  it("cuts to the middle when reduced motion is asked for", () => {
+    const { viewer, camera, now, run } = cesiumViewer(fromAbove());
+    const free = createRideCamera(viewer, { reducedMotion: () => true, now });
+
+    free.lookAround(() => runnerAt(KM));
+    run(1 / 60);
+
+    expect(offTheMiddleDeg(camera, runnerAt(KM))).toBeLessThan(0.05);
+  });
+
+  it("keeps the camera where it can still see the runner: not under the road, not on top of them, not miles off", () => {
+    const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+    free.lookAround(() => runnerAt(KM));
+    run(1);
+
+    drag(0, -40_000, -9000); // dragged under the road and out of the city
+    run(1 / 60);
+    const far = Cartesian3.clone(camera.position, new Cartesian3());
+    expect(Cartesian3.magnitude(far)).toBeCloseTo(FREE_LOOK.farthestM, 3);
+    expect(CesiumMath.toDegrees(Math.asin(far.z / Cartesian3.magnitude(far)))).toBeCloseTo(FREE_LOOK.lowestDeg, 3);
+    expect(Math.atan2(far.x, far.y)).toBeCloseTo(Math.atan2(0, -1), 6); // still due south of the runner: only how far and how low are ours
+
+    drag(0.5, 0.5, 0.2); // and brought in on top of them
+    run(1 / 60);
+    expect(Cartesian3.magnitude(camera.position)).toBeCloseTo(FREE_LOOK.nearestM, 3);
+    expect(offTheMiddleDeg(camera, runnerAt(KM))).toBeLessThan(0.05);
+  });
+
+  it("unties the camera when the runner leaves the Ride, leaving it where they left it: the map's own flights are the map's again", () => {
+    const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+    free.lookAround(() => runnerAt(KM));
+    run(1);
+    drag(400, -400, 300);
+    run(1 / 60);
+    const where = Cartographic.clone(camera.positionCartographic);
+
+    free.letGo();
+
+    expect(camera.transform.equals(Matrix4.IDENTITY)).toBe(true);
+    expect(camera.positionCartographic.longitude).toBeCloseTo(where.longitude, 12);
+    expect(camera.positionCartographic.latitude).toBeCloseTo(where.latitude, 12);
+    expect(camera.positionCartographic.height).toBeCloseTo(where.height, 6);
+    // And nothing pulls at it afterwards: it is the runner's map.
+    run(1);
+    expect(Cartesian3.distance(camera.positionWC, Cartographic.toCartesian(where))).toBeLessThan(1e-6);
+  });
+
+  it("gives the camera back to the Ride in a glide from wherever the runner left it, untied", () => {
+    const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
+    const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+    free.lookAround(() => runnerAt(KM));
+    run(1);
+    drag(900, -900, 400); // turned right round behind the runner
+
+    const wanted = rideView(nycScene, KM, "from-above");
+    free.follow(() => wanted, "jump");
+    expect(camera.transform.equals(Matrix4.IDENTITY)).toBe(true); // the frame is set back before the glide: a glide is in the world
+
+    run(0.1);
+    expect(Cartesian3.distance(camera.positionWC, Cartesian3.fromDegrees(wanted.eye.lon, wanted.eye.lat, wanted.eye.heightM))).toBeGreaterThan(100); // on its way
+    run(2);
+    expect(camera.positionCartographic.height).toBeCloseTo(wanted.eye.heightM, 1);
+    expect(CesiumMath.toDegrees(camera.heading)).toBeCloseTo(wanted.headingDeg, 3);
+    expect(CesiumMath.toDegrees(camera.pitch)).toBeCloseTo(wanted.pitchDeg, 3);
+  });
+});
