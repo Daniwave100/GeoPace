@@ -6,7 +6,7 @@
 // in the row's header. Collapsed, it is the landmarks, the height and the blue line with where
 // you are on it. A layer that is switched on adds its rows; "Show everything" adds every row.
 // The names along the top are the Ride's Stops (core/stops.ts): every landmark, the start, and
-// the climbs worth stopping for. The strip is the Ride's seek bar as much as it is Explore's.
+// the climbs worth stopping for. Scrubbing the strip moves the Ride, as it moves the runner in Explore.
 //
 // To a screen reader it is a slider, which is what it is: one value between two ends. All the
 // arithmetic lives in core/ (scrub.ts, trace.ts, layout.ts, units.ts), where it is tested; this

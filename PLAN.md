@@ -668,7 +668,7 @@ arrival times are approximate — state that in the UI.
 - **2026-09-19** — The Ride (#8, D53). "Ride the course" on the map carries the runner from start to finish as a
   time-lapse that slows for the Stops (the start, every landmark, the finish, and New York's three climbs of 15 m or
   more), with Back / Ride to the next stop pausing on arrival, the space bar, and two cameras switched mid-Ride: From
-  above, and On the road at 3 m, the one height setting. The strip names the Stops and is the Ride's seek bar. With
+  above, and On the road at 3 m, the one height setting. The strip names the Stops, and scrubbing it moves the Ride. With
   reduced motion the Ride steps Stop to Stop and every camera move is a cut. Built test-first on three seams: the
   Stops of a course, the Ride driven by hand-turned frames, and the cameras as pure geometry run down the whole of
   both courses; the scene's camera is tested against a stand-in viewer. A look in headless Chrome moved the controls
