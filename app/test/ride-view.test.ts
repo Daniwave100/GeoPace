@@ -69,16 +69,26 @@ function metersFrom(from: { lat: number; lon: number }, to: { lat: number; lon: 
   return { north: (to.lat - from.lat) * M_PER_DEG_LAT, east: (to.lon - from.lon) * M_PER_DEG_LAT * Math.cos((from.lat * Math.PI) / 180) };
 }
 
+interface Swing {
+  /** The fastest the view swings, degrees a second, where the Ride could still have gone slower; and where. */
+  degPerS: number;
+  km: number;
+  /** How many metres of the course the Ride is already as slow as it may go through a turn, and the fastest swing among them. */
+  atItsSlowestM: number;
+  fastestAtItsSlowestDegPerS: number;
+}
+
 /**
- * The fastest the view swings round anywhere on a course, in degrees a second, at the speed the
- * Ride goes there; walked a metre at a time, because round Columbus Circle the whole swing falls
- * within some 4 m. Places where the Ride is already as slow as it is allowed to go are left out:
- * there the swing is whatever the road demands (PLAN.md D53).
+ * How fast the view swings round along a whole course, at the speed the Ride goes there; walked a
+ * metre at a time, because round Columbus Circle the whole swing falls within some 4 m. Where the
+ * Ride is already as slow as it is allowed to go the swing is whatever the road demands (PLAN.md
+ * D53), so those metres are kept apart: but they are counted, and their swing measured, so that
+ * raising the floor through a turn can't quietly excuse every corner on the course.
  */
-function fastestSwingDegPerS(scene: RideScene, camera: RideCamera): { degPerS: number; km: number } {
+function swingAlong(scene: RideScene, camera: RideCamera): Swing {
   const course = rideCourseFor(scene);
   const asSlowAsItGoes = { ...course, swingDegPerKm: () => Number.MAX_VALUE };
-  let fastest = { degPerS: 0, km: 0 };
+  const swing: Swing = { degPerS: 0, km: 0, atItsSlowestM: 0, fastestAtItsSlowestDegPerS: 0 };
   let last = rideView(scene, 0, camera).headingDeg;
   for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
     const km = m / 1000;
@@ -86,10 +96,14 @@ function fastestSwingDegPerS(scene: RideScene, camera: RideCamera): { degPerS: n
     const speed = rideSpeedKmPerS(course, km, camera);
     // Degrees in a metre of road, times how many metres go by in a second.
     const degPerS = Math.abs(relativeBearing(last, heading)) * speed * 1000;
-    if (degPerS > fastest.degPerS && speed > rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) fastest = { degPerS, km };
     last = heading;
+    if (speed <= rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) {
+      // Only a turn counts: near a Stop the Ride is this slow on a dead straight road too.
+      if (degPerS > 1) swing.atItsSlowestM += 1;
+      swing.fastestAtItsSlowestDegPerS = Math.max(swing.fastestAtItsSlowestDegPerS, degPerS);
+    } else if (degPerS > swing.degPerS) Object.assign(swing, { degPerS, km });
   }
-  return fastest;
+  return swing;
 }
 
 describe("On the road", () => {
@@ -123,13 +137,21 @@ describe("On the road", () => {
   });
 
   it("turns into a corner gradually, never in a jolt, along the whole of both courses", () => {
-    // A quarter turn takes a second and a half at the least (60° a second, and a little over for
-    // measuring it 10 m at a time). The Ride eases off to keep to it at every street corner, where
-    // corners come in a row (New York's mile in the Bronx), and where the road loops (the Queensboro Bridge).
+    // A quarter turn takes a second and a half at the least: 60° a second. The Ride eases off to
+    // keep to it at every street corner, where corners come in a row (New York's mile in the
+    // Bronx), and where the road loops (the Queensboro Bridge).
     for (const scene of [cornerCourse(), nyc, berlin]) {
-      const fastest = fastestSwingDegPerS(scene, "on-the-road");
-      expect(fastest.degPerS, `km ${fastest.km.toFixed(2)}`).toBeLessThan(75);
+      const swing = swingAlong(scene, "on-the-road");
+      expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(61);
     }
+    // What is left over. The floor through a turn is tuned to a right angle, which from 25 m behind
+    // swings 57° a second at 12.5 m/s. New York has three sharper turns where the Ride, as slow as
+    // it may go, still swings faster: two corners of about 105° in Greenpoint (km 19.67 and 19.90)
+    // and the turn back on itself at Columbus Circle (km 41.99, at 3 m/s). Berlin has none.
+    const newYork = swingAlong(nyc, "on-the-road");
+    expect(newYork.atItsSlowestM).toBeLessThan(400);
+    expect(newYork.fastestAtItsSlowestDegPerS).toBeLessThan(115);
+    expect(swingAlong(berlin, "on-the-road").fastestAtItsSlowestDegPerS).toBeLessThan(61);
   });
 
   it("keeps the runner in the middle of the view round every corner, hairpin and loop of both courses", () => {
@@ -294,8 +316,10 @@ describe("From above", () => {
 
   it("turns with the course slowly: a change of direction is a sweep of several seconds, not a spin", () => {
     for (const scene of [cornerCourse(), nyc, berlin]) {
-      const fastest = fastestSwingDegPerS(scene, "from-above");
-      expect(fastest.degPerS, `km ${fastest.km.toFixed(2)}`).toBeLessThan(30);
+      const swing = swingAlong(scene, "from-above");
+      expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(21);
+      // From above the Ride never has to go as slow as it may to keep to that: nothing is excused.
+      expect(swing.fastestAtItsSlowestDegPerS).toBeLessThan(21);
     }
   });
 });

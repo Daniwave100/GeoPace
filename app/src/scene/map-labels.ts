@@ -10,7 +10,7 @@
 // A label stands where the course line is drawn: on the open terrain's ground while the line is
 // draped, at the road's own height while the line is (placement.ts). On a bridge the two are tens
 // of metres apart, and a label at the wrong one slides off the line as the camera tilts.
-import { Cartesian2, Cartesian3, Cartographic, sampleTerrainMostDetailed, SceneTransforms, type Viewer } from "cesium";
+import { Cartesian2, Cartesian3, Cartographic, sampleTerrainMostDetailed, SceneTransforms, type TerrainProvider, type Viewer } from "cesium";
 import { keepLabels } from "../core/declutter";
 import { type Encoding, ENCODINGS } from "../core/encoding";
 import { isOverTheHorizon } from "../core/horizon";
@@ -142,19 +142,35 @@ function placeKey(label: Pick<MapLabel, "lat" | "lon">): string {
   return `${label.lat.toFixed(6)},${label.lon.toFixed(6)}`;
 }
 
+/** What lifting needs of a label that has been placed: which label it is, and where it stands. */
+type Liftable = Pick<Placed, "label" | "position">;
+
 /**
  * A label's place starts at height zero, which near the ground puts it tens of metres from the
  * road. The open terrain says how high the ground is there; never the photoreal imagery, which is
  * for looking at only (PLAN.md D5). If the terrain can't say, the labels stay where they are.
+ *
+ * The ground can change while the answer is on its way: the open terrain gives way to the plain
+ * ground when a top tile fails (plain-ground.ts). An answer from a terrain that has gone is about a
+ * ground that is no longer drawn, and is dropped: taken, it left Berlin's labels 73 m up in the air
+ * over flat ground, and was remembered. `sample` is CesiumJS's own lookup; a test holds its answer back.
  */
-async function liftOntoTheGround(viewer: Viewer, placed: Placed[], known: Map<string, number>, stillWanted: () => boolean): Promise<void> {
+export async function liftOntoTheGround(
+  viewer: { terrainProvider: TerrainProvider },
+  placed: Liftable[],
+  known: Map<string, number>,
+  stillWanted: () => boolean,
+  sample: (terrain: TerrainProvider, places: Cartographic[]) => Promise<Cartographic[]> = sampleTerrainMostDetailed,
+): Promise<void> {
   const unknown = placed.filter((item) => !known.has(placeKey(item.label)));
   if (unknown.length === 0) return;
+  const asked = viewer.terrainProvider;
   try {
-    const ground = await sampleTerrainMostDetailed(
-      viewer.terrainProvider,
+    const ground = await sample(
+      asked,
       unknown.map((item) => Cartographic.fromDegrees(item.label.lon, item.label.lat)),
     );
+    if (viewer.terrainProvider !== asked) return;
     unknown.forEach((item, i) => {
       if (!Number.isFinite(ground[i].height)) return;
       known.set(placeKey(item.label), ground[i].height);

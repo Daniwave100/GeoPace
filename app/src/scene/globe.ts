@@ -30,6 +30,7 @@ import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
 import { registerCourseRibbon } from "./course-ribbon";
+import { groundUnderM } from "./ground-under";
 import { middleOfTheMap } from "./map-middle";
 import { plainGroundIfTerrainFails } from "./plain-ground";
 import { BASEMAP, TERRAIN } from "./providers";
@@ -189,10 +190,18 @@ export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
   basemap.saturation = theme === "dark" ? 0.15 : 1;
 }
 
-/** How far the camera is above the plain ground under it, or above the ellipsoid where no ground is loaded. */
+/** For each map, how high the road is where the runner is, from the Course Bundle: the ground while photoreal has hidden the globe (ground-under.ts). */
+const roadWhenHidden = new WeakMap<Viewer, () => number | undefined>();
+
+/** Say where to ask for the road's own height. Asked only while the plain ground is hidden, each time it is needed. */
+export function useRoadAsGroundWhenHidden(viewer: Viewer, roadM: () => number | undefined): void {
+  roadWhenHidden.set(viewer, roadM);
+}
+
+/** How far the camera is above the ground under it (never less than a metre, so the ground is always under the camera). */
 function heightAboveGround(viewer: Viewer): number {
   const eye = viewer.camera.positionCartographic;
-  return Math.max(eye.height - (viewer.scene.globe.getHeight(eye) ?? 0), 1);
+  return Math.max(eye.height - groundUnderM(viewer.scene.globe, eye, roadWhenHidden.get(viewer)), 1);
 }
 
 /** Move the map a quarter of a screen: `right` and `up` are -1, 0 or 1, as on the arrow keys. */

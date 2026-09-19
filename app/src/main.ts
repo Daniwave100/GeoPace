@@ -34,7 +34,7 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isStillFramed, leftOfMiddle, showMapTheme, showMoment, toggleStraightDown, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isStillFramed, leftOfMiddle, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
@@ -195,6 +195,8 @@ async function show(courseId: string): Promise<void> {
       straightDown: () => toggleStraightDown(map, flightSeconds()),
       fullMap: () => useFullMap(!fullMap),
     });
+    // While photoreal hides the plain ground, the map's own moves count heights from the road where the runner is.
+    useRoadAsGroundWhenHidden(map, () => (showing ? positionAtKm(showing.bundle.measured.course_line, showing.km).ellipsoidHeightM : undefined));
     rideCamera = createRideCamera(map, { reducedMotion: () => reducedMotion.matches, now: () => performance.now() });
     pauseTheRideWhenTheMapIsMoved();
     showTheme();
