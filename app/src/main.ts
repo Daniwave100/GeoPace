@@ -485,14 +485,14 @@ function handOnTheMap(): void {
  * The map's own buttons and keys still outrank the Ride: zoom, Whole course, Where I am, Straight
  * down and the arrow keys pause a Ride that is playing, end free look, and stop a glide where it
  * is. The map is then the runner's to orbit, pan and zoom until they ride on. (Whole course can
- * only mean leaving the runner; whether zoom should move the free camera in and out instead is the
- * owner's to judge on the built thing, issue #28.)
+ * only mean leaving the runner; whether zoom should move the camera in free look in and out
+ * instead is the owner's to judge on the built thing, issue #28.)
  */
 function takeTheMap(): void {
   if (!showing) return;
   const { ride } = showing;
   ride.pause();
-  ride.useCamera(ride.camera); // out of free look: what the map flies to is the map's own, not the runner's
+  ride.handTheCameraBack(); // out of free look: what the map flies to is the map's own, not the runner's
   rideCamera?.letGo(); // after both, each of which asks for one last view of its own
 }
 

@@ -734,6 +734,22 @@ describe("free look", () => {
     expect(ride.freeLook).toBe(true);
   });
 
+  it("is handed back by the map's own buttons without changing which camera the Ride is on", () => {
+    const { ride, changes } = rideOn(nyc);
+    ride.useCamera("on-the-road");
+    ride.playPause();
+    ride.lookAround();
+    const told = changes();
+
+    ride.handTheCameraBack(); // Whole course, Where I am, zoom, Straight down, the arrow keys
+
+    expect(ride.freeLook).toBe(false);
+    expect(ride.camera).toBe("on-the-road");
+    expect(changes()).toBe(told + 1);
+    ride.handTheCameraBack(); // and again: the camera is the Ride's already, and the player has nothing to hear
+    expect(changes()).toBe(told + 1);
+  });
+
   it("is over when the runner leaves the Ride: the next Ride starts on the Ride's own camera", () => {
     const { ride } = rideOn(nyc);
     ride.playPause();

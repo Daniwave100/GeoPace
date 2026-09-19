@@ -83,9 +83,16 @@ export interface RideScene {
   notMeasured: NotMeasuredSpan[];
 }
 
+/** A place in the 3D scene: `heightM` is above the ellipsoid, where the scene counts heights from. */
+export interface ScenePlace {
+  lat: number;
+  lon: number;
+  heightM: number;
+}
+
 export interface RideView {
-  /** Where the camera is. `heightM` is above the ellipsoid: where the 3D scene counts heights from. */
-  eye: { lat: number; lon: number; heightM: number };
+  /** Where the camera is. */
+  eye: ScenePlace;
   /** Which way it looks: degrees clockwise from true north. */
   headingDeg: number;
   /** Degrees above the horizon: negative looks down. */
@@ -94,13 +101,6 @@ export interface RideView {
 
 /** The road's height in the scene at a place on the course. */
 export type HeightAt = (place: RoadPosition) => number;
-
-/** A place in the 3D scene: `heightM` is above the ellipsoid, where the scene counts heights from. */
-export interface ScenePlace {
-  lat: number;
-  lon: number;
-  heightM: number;
-}
 
 export interface RideViewOptions {
   /** The road's height in the scene: left out, the Course Bundle's own height above the ellipsoid. */

@@ -95,6 +95,11 @@ const THERE = { meters: 1, degrees: 1 };
  * meaning anything, and between `nearestM` and `farthestM` of them. Only what is outside is moved:
  * the view the runner turned to is theirs.
  *
+ * The angle is measured at the runner's own level, so it keeps the camera out of the road *there*;
+ * what keeps it out of a hillside between the two is CesiumJS's own collision, which free look
+ * leaves alone, since in free look the camera's place is whatever those controls left (which is
+ * also why free look over photoreal is unknown until the owner's key shows it: D54).
+ *
  * `centringSeconds` is what the one turn of free look's own takes: From above holds the runner off
  * the middle of the map (the readout block covers its left, core/framing.ts) and free look orbits
  * them, so entering it carries them to the middle over that half second instead of snapping.
@@ -107,8 +112,8 @@ interface Tied {
   /** Where the camera was looking when free look began, metres east and north of the runner: what the one turn of its own brings to the middle. */
   offCentre: Cartesian3;
   startedMs: number;
-  /** How much of `offCentre` the frame the camera is tied to carries now: 1 as free look begins, 0 once the runner is in the middle. */
-  stillOff: number;
+  /** How much of `offCentre` the frame the camera was tied to last frame carried: 0 as free look begins (the frame was put on the runner), then the turn's own share of it. */
+  carriedLastFrame: number;
 }
 
 export function createRideCamera(viewer: SceneForRide, options: RideCameraOptions): CameraInTheScene {
@@ -143,11 +148,13 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
    */
   function holdOnTheRunner(tie: Tied): void {
     const along = options.reducedMotion() ? 1 : Math.min((options.now() - tie.startedMs) / (FREE_LOOK.centringSeconds * 1000), 1);
-    const stillOff = 1 - along * along * (3 - 2 * along); // how much of the turn is still to come: even at both ends, so neither end of it is a jolt
-    const fromRunner = keptNearTheRunner(Cartesian3.add(camera.position, Cartesian3.multiplyByScalar(tie.offCentre, tie.stillOff, new Cartesian3()), new Cartesian3()));
-    const offCentre = Cartesian3.multiplyByScalar(tie.offCentre, stillOff, new Cartesian3());
+    const toCome = 1 - along * along * (3 - 2 * along); // how much of the turn is still to come: even at both ends, so neither end of it is a jolt
+    // Where the camera stands from the runner: the place the hand left it at, which is counted
+    // within last frame's own frame, and that frame's origin was this much off the runner.
+    const fromRunner = keptNearTheRunner(Cartesian3.add(camera.position, Cartesian3.multiplyByScalar(tie.offCentre, tie.carriedLastFrame, new Cartesian3()), new Cartesian3()));
+    const offCentre = Cartesian3.multiplyByScalar(tie.offCentre, toCome, new Cartesian3());
     const frame = Matrix4.multiplyByTranslation(frameOn(tie.runner()), offCentre, new Matrix4());
-    tie.stillOff = stillOff;
+    tie.carriedLastFrame = toCome;
     camera.lookAtTransform(frame, Cartesian3.subtract(fromRunner, offCentre, fromRunner));
   }
 
@@ -190,7 +197,7 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
       // With no offset the camera stays exactly where it is in the world, and its place is counted
       // within the frame from now on: which is what `whereItIsLooking` then reads.
       camera.lookAtTransform(frameOn(runner()));
-      tied = { runner, offCentre: whereItIsLooking(camera), startedMs: options.now(), stillOff: 0 };
+      tied = { runner, offCentre: whereItIsLooking(camera), startedMs: options.now(), carriedLastFrame: 0 };
     },
     letGo() {
       untie();
@@ -229,7 +236,7 @@ function whereItIsLooking(camera: SceneForRide["camera"]): Cartesian3 {
  * Always a place of its own: CesiumJS moves the camera's own place into the new frame before it
  * reads the one it is given, so handing it back its own would leave it behind the runner.
  */
-export function keptNearTheRunner(at: Cartesian3): Cartesian3 {
+function keptNearTheRunner(at: Cartesian3): Cartesian3 {
   const awayM = Cartesian3.magnitude(at);
   const flatM = Math.hypot(at.x, at.y);
   const lowest = CesiumMath.toRadians(FREE_LOOK.lowestDeg);

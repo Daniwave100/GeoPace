@@ -234,7 +234,9 @@ export interface Ride {
    * does nothing: there, the map is the map.
    */
   lookAround(): void;
-  /** Switch cameras, in the middle of the Ride or not, and give the camera back to the Ride if it was the runner's. The time-lapse follows: gentler On the road. */
+  /** Out of free look: the camera is the Ride's own again, the one it already had. What the map's own buttons do before they take it. */
+  handTheCameraBack(): void;
+  /** Switch cameras, in the middle of the Ride or not, and hand the camera back if it was the runner's. The time-lapse follows: gentler On the road. */
   useCamera(camera: RideCamera): void;
   /** Back to Explore: the Ride stops where it is. */
   leave(): void;
@@ -382,6 +384,11 @@ export function createRide(options: RideOptions): Ride {
     lookAround() {
       if (!on || freeLook) return; // dragged again and again, the camera is already the runner's: nothing begins afresh
       freeLook = true;
+      options.onChange();
+    },
+    handTheCameraBack() {
+      if (!freeLook) return;
+      freeLook = false;
       options.onChange();
     },
     useCamera(next) {

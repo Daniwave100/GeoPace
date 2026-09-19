@@ -10,9 +10,9 @@
 // The two cameras are three choices (issue #28, PLAN.md D54): the Ride's two, and Look around, the
 // camera the runner turns themselves. A hand on the map chooses that one, and choosing either of
 // the others is how the camera is handed back to the Ride.
-import type { RideCamera } from "../core/ride";
+import { type RideCamera, RIDE_CAMERAS } from "../core/ride";
 import { html } from "../dom";
-import { segmented } from "../segmented";
+import { type Choice, segmented } from "../segmented";
 
 export interface RideActions {
   playPause(): void;
@@ -47,7 +47,7 @@ export interface RideControls {
 /** The third choice beside the two cameras: not one of the Ride's, so not a `RideCamera`. */
 const LOOK_AROUND = "look-around";
 
-const CAMERAS: { value: string; label: string; explained: string }[] = [
+const CAMERAS: Choice[] = [
   { value: "from-above", label: "From above", explained: "" },
   { value: "on-the-road", label: "On the road", explained: "" },
   { value: LOOK_AROUND, label: "Look around", explained: "drag the map to turn the camera round yourself; the Ride plays on" },
@@ -82,7 +82,17 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   const leave = button("ride-leave", "Back to the map", actions.leave);
 
   const stopLine = html("p", { class: "ride-stop" });
-  const cameras = segmented("Camera", "ride-camera", CAMERAS, (value) => (value === LOOK_AROUND ? actions.lookAround() : actions.useCamera(value as RideCamera)), "ride-cameras");
+  const cameras = segmented(
+    "Camera",
+    "ride-camera",
+    CAMERAS,
+    (value) => {
+      const picked = RIDE_CAMERAS.find((camera) => camera === value);
+      if (picked) actions.useCamera(picked);
+      else actions.lookAround();
+    },
+    "ride-cameras",
+  );
   const player = html(
     "div",
     { class: "ride-player", role: "group", "aria-label": "The Ride" },

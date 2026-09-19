@@ -471,6 +471,32 @@ describe("free look: the camera the runner turns", () => {
     expect(Cartesian3.distance(camera.positionWC, Cartographic.toCartesian(where))).toBeLessThan(1e-6);
   });
 
+  it("is untied by the sequence the map's own buttons make, and by the one switching course makes", () => {
+    // main.ts has no test harness of its own; what those two do at this seam is the sequence below.
+    // The map's own buttons hand the camera back (a jump, so `follow`) and then take it (`letGo`);
+    // switching course leaves the Ride, which is `letGo` alone. Either way the frame must be set
+    // back, or every flight the map makes afterwards is counted from the runner (PLAN.md §8).
+    for (const mapsOwnButton of [true, false]) {
+      const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
+      const free = createRideCamera(viewer, { reducedMotion: () => false, now });
+      free.lookAround(() => runnerAt(KM));
+      run(1);
+      drag(800, -600, 400);
+      run(1 / 60);
+
+      if (mapsOwnButton) free.follow(() => fromAbove(), "jump");
+      free.letGo();
+
+      expect(camera.transform.equals(Matrix4.IDENTITY)).toBe(true);
+      // And the map's own flight, made from here, lands where it says: a place 3 km up over the
+      // runner is 3 km up over the runner, not 3 km out from a frame that sits on them.
+      const flight = Cartesian3.fromDegrees(runnerAt(KM).lon, runnerAt(KM).lat, 3000);
+      camera.setView({ destination: flight, orientation: { heading: 0, pitch: -CesiumMath.PI_OVER_TWO, roll: 0 } });
+      run(1);
+      expect(Cartesian3.distance(camera.positionWC, flight)).toBeLessThan(1);
+    }
+  });
+
   it("gives the camera back to the Ride in a glide from wherever the runner left it, untied", () => {
     const { viewer, camera, now, run, drag } = cesiumViewer(fromAbove());
     const free = createRideCamera(viewer, { reducedMotion: () => false, now });
