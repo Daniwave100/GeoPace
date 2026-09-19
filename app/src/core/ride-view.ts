@@ -64,7 +64,7 @@ const FROM_ABOVE = {
 const M_PER_DEG_LAT = 111_320;
 const RAD = Math.PI / 180;
 
-/** As much of a course as the camera needs: the course line, and where the Stops are. */
+/** As much of a course as the Ride's cameras and its time-lapse need: the course line, where the Stops are (the Ride slows for them; no camera looks at them), and where the height is filled in. */
 export interface RideScene {
   line: CourseLine;
   /** In course order (core/stops.ts). */

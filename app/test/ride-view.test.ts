@@ -69,6 +69,12 @@ function metersFrom(from: { lat: number; lon: number }, to: { lat: number; lon: 
   return { north: (to.lat - from.lat) * M_PER_DEG_LAT, east: (to.lon - from.lon) * M_PER_DEG_LAT * Math.cos((from.lat * Math.PI) / 180) };
 }
 
+/** How far a camera is from the runner on the road, in a straight line through the air. */
+function distanceM(runner: { lat: number; lon: number; ellipsoidHeightM: number }, eye: { lat: number; lon: number; heightM: number }): number {
+  const back = metersFrom(runner, eye);
+  return Math.hypot(back.north, back.east, eye.heightM - runner.ellipsoidHeightM);
+}
+
 interface Swing {
   /** The fastest the view swings, degrees a second, where the Ride could still have gone slower; and where. */
   degPerS: number;
@@ -291,8 +297,7 @@ describe("From above", () => {
     const scene = cornerCourse();
     const runner = positionAtKm(scene.line, 1);
     const centred = rideView(scene, 1, "from-above");
-    const fromTheRunner = metersFrom(runner, centred.eye);
-    const range = Math.hypot(fromTheRunner.north, fromTheRunner.east, centred.eye.heightM - 100);
+    const range = distanceM(runner, centred.eye);
 
     const shifted = rideView(scene, 1, "from-above", { leftOfRunner: 0.1 });
 
@@ -309,14 +314,12 @@ describe("From above", () => {
 
   it("keeps one distance from the runner all the way, at a Stop, up a climb and on the open road alike: it never dollies in and out", () => {
     // The owner's pick (issue #24). First built coming down to 900 m at every Stop and going back up
-    // to 2,200 m after it: eighteen times in New York, a camera that "moves a little bit too much".
+    // to 2,200 m after it: eighteen times in New York, a camera that "is moving a little bit too much".
     for (const scene of [nyc, berlin]) {
       const distancesM: number[] = [];
       for (let km = 0; km <= scene.line.length_m / 1000; km += 0.05) {
         const view = rideView(scene, km, "from-above");
-        const runner = positionAtKm(scene.line, km);
-        const back = metersFrom(runner, view.eye);
-        distancesM.push(Math.hypot(back.north, back.east, view.eye.heightM - runner.ellipsoidHeightM));
+        distancesM.push(distanceM(positionAtKm(scene.line, km), view.eye));
       }
       // Within a few metres: over a bridge whose height is filled in, the camera rides over an estimate of the crest.
       expect(Math.max(...distancesM) - Math.min(...distancesM)).toBeLessThan(5);
