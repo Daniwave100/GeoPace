@@ -334,9 +334,10 @@ bridges:
     source: https://www.openstreetmap.org/way/46858873
     accessed: 2026-09-17
     note: >-
-      The 2017 LiDAR has no returns at all over the middle of the main span (about km 0.85-1.45),
-      so the height there is a straight line between the last measured deck heights on either
-      side. The real deck crests a few meters higher.
+      The 2017 LiDAR has no returns at all over the middle of the main span, so the height there
+      is a straight line between the last measured deck heights on either side. The real deck
+      crests a few meters higher. The pipeline finds the stretch itself and lists it in the
+      Course Bundle (measured.elevation_not_measured: km 0.77-1.36 as built on 2026-09-18).
   - name: Gowanus Expressway viaduct (Brooklyn approach) and the ramp to 92nd Street
     km_start: 1.94
     km_end: 2.77

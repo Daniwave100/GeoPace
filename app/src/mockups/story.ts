@@ -58,29 +58,12 @@ export interface Exposure {
   highPercent: number;
 }
 
-/**
- * A stretch where a "measured" column isn't really measured. PLAN.md §10 has this open: the
- * Course Bundle has no way to say "this is filled in", so until the schema grows one, the app has
- * to carry it or it will draw a guess in the same ink as a measurement.
- */
+/** A stretch where a "measured" column isn't really measured: from the Course Bundle's own list. */
 export interface UnmeasuredSpan {
   fromKm: number;
   toKm: number;
   reason: string;
-  /** Points at an entry in the bundle's own `sources`, rather than restating a URL. */
-  sourceId: string;
 }
-
-const UNMEASURED_ELEVATION: Record<string, UnmeasuredSpan[]> = {
-  nyc: [
-    {
-      fromKm: 0.85,
-      toKm: 1.45,
-      reason: "No LiDAR returns over the middle of the Verrazzano's main span; the height here is a straight line between the measured deck either side, so the real crest is a few metres higher.",
-      sourceId: "nyc-lidar-2017",
-    },
-  ],
-};
 
 export interface Readout {
   km: number;
@@ -199,7 +182,7 @@ export function buildStory(bundle: CourseBundle, plan: RacePlan): CourseStory {
     (station) => ({ km: certifiedKmToLineKm(station.certifiedKm, bundle), certifiedKm: station.certifiedKm, offers: station.offers }),
   );
 
-  const unmeasured = UNMEASURED_ELEVATION[courseId] ?? [];
+  const unmeasured: UnmeasuredSpan[] = bundle.measured.elevation_not_measured.map((span) => ({ fromKm: span.km_start, toKm: span.km_end, reason: span.reason }));
   const elevationMeasuredAt = (km: number) => !unmeasured.some((span) => km >= span.fromKm && km <= span.toKm);
 
   /** Sample: how enclosed the street is. Drives both the canyon score and the shade range. */

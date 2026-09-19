@@ -7,7 +7,7 @@
 import { BundleError, loadCourseBundle } from "../bundle/loader";
 import { clamp } from "../core/series";
 import { type CourseStory, buildStory } from "./story";
-import { html } from "./svg";
+import { html } from "../svg";
 import "./chrome.css";
 
 export const MOCKUPS = [

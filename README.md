@@ -15,12 +15,29 @@ cd app && npm install && npm run dev
 
 Then open http://localhost:5173 and pick a course: **Berlin** or **New York City**.
 
-Set **your race plan** (the edition, your start wave, and a goal as a finish time or a pace per
-km), then drag the **kilometre strip** under the map, click it, or use the arrow keys. The runner
-on the map, the time of day, the elapsed time and the sun all move together, in the race's own
-time zone whatever zone your computer is in (the map dims as the sun gets low). Open **Every
-kilometre** under the strip for a table of splits; click a kilometre in it to jump there. Your plan is remembered in your browser and goes
-nowhere else.
+The app opens on **Explore**: the city from above with the course on it as a blue line, moved like any
+maps app (drag, scroll, Ctrl + drag to tilt; or focus the map and use the arrow keys and + / −). Laid
+over the map: the distance as one giant numeral, the time of day, the elapsed time, and **one
+sentence** about where you are ("Climbing 4%. Ed Koch Queensboro Bridge in 600 m. Sun on your left.").
+Along the bottom is the **strip**, the whole course as one line: drag it, click it, or use the arrow
+keys, and the runner on the map, the clock, the sentence and the sun all move together, in the race's
+own time zone whatever zone your computer is in.
+
+Switch **Hills** on and three things happen at once: every climb and descent is marked on the course
+line (yellow fading to deep red going up, aqua fading to deep teal coming down: the darker, the
+steeper) with a label saying how steep and how long it is, the strip gains its Grade and Effort rows, and the sentence
+says what the road is doing under you. Switch it off and all three go. **Show everything** opens every
+row. Where the survey has no height (the middle of the Verrazzano's main span),
+the map, the strip and the sentence all say **not measured here** instead of drawing a guess.
+
+Drag the strip's **top edge** to make its rows taller or to give the map the room. On the map,
+**Full map** (or F) gives it the whole screen and **Straight down** (or B) looks from directly above
+like a paper map.
+
+**Your race plan** opens from the banner: the edition, your start wave, and a goal as a finish time
+or a pace, with a table of splits whose rows jump the runner there. The banner also switches between
+**km and miles** (everything follows: feet, pace per mile, splits per mile) and between **light and
+dark**. Your plan and your choices are remembered in your browser and go nowhere else.
 
 Times assume an even pace, and the app says so. Where a start time is the last edition's because
 this one's isn't published, every time that rests on it is greyed and marked **carried over**, with
@@ -48,11 +65,15 @@ the imagery can't be had (a refused key, a used-up allowance, no connection) you
 plain map with a message saying why. Photoreal is for looking at: its shadows were there when the
 city was photographed, so GeoPace's numbers never come from it.
 
+Over the imagery the course is drawn at the road's own height, from GeoPace's own survey data, so
+it stays on the road as you move the camera: under the trees in Central Park, and on the deck the
+runners actually use on the Queensboro Bridge.
+
 ## Design mockups
 
-The app's look isn't chosen yet. Three clickable directions show the same course, race plan and
-layers three different ways; with the app running, open http://localhost:5173/mockups/ and try
-each one:
+The app's look was chosen from three clickable directions that show the same course, race plan and
+layers three different ways. **B · Race poster** won, with the Field instrument's charts. They are
+still there to look at; with the app running, open http://localhost:5173/mockups/:
 
 - **A · Roadbook** — a survey sheet: the course runs down the page as a route card, and what
   runners say is written in the margin in purple pencil.
@@ -81,7 +102,8 @@ cd pipeline && uv run geopace build nyc
 The first run downloads the raw inputs into `pipeline/.cache/` (never committed): for Berlin the
 official course file and about 300 MB of terrain tiles; for NYC the streets along the course, the
 1-ft elevation model block by block, and the LiDAR points around each bridge. Only the corridor
-along the course is ever fetched, never the whole city. Later runs reuse the cache.
+along the course is ever fetched, never the whole city. Both also need the worldwide geoid grid
+(80 MB, fetched once). Later runs reuse the cache.
 
 ## Tests
 
@@ -99,6 +121,7 @@ data/courses/<course>/editions/     one file per edition: the race date and the 
         │
 pipeline/ (Python)                  route → evenly spaced samples → official terrain heights
         │                            → bridge decks → smoothed → grade → difficulty
+        │                            → height above the ellipsoid, for the 3D scene
         ▼
 data/derived/<course>/course-bundle.json   committed; must match schema/course-bundle.schema.json
         │
@@ -114,10 +137,15 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
 - **Elevation** comes from each city's official ground model, never GPS. It is smoothed before
   grade is computed.
 - **Bridges** are missing from those models: they are bare-earth, so a bridge reads as the water
-  underneath (New York's start on the Verrazzano would sit at sea level). Berlin's low, flat city
-  bridges are carried straight across. New York's are measured from the 2017 city LiDAR, using the
+  underneath (New York's start on the Verrazzano would sit at sea level). Berlin's are read from the
+  city's surface model, which still has them. New York's are measured from the 2017 city LiDAR, using the
   returns classified as bridge deck — including which of the two decks runners actually use: the
   Verrazzano's upper level, the Queensboro's lower level.
+- **The height the 3D scene needs** is not the height a runner is told. Surveys count from sea level;
+  a 3D globe counts from a smooth mathematical surface, the ellipsoid, which sea level sits 32.5 m
+  under in New York and 39.5 m over in Berlin. The pipeline adds that difference to every point from a
+  published worldwide model (EGM2008), so the app can draw the course at the road's own height over
+  photoreal imagery without ever measuring anything off Google's surface.
 - **Race dates and start waves** are written down per edition from the organizer's own pages. Wave
   times are local wall-clock times; the pipeline turns each into an exact instant in the course's
   time zone, and the app works it out again independently, so the two check each other. That
@@ -132,12 +160,14 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
 |------|--------|---------|
 | Berlin course route | [BMW BERLIN-MARATHON course file (2025)](https://www.bmw-berlin-marathon.com/en/your-race/course/) | Course geometry only; file not redistributed |
 | Berlin elevation | [Geoportal Berlin, ATKIS® DGM1](https://gdi.berlin.de/data/dgm1/atom/) | [dl-de/zero-2.0](https://www.govdata.de/dl-de/zero-2-0) |
+| Berlin bridge decks | [Geoportal Berlin, ATKIS® DOM1](https://gdi.berlin.de/data/dom/atom/) | [dl-de/zero-2.0](https://www.govdata.de/dl-de/zero-2-0) |
 | NYC course streets | [City of New York course street closures (2025)](https://www.nyc.gov/assets/cecm/downloads/pdf/marathon-street-closures-no-parking-2025.pdf) · [NYRR](https://www.nyrr.org/tcsnycmarathon/race-day/the-course) | Facts about which streets the course uses |
 | Berlin race date and first start | [BMW BERLIN-MARATHON race day page](https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners) | Facts, paraphrased |
 | NYC race-date rule and 2025 wave times (carried over) | [NYRR 2025 runner guide](https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf) | Facts, paraphrased |
 | NYC start line | [USATF course certification NY22001JHP](https://certifiedroadraces.com/certificate/?type=l&id=NY22001JHP) | Published measurement of the certified course |
 | NYC elevation | [2017 NYC 1-ft bare-earth DEM](https://www.fisheries.noaa.gov/inport/item/64732) (City of New York, via NOAA Digital Coast) | [NYC Open Data: no usage restrictions](https://opendata.cityofnewyork.us/faq/) |
 | NYC bridge decks | [2017 NYC Topobathymetric LiDAR](https://www.fisheries.noaa.gov/inport/item/64728) (City of New York, via NOAA Digital Coast) | as above |
+| Height above the ellipsoid, both cities | [EGM2008 geoid model](https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84) (U.S. National Geospatial-Intelligence Agency), as the [PROJ project's GeoTIFF](https://cdn.proj.org/us_nga_egm08_25.tif) | Public domain |
 | Street geometry, bridge locations | [OpenStreetMap](https://www.openstreetmap.org/copyright) | ODbL |
 | Map tiles | [OpenStreetMap](https://www.openstreetmap.org/copyright) ([tile policy](https://operations.osmfoundation.org/policies/tiles/)) | ODbL |
 | 3D terrain | [Re:Earth Terrain](https://terrain.reearth.land/) · [Mapterhorn](https://mapterhorn.com/attribution) | CC BY 4.0 |

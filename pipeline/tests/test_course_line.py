@@ -6,7 +6,7 @@ import pytest
 from geopace.bundle import build_course_bundle
 from geopace.course_facts import CourseFactsInvalid, parse_course_facts
 
-from conftest import meters_north_of, straight_north_route, synthetic_decks, parsed_synthetic_editions, synthetic_elevation
+from conftest import meters_north_of, straight_north_route, synthetic_decks, parsed_synthetic_editions, synthetic_elevation, synthetic_geoid
 
 START_LAT = 52.5
 
@@ -35,6 +35,7 @@ def test_noisy_elevation_yields_smoothed_grades_within_realistic_bounds(syntheti
         route=straight_north_route(5000),
         elevation=hill_with_noise(),
         editions=parsed_synthetic_editions(),
+        geoid=synthetic_geoid(),
     )
     line = course_line(bundle)
     grade = np.array(line["grade"])
@@ -65,6 +66,7 @@ def test_listed_bridges_carry_the_course_over_the_water_not_down_to_it(synthetic
             route=straight_north_route(5000),
             elevation=synthetic_elevation(river_without_bridge_deck),
             editions=parsed_synthetic_editions(),
+            geoid=synthetic_geoid(),
         )
     )
     km = np.array(line["km"])
@@ -115,7 +117,7 @@ def with_test_bridge(synthetic_facts, **bridge):
     return synthetic_facts
 
 
-def build_with_decks(synthetic_facts, bridge, decks_at):
+def build_with_decks(synthetic_facts, bridge, decks_at, geoid=None):
     with_test_bridge(synthetic_facts, **bridge)
     return build_course_bundle(
         parse_course_facts(synthetic_facts),
@@ -123,6 +125,7 @@ def build_with_decks(synthetic_facts, bridge, decks_at):
         elevation=synthetic_elevation(bay_without_bridge_deck),
         decks=synthetic_decks(deck_returns(decks_at)),
         editions=parsed_synthetic_editions(),
+        geoid=geoid or synthetic_geoid(),
     )
 
 
@@ -153,6 +156,22 @@ def test_on_a_double_deck_bridge_the_course_is_on_the_deck_runners_use(synthetic
     assert np.max(upper["elevation_m"]) == pytest.approx(66.4, abs=2)
 
 
+def test_the_height_above_the_ellipsoid_is_still_the_deck_runners_use(synthetic_facts):
+    """New York: sea level is 32.5 m *below* the ellipsoid. The line at road height has to come out on the
+    Queensboro's lower deck, 6.4 m under the upper one, not on top of the bridge."""
+    two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+    new_york = synthetic_geoid(lambda lat, lon: np.full(np.shape(lat), -32.5))
+
+    lower = course_line(build_with_decks(synthetic_facts, {"deck": "lower"}, two_decks, geoid=new_york))
+    upper = course_line(build_with_decks(synthetic_facts, {"deck": "upper"}, two_decks, geoid=new_york))
+
+    crest = int(np.argmax(lower["elevation_m"]))
+    assert upper["ellipsoid_height_m"][crest] - lower["ellipsoid_height_m"][crest] == pytest.approx(6.4, abs=0.05)
+    # 60 m above sea level is 27.5 m above the ellipsoid there: added, with its sign, not subtracted.
+    assert lower["ellipsoid_height_m"][crest] == pytest.approx(60 - 32.5, abs=2)
+    assert lower["ellipsoid_height_m"][crest] - lower["elevation_m"][crest] == pytest.approx(-32.5, abs=0.011)
+
+
 def bay_with_no_ground_at_all(lat, lon):
     """Like a real bare-earth model over open water: no data, not even the water surface."""
     d = meters_north_of(lat, START_LAT)
@@ -169,6 +188,7 @@ def test_water_with_no_ground_data_is_fine_where_a_bridge_carries_the_course(syn
             elevation=synthetic_elevation(bay_with_no_ground_at_all),
             decks=synthetic_decks(deck_returns(lambda d: [high_arched_deck(d)])),
             editions=parsed_synthetic_editions(),
+            geoid=synthetic_geoid(),
         )
     )
 
@@ -183,6 +203,7 @@ def test_missing_ground_where_no_bridge_carries_the_course_is_refused(synthetic_
             route=straight_north_route(5000),
             elevation=synthetic_elevation(bay_with_no_ground_at_all),
             editions=parsed_synthetic_editions(),
+            geoid=synthetic_geoid(),
         )
 
 
@@ -207,6 +228,7 @@ def test_a_structure_passing_overhead_is_not_mistaken_for_a_second_deck(syntheti
             elevation=synthetic_elevation(bay_without_bridge_deck),
             decks=synthetic_decks(returns),
             editions=parsed_synthetic_editions(),
+            geoid=synthetic_geoid(),
         )
     )
 
@@ -237,6 +259,7 @@ def test_a_bridge_passing_under_another_structure_keeps_its_own_deck(synthetic_f
             elevation=synthetic_elevation(bay_without_bridge_deck),
             decks=synthetic_decks(returns),
             editions=parsed_synthetic_editions(),
+            geoid=synthetic_geoid(),
         )
     )
     km = np.array(line["km"])
@@ -273,3 +296,106 @@ def test_a_bridge_without_a_source_is_rejected(synthetic_facts):
 
     with pytest.raises(CourseFactsInvalid, match=r"bridges\[0\] \(Test bridge\).*source"):
         parse_course_facts(synthetic_facts)
+
+
+# ---- Where the height is not measured: the bundle has to say so, or the app draws a guess as a fact.
+
+
+def not_measured(bundle):
+    return bundle["measured"]["elevation_not_measured"]
+
+
+def test_a_course_measured_all_the_way_has_nothing_to_flag(synthetic_facts):
+    bundle = build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=hill_with_noise(),
+        editions=parsed_synthetic_editions(),
+        geoid=synthetic_geoid(),
+    )
+
+    assert not_measured(bundle) == []
+
+
+def test_a_bridge_spanned_in_a_straight_line_is_flagged_as_not_measured(synthetic_facts):
+    source = {"source": "https://example.org/bridge", "accessed": "2026-09-16"}
+    synthetic_facts["bridges"] = [{"name": "Test bridge", "km_start": 2.0, "km_end": 2.08, **source}]
+
+    bundle = build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=synthetic_elevation(river_without_bridge_deck),
+        editions=parsed_synthetic_editions(),
+        geoid=synthetic_geoid(),
+    )
+
+    [span] = not_measured(bundle)
+    assert span["km_start"] == pytest.approx(2.0, abs=0.011)
+    assert span["km_end"] == pytest.approx(2.08, abs=0.011)
+    # Said for the runner: which bridge, and that the height is a straight line, not a survey.
+    assert "Test bridge" in span["reason"]
+    assert "straight line" in span["reason"]
+
+
+def deck_returns_with_a_hole(hole_from_m, hole_to_m):
+    """A deck the scan covers everywhere except one stretch, like the Verrazzano's main span."""
+    complete = deck_returns(lambda d: [high_arched_deck(d)])
+
+    def returns(lat, lon):
+        d = meters_north_of(lat, START_LAT)
+        return [np.empty(0) if hole_from_m <= di <= hole_to_m else found for di, found in zip(d, complete(lat, lon))]
+
+    return returns
+
+
+def build_with_a_hole(synthetic_facts, hole_from_m, hole_to_m):
+    with_test_bridge(synthetic_facts)
+    return build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=synthetic_elevation(bay_without_bridge_deck),
+        decks=synthetic_decks(deck_returns_with_a_hole(hole_from_m, hole_to_m)),
+        editions=parsed_synthetic_editions(),
+        geoid=synthetic_geoid(),
+    )
+
+
+def test_a_gap_in_the_scan_of_a_bridge_deck_is_flagged_and_the_measured_deck_is_not(synthetic_facts):
+    bundle = build_with_a_hole(synthetic_facts, 2200, 2800)
+
+    # Only the hole: the rest of the 2.6 km bridge has measured deck heights and stays unflagged.
+    [span] = not_measured(bundle)
+    assert span["km_start"] == pytest.approx(2.2, abs=0.011)
+    assert span["km_end"] == pytest.approx(2.8, abs=0.011)
+    assert "Test Narrows Bridge" in span["reason"]
+    assert "straight line" in span["reason"]
+
+
+def test_a_gap_too_short_to_change_the_smoothed_height_is_not_flagged(synthetic_facts):
+    # Two samples without returns (20 m) vanish inside the 50 m smoothing; flagging them would
+    # pepper every bridge with specks nobody can act on.
+    bundle = build_with_a_hole(synthetic_facts, 2495, 2515)
+
+    assert not_measured(bundle) == []
+
+
+def test_flagged_stretches_lie_on_the_course_in_order_and_never_overlap(synthetic_facts):
+    source = {"source": "https://example.org/bridge", "accessed": "2026-09-16"}
+    synthetic_facts["bridges"] = [
+        {"name": "First bridge", "km_start": 1.0, "km_end": 1.1, **source},
+        {"name": "Second bridge", "km_start": 3.0, "km_end": 3.2, **source},
+    ]
+
+    spans = not_measured(
+        build_course_bundle(
+            parse_course_facts(synthetic_facts),
+            route=straight_north_route(5000),
+            elevation=hill_with_noise(),
+            editions=parsed_synthetic_editions(),
+            geoid=synthetic_geoid(),
+        )
+    )
+
+    assert [span["reason"].count("bridge") > 0 for span in spans] == [True, True]
+    assert all(0 <= span["km_start"] < span["km_end"] <= 5.0 for span in spans)
+    assert spans[0]["km_end"] <= spans[1]["km_start"]

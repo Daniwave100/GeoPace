@@ -36,10 +36,24 @@ ask before anything that changes scope or look.
 - Elevation re-derived from terrain models and smoothed before any grade (raw GPS is garbage).
 - NYC bridges: bare-earth DEMs drop bridge decks — the Verrazzano start must not read as sea level.
   Decks come from LiDAR; on a double-deck bridge the course facts say which deck runners use.
+- A height that was filled in (a bridge spanned in a straight line, a gap in a LiDAR scan) must never look
+  measured: the bundle lists those stretches, and the map, the strip and the sentence grey them out (D45, D47).
 - Wind "from" direction convention (a headwind must not come out as a tailwind).
+- The 3D scene counts heights from the ellipsoid, surveys from sea level: about 32.5 m *below* the ellipsoid in New York,
+  39.5 m *above* it in Berlin. A missing, swapped or sign-flipped geoid offset must not pass (D51). The height comes from
+  the Course Bundle, never from Google's surface (D5).
 - Timezone/DST: **US DST ends Sun 2026-11-01**, likely NYC race day.
 - Course length stays within tolerance of the certified 42.195 km (a route traced along street
   centre lines gets a wider tolerance than an organizer's course file — see D21/D22).
+
+## Adding a layer
+A layer is data (`app/src/core/layers.ts`, PLAN.md D47): its strip rows, its marks on the course line and its clause,
+each tagged with the kind of claim it is. Add it to the list in `app/src/main.ts`. Never give a layer its own colours
+or dash patterns: the encodings come from `core/encoding.ts`, and "how much, and which way" (a number from -1 to 1, like
+how steep a hill is, negative coming down) gets its colour from `core/mark-look.ts`: warm against the runner, teal with
+them, fading from pale to deep. Blue means only the course and where you are on it. Nothing on the course line is laid over anything else: a mark is
+painted beside the blue by the same line (`scene/course-ribbon.ts`, D52), draped on the keyless map and at the road's height in photoreal alike. Every distance, height and pace shown or typed goes
+through `core/units.ts`.
 
 ## Commands
 - Run the app: `cd app && npm install && npm run dev` → http://localhost:5173

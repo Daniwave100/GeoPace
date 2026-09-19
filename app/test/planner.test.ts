@@ -281,6 +281,18 @@ describe("Race Plan", () => {
     expect(parseGoal("pace", "5:20", course)).toEqual({ kind: "pace", secondsPerKm: 320 });
   });
 
+  it("reads a pace typed per mile when the runner thinks in miles, and keeps it per km inside", () => {
+    const typed = parseGoal("pace", "9:09", course, "mi");
+    expect(typed?.kind).toBe("pace");
+    expect(typed?.kind === "pace" && typed.secondsPerKm).toBeCloseTo(549 / 1.609344, 9);
+    // 9:09 per km would be a six-and-a-half-hour marathon, and 5:20 per mile a 2:20 one: both fine.
+    // But what is plausible is judged on the marathon it means, not on the digits.
+    expect(parseGoal("pace", "20:00", course, "mi")).not.toBeNull(); // 8:44 finish
+    expect(parseGoal("pace", "25:00", course, "mi")).toBeNull(); // 10:55 finish
+    // A finish time is a finish time in any units.
+    expect(parseGoal("finish", "4:00", course, "mi")).toEqual({ kind: "finish", seconds: 14400 });
+  });
+
   it("keeps the goal itself when the runner switches how it is written", () => {
     const fourHours = { kind: "finish", seconds: 4 * 3600 } as const;
     const asPace = goalWrittenAs("pace", fourHours, course);

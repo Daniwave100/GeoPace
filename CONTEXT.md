@@ -44,8 +44,12 @@ _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 ### The runner's plan
 
 **Race Plan**:
-The runner's own choices: course, edition, wave, own start time if they have typed one, goal time or pace, units, and fueling plan.
+The runner's own choices for one course: edition, wave, own start time if they have typed one, goal time or pace, and fueling plan.
 _Avoid_: settings, profile
+
+**Units**:
+Kilometres or miles, with metres or feet to match: what the runner reads and types. They belong to the runner, not to a course, so they are remembered beside the Race Plans rather than inside one, and changing them never changes a plan. Everything inside the app stays metric.
+_Avoid_: imperial mode, locale
 
 **Wave**:
 A group of runners with its own start time.
@@ -60,7 +64,7 @@ For one Race Plan, the link between where the runner is and what time it is ther
 _Avoid_: timer, timeline
 
 **Splits**:
-The time of day and the elapsed time at every kilometre (later, every mile) of a Race Plan, and at the finish.
+The time of day and the elapsed time at every kilometre, or every mile, of a Race Plan, and at the finish.
 _Avoid_: pace chart, pace band, schedule
 
 **Scrubbing**:
@@ -94,8 +98,41 @@ The three numbers that say where and when the runner is: kilometre, time of day,
 _Avoid_: HUD, stats
 
 **Sentence**:
-The one plain-language line saying what the course is doing where the runner is now.
+The one plain-language line saying what the course is doing where the runner is now, made of clauses.
 _Avoid_: caption, subtitle, summary
+
+**Clause**:
+One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's.
+
+**Strip's top edge**:
+The rule between the map and the strip, which drags up and down to resize the strip.
+_Avoid_: splitter, divider, handle
+
+**Full map**:
+The map given the whole screen: the readout and the strip step aside, and the credits fold to one line.
+_Avoid_: fullscreen mode, map-only mode
+
+**Straight down**:
+The map seen from directly above with north up, like a paper map; the other way of looking at it is tilted.
+_Avoid_: bird's-eye mode, 2D mode, top view
+
+**Banner**:
+The black bar across the top: the course, the Race Plan in one line, the units and the theme.
+_Avoid_: header, toolbar, nav
+
+### The course on the map
+
+**Draped**:
+Said of the course line painted onto whatever surface the map shows above the route. How it is drawn on the keyless map, where nothing stands over the road.
+_Avoid_: clamped, on the ground
+
+**At road height**:
+Said of the course line drawn in 3D at the height the pipeline measured for the road, a little above it. How it is drawn over Photoreal, where a draped line would land on trees and bridge structures.
+_Avoid_: on the road (that is a camera), 3D line, floating
+
+**Lift**:
+How far above the measured road the line is drawn at road height, so that it doesn't sink into a photographed surface that disagrees with the survey by a metre or so.
+_Avoid_: offset, clearance
 
 ### Layers
 
@@ -141,7 +178,19 @@ _Avoid_: crowd, crowding, busyness
 **Bottleneck**:
 A place where congestion is known to happen.
 
+**Line mark**:
+A stretch of the course line that a layer marks on the map: the line is drawn wider there, with the layer's colour either side of the blue, or flat grey where the layer's value is not measured.
+_Avoid_: highlight, segment, overlay
+
+**Hill**:
+A sustained climb or descent that a runner would call one: what the Hills layer marks on the course line.
+_Avoid_: segment, ramp
+
 ### Kinds of claim
+
+**Encoding**:
+How a kind of claim is drawn, the same on the map, on the strip and in words: solid, hollow, grey and struck through, or hazard stripes.
+_Avoid_: style, theme, legend (the key is what explains the encodings on screen)
 
 **Measured**:
 Taken from a survey or instrument, or computed from such data by a published model.
@@ -193,6 +242,14 @@ _Avoid_: session, request, hit
 
 **Course Bundle**:
 Everything the app needs about one course, prepared ahead of time by the pipeline. The one contract between the two halves.
+
+**Height above the ellipsoid**:
+A course-line point's height counted from the WGS84 ellipsoid, the smooth mathematical surface a 3D globe counts heights from, instead of from sea level. Only for placing things in the 3D scene; a runner is never shown it.
+_Avoid_: altitude, elevation (elevation is the height above sea level, the one a runner is told)
+
+**Geoid model**:
+The published table of how far sea level is from the ellipsoid, place by place: what turns a surveyed height into a height above the ellipsoid.
+_Avoid_: datum shift, correction
 
 **Course facts** / **Edition facts**:
 Hand-maintained sourced facts about a course, and about one edition of it.

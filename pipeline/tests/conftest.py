@@ -7,7 +7,7 @@ import pytest
 
 from geopace.edition_facts import EditionFacts, parse_edition_facts
 from geopace.provenance import Attribution, Source
-from geopace.elevation import BridgeDeckModel, ElevationModel
+from geopace.elevation import BridgeDeckModel, ElevationModel, GeoidModel
 
 EARTH_RADIUS_M = 6_371_008.8
 
@@ -51,6 +51,22 @@ def synthetic_decks(returns):
             accessed="2026-09-17",
         ),
         attribution=Attribution(text="Synthetic LiDAR", url="https://example.org/lidar"),
+    )
+
+
+def synthetic_geoid(offset=None):
+    """Wrap a (lat, lon) -> meters function as a geoid model: how far sea level is above the
+    ellipsoid at each place. Left out, it is Berlin's 39.5 m everywhere."""
+    return GeoidModel(
+        offset=offset or (lambda lat, lon: np.full(np.shape(lat), 39.5)),
+        source=Source(
+            id="synthetic-geoid",
+            title="Synthetic geoid model",
+            url="https://example.org/geoid",
+            licence="test data",
+            accessed="2026-09-18",
+        ),
+        attribution=Attribution(text="Synthetic geoid", url="https://example.org/geoid"),
     )
 
 

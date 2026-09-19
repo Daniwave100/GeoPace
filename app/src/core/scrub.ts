@@ -4,13 +4,13 @@
 import type { CourseLine } from "../bundle/types";
 import { clamp } from "./series";
 
-/** One press of an arrow key: 100 m, fine enough to find the top of a bridge. */
-const STEP_KM = 0.1;
-/** Shift + arrow, or Page Up/Down: one kilometre, the unit runners think in. */
-const BIG_STEP_KM = 1;
+/** One press of an arrow key: a tenth of the runner's unit (100 m, or 161 m), fine enough to find the top of a bridge. */
+const STEP = 0.1;
+/** Shift + arrow, or Page Up/Down: one kilometre or one mile, the unit the runner thinks in. */
+const BIG_STEP = 1;
 
-/** A millimetre, in km: what floating point may have left a km short of, or past, a mark. */
-const ON_THE_MARK_KM = 1e-6;
+/** About a millimetre: what floating point may have left a position short of, or past, a mark. */
+const ON_THE_MARK = 1e-6;
 
 /** The part of a KeyboardEvent this needs. */
 export interface ScrubKey {
@@ -23,24 +23,28 @@ export interface ScrubKey {
 
 /**
  * Where a key press moves the runner, or null if the press isn't for the strip. Steps land on
- * round numbers (the next 100 m mark, the next whole km) rather than adding to wherever a click
- * left the runner, so "km 30" can always be reached. Presses with Alt, Ctrl or Cmd belong to the
- * browser: Alt+Left and Cmd+Left are Back.
+ * round numbers (the next tenth, the next whole km) rather than adding to wherever a click left
+ * the runner, so "km 30" can always be reached. `unitKm` is the length in km of the unit the
+ * runner is shown (1, or 1.609344 for miles): the round numbers are counted in that unit, so with
+ * miles shown the steps land on whole miles and tenths of a mile. Presses with Alt, Ctrl or Cmd
+ * belong to the browser: Alt+Left and Cmd+Left are Back.
  */
-export function kmAfterKey(pressed: ScrubKey, km: number, lengthKm: number): number | null {
+export function kmAfterKey(pressed: ScrubKey, km: number, lengthKm: number, unitKm = 1): number | null {
   if (pressed.altKey || pressed.ctrlKey || pressed.metaKey) return null;
-  const step = pressed.shiftKey ? BIG_STEP_KM : STEP_KM;
+  const step = pressed.shiftKey ? BIG_STEP : STEP;
+  const shown = km / unitKm;
+  const land = (mark: number) => clamp(mark * unitKm, 0, lengthKm);
   switch (pressed.key) {
     case "ArrowRight":
     case "ArrowUp":
-      return clamp(nextMark(km, step), 0, lengthKm);
+      return land(nextMark(shown, step));
     case "ArrowLeft":
     case "ArrowDown":
-      return clamp(previousMark(km, step), 0, lengthKm);
+      return land(previousMark(shown, step));
     case "PageUp":
-      return clamp(nextMark(km, BIG_STEP_KM), 0, lengthKm);
+      return land(nextMark(shown, BIG_STEP));
     case "PageDown":
-      return clamp(previousMark(km, BIG_STEP_KM), 0, lengthKm);
+      return land(previousMark(shown, BIG_STEP));
     case "Home":
       return 0;
     case "End":
@@ -50,15 +54,15 @@ export function kmAfterKey(pressed: ScrubKey, km: number, lengthKm: number): num
   }
 }
 
-/** The first multiple of `step` beyond `km`. Counted in whole steps, so 0.1 steps never drift. */
-function nextMark(km: number, step: number): number {
-  const stepsPerKm = Math.round(1 / step);
-  return (Math.floor((km + ON_THE_MARK_KM) * stepsPerKm) + 1) / stepsPerKm;
+/** The first multiple of `step` beyond `position`. Counted in whole steps, so 0.1 steps never drift. */
+function nextMark(position: number, step: number): number {
+  const stepsPerUnit = Math.round(1 / step);
+  return (Math.floor((position + ON_THE_MARK) * stepsPerUnit) + 1) / stepsPerUnit;
 }
 
-function previousMark(km: number, step: number): number {
-  const stepsPerKm = Math.round(1 / step);
-  return (Math.ceil((km - ON_THE_MARK_KM) * stepsPerKm) - 1) / stepsPerKm;
+function previousMark(position: number, step: number): number {
+  const stepsPerUnit = Math.round(1 / step);
+  return (Math.ceil((position - ON_THE_MARK) * stepsPerUnit) - 1) / stepsPerUnit;
 }
 
 /** The km under the pointer, given how far along the strip it is (0 = left end, 1 = right end). */
@@ -69,6 +73,8 @@ export function kmAtFraction(fraction: number, lengthKm: number): number {
 export interface RoadPosition {
   lat: number;
   lon: number;
+  /** The road's height above the ellipsoid: where the 3D scene counts heights from, not sea level. For placing things in the scene; never shown to the runner. */
+  ellipsoidHeightM: number;
   /** Direction of travel, degrees clockwise from true north. */
   bearingDeg: number;
 }
@@ -95,6 +101,7 @@ export function positionAtKm(line: CourseLine, km: number): RoadPosition {
   return {
     lat: between(line.lat),
     lon: between(line.lon),
+    ellipsoidHeightM: between(line.ellipsoid_height_m),
     // The heading of the stretch being run. Blending headings would cut every corner.
     bearingDeg: line.bearing_deg[low],
   };

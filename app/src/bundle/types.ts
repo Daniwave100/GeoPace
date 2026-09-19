@@ -2,7 +2,7 @@
 // keep these types in step with it (the loader validates every bundle against the schema).
 
 export interface CourseBundle {
-  schema_version: 2;
+  schema_version: 4;
   course_id: string;
   generated_at: string;
   pipeline_version: string;
@@ -22,6 +22,8 @@ export interface CourseBundle {
   measured: {
     course_line: CourseLine;
     elevation_summary: { gain_m: number; loss_m: number; min_m: number; max_m: number };
+    /** Where the height is a straight line between measured heights, in course order. Often empty. */
+    elevation_not_measured: NotMeasuredSpan[];
     difficulty_model: {
       name: string;
       description: string;
@@ -34,6 +36,19 @@ export interface CourseBundle {
   attributions: { text: string; url: string }[];
 }
 
+/**
+ * A stretch where a measured column isn't measured: a bridge deck the ground model leaves out, or
+ * a gap in the scan of one. The app greys it out, and shows the reason, instead of drawing a
+ * filled-in value as a measurement (PLAN.md principle 5).
+ */
+export interface NotMeasuredSpan {
+  /** km from the start, same scale as course_line.km */
+  km_start: number;
+  km_end: number;
+  /** In plain words, for the runner. */
+  reason: string;
+}
+
 /** Parallel columns: index i of every array describes the same course sample. */
 export interface CourseLine {
   spacing_m: number;
@@ -42,7 +57,14 @@ export interface CourseLine {
   lon: number[];
   /** km from the start */
   km: number[];
+  /** meters above sea level: what a runner is told */
   elevation_m: number[];
+  /**
+   * The same height in meters above the WGS84 ellipsoid, which is where the 3D scene counts
+   * heights from: tens of meters away from sea level, by a different amount in each city. Only
+   * for placing things in the scene; never shown to the runner.
+   */
+  ellipsoid_height_m: number[];
   /** rise over run, 0.05 = 5% uphill */
   grade: number[];
   /** energy cost relative to flat; null where the grade is outside the model's valid range */

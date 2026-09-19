@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import type { Edition } from "../src/bundle/types";
 import { defaultPlan, type PlannerCourse, type RacePlan } from "../src/core/planner";
-import { loadPlan, type PlanStorage, rememberedCourseId, savePlan } from "../src/plan/plan-store";
+import { loadPlan, loadUnits, type PlanStorage, rememberedCourseId, savePlan, saveUnits } from "../src/plan/plan-store";
 
 const SOURCE = { source: "https://example.org/race-day", accessed: "2026-09-18" };
 const edition = (day: string, waveIds: string[]): Edition => ({
@@ -88,5 +88,48 @@ describe("Race Plan store", () => {
     savePlan(storage, defaultPlan(BERLIN));
 
     expect(loadPlan(storage, BERLIN)).toEqual(defaultPlan(BERLIN));
+  });
+});
+
+describe("units, remembered beside the plans", () => {
+  const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 } };
+
+  it("opens in kilometres on a first visit", () => {
+    expect(loadUnits(fakeStorage())).toBe("km");
+  });
+
+  it("remembers miles across a reload, for every course at once", () => {
+    const storage = fakeStorage();
+    saveUnits(storage, "mi");
+
+    expect(loadUnits(storage)).toBe("mi");
+    // The choice belongs to the runner, not to a course: no plan had to exist for it to stick.
+    expect(rememberedCourseId(storage)).toBeNull();
+  });
+
+  it("opens a plan remembered before units existed in kilometres, and keeps the plan", () => {
+    const before = fakeStorage({ "geopace.race-plans": JSON.stringify({ lastCourseId: "nyc", plans: { nyc: plan } }) });
+
+    expect(loadUnits(before)).toBe("km");
+    expect(loadPlan(before, NYC)).toEqual(plan);
+  });
+
+  it("never changes the plan when the units change, and never loses the units when the plan does", () => {
+    const storage = fakeStorage();
+    savePlan(storage, plan);
+    saveUnits(storage, "mi");
+    expect(loadPlan(storage, NYC)).toEqual(plan); // a 4:00:00 goal is still 4:00:00
+
+    savePlan(storage, { ...plan, waveId: "wave-3" });
+    expect(loadUnits(storage)).toBe("mi");
+
+    saveUnits(storage, "km");
+    expect(loadPlan(storage, NYC)).toEqual({ ...plan, waveId: "wave-3" });
+  });
+
+  it("reads anything that isn't a unit as kilometres, and survives blocked storage", () => {
+    expect(loadUnits(fakeStorage({ "geopace.race-plans": JSON.stringify({ lastCourseId: null, plans: {}, units: "furlongs" }) }))).toBe("km");
+    expect(loadUnits(brokenStorage)).toBe("km");
+    expect(() => saveUnits(brokenStorage, "mi")).not.toThrow();
   });
 });

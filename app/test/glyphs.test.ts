@@ -3,7 +3,7 @@
 // convention for the numbers; this pins it for the drawing, where it is just as easy to flip.
 import { describe, expect, it } from "vitest";
 import { windOnRunner } from "../src/core/bearing";
-import { windArrowOnPage } from "../src/mockups/layout";
+import { windArrowOnPage } from "../src/core/layout";
 
 describe("wind arrow on the page", () => {
   it("points back at the runner for a headwind, whichever way the strip runs", () => {

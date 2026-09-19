@@ -13,7 +13,7 @@ import { localVector } from "../core/bearing";
 import { shadowCast } from "../core/shadow";
 import type { SunPosition } from "../core/solar";
 import { sampleNoise } from "./sample-data";
-import { points, svg } from "./svg";
+import { points, svg } from "../svg";
 
 /** Looking down at the model, yawed a little off the street so the facades are not edge-on. */
 const YAW_DEG = 16;

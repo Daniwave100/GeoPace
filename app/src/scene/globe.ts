@@ -1,35 +1,43 @@
-// The 3D globe: keyless basemap and terrain, with the course and the runner drawn on the ground.
+// The 3D globe: keyless basemap and terrain, the camera, and the scene's clock. The course is
+// drawn by course-line.ts, and the runner is laid over the map by map-dots.ts.
 //
 // The scene has no clock of its own. Cesium's clock is stopped and set from the Planner's race
 // clock every time the runner moves, so Cesium's sun is where the sun will be when the runner
 // gets there, and never drifts from the readout.
 import {
   BoundingSphere,
+  Cartesian2,
   Cartesian3,
+  Cartesian4,
   Cartographic,
   CesiumTerrainProvider,
-  Color,
-  ConstantPositionProperty,
   Credit,
   HeadingPitchRange,
-  HeightReference,
   ImageryLayer,
   Ion,
   JulianDate,
-  LabelStyle,
   Math as CesiumMath,
+  Matrix4,
   OpenStreetMapImageryProvider,
+  PerspectiveFrustum,
   sampleTerrainMostDetailed,
   Terrain,
-  VerticalOrigin,
+  Transforms,
   Viewer,
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
-import type { CourseBundle } from "../bundle/types";
+import type { CourseLine } from "../bundle/types";
+import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
+import { registerCourseRibbon } from "./course-ribbon";
 import { BASEMAP, TERRAIN } from "./providers";
 
-const RUNNER_ID = "runner";
+const EARTH_RADIUS_M = 6_371_000;
+/** How far down the camera looks when it frames the course: from above, tilted enough that the city reads as 3D. */
+const CAMERA_TILT_RAD = CesiumMath.toRadians(60);
+
+/** Where the camera was left by the last framing of the whole course, to tell whether the runner has moved the map since. */
+const framedFrom = new WeakMap<Viewer, Cartesian3>();
 
 /** The viewer is made once; switching course only swaps what is drawn on it. */
 export function createGlobe(container: HTMLElement): Viewer {
@@ -37,6 +45,7 @@ export function createGlobe(container: HTMLElement): Viewer {
   // until a runner brings their own key (PLAN.md D3), so the demo token is switched off: nothing
   // here can reach ion by accident, and a runner's token is only ever handed over explicitly.
   Ion.defaultAccessToken = "";
+  registerCourseRibbon();
 
   const viewer = new Viewer(container, {
     baseLayer: new ImageryLayer(
@@ -74,72 +83,124 @@ export function createGlobe(container: HTMLElement): Viewer {
   return viewer;
 }
 
-/** Put the runner at a place on the course at a moment: the marker and the sun move together. */
-export function showRunner(viewer: Viewer, place: RoadPosition, instant: Date): void {
-  const position = Cartesian3.fromDegrees(place.lon, place.lat);
-  const runner = viewer.entities.getById(RUNNER_ID);
-  if (runner) {
-    runner.position = new ConstantPositionProperty(position);
-  } else {
-    viewer.entities.add({
-      id: RUNNER_ID,
-      name: "Runner",
-      position,
-      point: {
-        pixelSize: 16,
-        color: Color.fromCssColorString("#1546ff"),
-        outlineColor: Color.WHITE,
-        outlineWidth: 3,
-        heightReference: HeightReference.CLAMP_TO_GROUND,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY, // never hidden behind a hill or a bridge
-      },
-    });
-  }
+/** Set the scene's clock to the moment the runner is where they are: the scene's sun is that moment's sun (PLAN.md D39). */
+export function showMoment(viewer: Viewer, instant: Date): void {
   viewer.clock.currentTime = JulianDate.fromDate(instant);
 }
 
-/** Draw one course: the route on the ground, its start and finish, and fly to it. */
-export function showCourse(viewer: Viewer, bundle: CourseBundle): void {
-  const line = bundle.measured.course_line;
-  viewer.entities.removeAll();
-  const positions = Cartesian3.fromDegreesArray(line.lon.flatMap((lon, i) => [lon, line.lat[i]]));
-  viewer.entities.add({
-    name: `${bundle.course.name} course`,
-    polyline: { positions, width: 5, clampToGround: true, material: Color.fromCssColorString("#d0342c") },
-  });
-
-  const last = line.km.length - 1;
-  addMarker(viewer, "Start", line.lat[0], line.lon[0]);
-  addMarker(viewer, "Finish", line.lat[last], line.lon[last]);
-
-  frameCourse(viewer, line.lat, line.lon);
-}
-
-function addMarker(viewer: Viewer, text: string, lat: number, lon: number): void {
-  viewer.entities.add({
-    position: Cartesian3.fromDegrees(lon, lat),
-    point: { pixelSize: 10, color: Color.WHITE, outlineColor: Color.BLACK, outlineWidth: 2, heightReference: HeightReference.CLAMP_TO_GROUND },
-    label: {
-      text,
-      font: "14px sans-serif",
-      style: LabelStyle.FILL_AND_OUTLINE,
-      fillColor: Color.BLACK,
-      outlineColor: Color.WHITE,
-      outlineWidth: 3,
-      verticalOrigin: VerticalOrigin.BOTTOM,
-      heightReference: HeightReference.CLAMP_TO_GROUND,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    },
+/**
+ * Look at the whole course from above and a little to the south. `coveredLeftPx` is how
+ * much of the map's left side is under the readout block: the course is put in the middle of the
+ * part that is clear. `seconds` of flight; 0 jumps, which is what reduced motion gets.
+ */
+export function frameCourse(viewer: Viewer, line: CourseLine, coveredLeftPx: number, seconds = 0): void {
+  const sphere = BoundingSphere.fromPoints(line.lat.map((lat, i) => Cartesian3.fromDegrees(line.lon[i], lat)));
+  const view = { fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx };
+  const rangeM = rangeToFitM({ ...view, radiusM: sphere.radius, tiltRad: CAMERA_TILT_RAD });
+  // The camera faces north, so the course's left is west: aim that far west of its middle, and the
+  // course lands in the clear part of the map. Aimed there from the start, a flight ends where it
+  // should, with no jump sideways at the end.
+  const east = Matrix4.getColumn(Transforms.eastNorthUpToFixedFrame(sphere.center), 0, new Cartesian4());
+  const west = Cartesian3.multiplyByScalar(new Cartesian3(east.x, east.y, east.z), -sidewaysShiftM({ ...view, rangeM }), new Cartesian3());
+  viewer.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.add(sphere.center, west, new Cartesian3()), sphere.radius), {
+    offset: new HeadingPitchRange(0, -CAMERA_TILT_RAD, rangeM),
+    duration: seconds,
+    complete: () => framedFrom.set(viewer, Cartesian3.clone(viewer.camera.positionWC)),
   });
 }
 
-/** Look at the whole course from the south, tilted so the city reads as 3D. */
-function frameCourse(viewer: Viewer, lat: number[], lon: number[]): void {
-  const sphere = BoundingSphere.fromPoints(lat.map((la, i) => Cartesian3.fromDegrees(lon[i], la)));
-  viewer.camera.flyToBoundingSphere(sphere, {
-    offset: new HeadingPitchRange(0, CesiumMath.toRadians(-45), sphere.radius * 2.6),
-    duration: 0,
+/**
+ * Whether the map is still as the last framing of the whole course left it. If it is, a change in
+ * the map's size (the strip opening) can frame the course again; if the runner has moved the map,
+ * it is theirs, and is left alone.
+ */
+export function isStillFramed(viewer: Viewer): boolean {
+  const from = framedFrom.get(viewer);
+  return from !== undefined && Cartesian3.equalsEpsilon(from, viewer.camera.positionWC, 0, 0.5);
+}
+
+function horizontalFov(viewer: Viewer): number {
+  const frustum = viewer.camera.frustum;
+  if (!(frustum instanceof PerspectiveFrustum) || frustum.fov === undefined) return CesiumMath.toRadians(60);
+  // CesiumJS's `fov` is across the longer side of the view.
+  const aspect = frustum.aspectRatio ?? 1;
+  return aspect >= 1 ? frustum.fov : 2 * Math.atan(Math.tan(frustum.fov / 2) * aspect);
+}
+
+/** Bring a place on the course to the middle of the map, from the height the camera is already at. */
+export function goTo(viewer: Viewer, place: RoadPosition, seconds = 0): void {
+  const rangeM = Math.max(heightAboveGround(viewer) / Math.sin(CAMERA_TILT_RAD), 300);
+  viewer.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.fromDegrees(place.lon, place.lat), 1), {
+    offset: new HeadingPitchRange(viewer.camera.heading, -CAMERA_TILT_RAD, rangeM),
+    duration: seconds,
   });
+}
+
+/** Steeper than this and the camera counts as looking straight down. */
+const STRAIGHT_DOWN_RAD = CesiumMath.toRadians(80);
+
+export function isLookingStraightDown(viewer: Viewer): boolean {
+  return -viewer.camera.pitch > STRAIGHT_DOWN_RAD;
+}
+
+/**
+ * Look at the same place from straight above, north up, like a paper map; or, if the camera is
+ * already there, tip back to the tilted view. What is in the middle of the map stays in the middle,
+ * at the same distance, so it is a way back from road height as well as a way to read the course
+ * like a map.
+ */
+export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
+  const canvas = viewer.canvas;
+  const middle = viewer.camera.pickEllipsoid(new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
+  if (!middle) return; // looking at the sky: there is no place to keep in the middle
+  const rangeM = Math.max(Cartesian3.distance(viewer.camera.positionWC, middle), 300);
+  const tiltRad = isLookingStraightDown(viewer) ? CAMERA_TILT_RAD : CesiumMath.PI_OVER_TWO;
+  viewer.camera.flyToBoundingSphere(new BoundingSphere(middle, 1), { offset: new HeadingPitchRange(0, -tiltRad, rangeM), duration: seconds });
+}
+
+/**
+ * In the dark theme the keyless map goes quiet: dimmer and almost without colour, so a bright map
+ * doesn't glare out of a dark screen and the blue line is the brightest thing on it. Only our own
+ * basemap layer is touched. Photoreal imagery is Google's and is shown as it comes.
+ */
+export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
+  const basemap = viewer.imageryLayers.get(0);
+  if (!basemap) return;
+  basemap.brightness = theme === "dark" ? 0.55 : 1;
+  basemap.contrast = theme === "dark" ? 1.15 : 1;
+  basemap.saturation = theme === "dark" ? 0.15 : 1;
+}
+
+/** How far the camera is above the plain ground under it, or above the ellipsoid where no ground is loaded. */
+function heightAboveGround(viewer: Viewer): number {
+  const eye = viewer.camera.positionCartographic;
+  return Math.max(eye.height - (viewer.scene.globe.getHeight(eye) ?? 0), 1);
+}
+
+/** Move the map a quarter of a screen: `right` and `up` are -1, 0 or 1, as on the arrow keys. */
+export function panMap(viewer: Viewer, right: number, up: number): void {
+  const camera = viewer.camera;
+  const height = heightAboveGround(viewer);
+  if (height > 1_000_000) {
+    // From this far out the ground curves away: go round the globe instead of along a tangent.
+    const angle = (height * 0.2) / EARTH_RADIUS_M;
+    if (right !== 0) camera.rotateRight(-right * angle);
+    if (up !== 0) camera.rotateUp(-up * angle);
+    return;
+  }
+  // Along the ground, not along the tilted camera: sideways, and towards the top of the screen.
+  const skyward = viewer.scene.globe.ellipsoid.geodeticSurfaceNormal(camera.positionWC, new Cartesian3());
+  const ahead = Cartesian3.normalize(Cartesian3.cross(skyward, camera.rightWC, new Cartesian3()), new Cartesian3());
+  const step = Math.max(height * 0.3, 20);
+  camera.move(camera.rightWC, right * step);
+  camera.move(ahead, up * step);
+}
+
+/** Zoom the map in (`towards` = 1) or out (-1), never through the ground. */
+export function zoomMap(viewer: Viewer, towards: number): void {
+  const height = heightAboveGround(viewer);
+  if (towards > 0 && height > 80) viewer.camera.zoomIn(height * 0.4);
+  if (towards < 0 && height < 20_000_000) viewer.camera.zoomOut(height * 0.7);
 }
 
 /**
