@@ -32,3 +32,7 @@ unmeasured stretch, and the Verrazzano's unmeasured main span with Hills on. The
   and try to fix that."
 - **The lift:** not mentioned. It was left at the 1.5 m the trial opens with.
 
+## Second look on 2026-09-18, later the same evening, after the three fixes
+
+- **The flat grey band, the line at one strength across its width, the runner's dot on top:** "ok everything looks good."
+
