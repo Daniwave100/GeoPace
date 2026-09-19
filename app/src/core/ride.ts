@@ -1,5 +1,5 @@
 // The Ride (PLAN.md D34, issue #8): the runner carried along the course as a time-lapse, quick
-// between Stops and slow through them, so the whole course takes a couple of minutes and there is
+// between Stops and slow through them, so the whole course takes a few minutes and there is
 // time to read at the places that matter. Pure logic, no drawing and no 3D: where the runner is
 // and whether the Ride is playing. The strip, the readout, the sentence and the camera are moved
 // by whoever listens, through the same scrubbing that a hand on the strip does.
@@ -22,7 +22,7 @@ export interface RideCourse {
   swingDegPerKm?(km: number, camera: RideCamera): number;
 }
 
-/** One camera's time-lapse. Speeds are km of course a second, since positions along a course are km: 0.55 is 550 m of road a second. */
+/** One camera's time-lapse. Speeds are km of course a second, since positions along a course are km: 0.45 is 450 m of road a second. */
 interface TimeLapse {
   /** The cruise: between Stops, how much course goes by in a second. */
   cruiseKmPerS: number;
@@ -52,17 +52,18 @@ const THE_PACE_OF_THE_RUN_KM_PER_S = 0.003;
 /**
  * Through a stretch that is a Stop (a climb), past the slow of arriving at its foot, the Ride gets
  * no nearer its cruise than this: slow all the way up, so the hill is seen, without crawling for a
- * kilometre. From above the camera stays down for the look with it (core/ride-view.ts).
+ * kilometre.
  */
 const MOST_CRUISE_THROUGH_A_STRETCH = 0.3;
 
 /**
- * How fast each camera's time-lapse goes. From above the whole course is a couple of minutes:
- * half a kilometre of road a second reads well from the air. On the road the same speed would be a blur,
+ * How fast each camera's time-lapse goes. From above the whole course is about three minutes, at
+ * 450 m of road a second: first built at 550, and the owner, after riding both courses, asked for it
+ * "a little bit" slower (issue #24). On the road the same speed would be a blur,
  * so the time-lapse is gentler (PLAN.md D33, §6 "The ride"), and slows to a fast run at a Stop.
  */
 const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
-  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.1, brakingKmPerS2: 0.4 },
+  "from-above": { cruiseKmPerS: 0.45, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.1, brakingKmPerS2: 0.4 },
   // On the road the camera looks at the runner from 25 m behind, so a street corner swings the view
   // a quarter turn in those 25 m: the Ride takes it as a vehicle would, in a second and a half, at
   // some 13 m/s. A Stop is slower still: 12 m/s for the 60 m around it, five seconds to read it by.
@@ -72,8 +73,7 @@ const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
 /**
  * How far into its cruise the Ride is at `km`: 0 at a Stop and close to one, 1 on the open road
  * between Stops, easing between the two with no sudden change at either end, which a moving
- * camera would show as a jolt. The camera uses it too: From above comes down for a closer look
- * exactly as the Ride slows (core/ride-view.ts).
+ * camera would show as a jolt.
  */
 export function cruising(course: RideCourse, km: number, camera: RideCamera): number {
   const lapse = TIME_LAPSE[camera];
@@ -81,8 +81,7 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
   let toNearestStop = Number.POSITIVE_INFINITY;
   for (const stop of course.stops) {
     // Through a stretch the Ride is held back all the way up, and past its top it is let go of
-    // gradually, over the same distance it eases away from a Stop: never all at once, which From
-    // above, taking its height from this number, showed as a 900 m jump of the camera.
+    // gradually, over the same distance it eases away from a Stop: never all at once.
     if (stop.toKm !== undefined && km > stop.km) {
       const past = clamp((km - stop.toKm) / lapse.easeOverKm, 0, 1);
       most = Math.min(most, MOST_CRUISE_THROUGH_A_STRETCH + (1 - MOST_CRUISE_THROUGH_A_STRETCH) * past * past * (3 - 2 * past));

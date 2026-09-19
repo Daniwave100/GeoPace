@@ -307,11 +307,23 @@ describe("From above", () => {
     expect(shifted.eye.heightM).toBeCloseTo(centred.eye.heightM, 9);
   });
 
-  it("comes down for a closer look at a Stop, and goes up again between Stops", () => {
-    const atTheBarclaysCenter = rideView(nyc, 12.1, "from-above");
-    const onFourthAvenue = rideView(nyc, 6, "from-above");
-
-    expect(atTheBarclaysCenter.eye.heightM).toBeLessThan(onFourthAvenue.eye.heightM / 1.5);
+  it("keeps one distance from the runner all the way, at a Stop, up a climb and on the open road alike: it never dollies in and out", () => {
+    // The owner's pick (issue #24). First built coming down to 900 m at every Stop and going back up
+    // to 2,200 m after it: eighteen times in New York, a camera that "moves a little bit too much".
+    for (const scene of [nyc, berlin]) {
+      const distancesM: number[] = [];
+      for (let km = 0; km <= scene.line.length_m / 1000; km += 0.05) {
+        const view = rideView(scene, km, "from-above");
+        const runner = positionAtKm(scene.line, km);
+        const back = metersFrom(runner, view.eye);
+        distancesM.push(Math.hypot(back.north, back.east, view.eye.heightM - runner.ellipsoidHeightM));
+      }
+      // Within a few metres: over a bridge whose height is filled in, the camera rides over an estimate of the crest.
+      expect(Math.max(...distancesM) - Math.min(...distancesM)).toBeLessThan(5);
+      // Far enough off for the course to read like a map, near enough for the city to read as a city.
+      expect(Math.min(...distancesM)).toBeGreaterThan(1000);
+      expect(Math.max(...distancesM)).toBeLessThan(2200);
+    }
   });
 
   it("turns with the course slowly: a change of direction is a sweep of several seconds, not a spin", () => {

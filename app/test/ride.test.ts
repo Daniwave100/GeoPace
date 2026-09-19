@@ -80,9 +80,19 @@ describe("the Ride's time-lapse", () => {
     }
   });
 
+  it("from above, takes the open road at under half a kilometre a second: the owner's pick, a little slower than it was first built", () => {
+    // Issue #24, after riding both courses: "slow down how fast it's going. Not too much, but just a
+    // little bit." It was 550 m of course a second. Still quick enough that the course is a few minutes.
+    for (const course of [nyc, berlin]) {
+      const onTheOpenRoad = rideSpeedKmPerS(course, 6, "from-above");
+      expect(onTheOpenRoad).toBeLessThan(0.5);
+      expect(onTheOpenRoad).toBeGreaterThan(0.4);
+    }
+  });
+
   it("never changes pace in a step: from one metre of either course to the next, how far into its cruise the Ride is barely moves", () => {
     // The trap: a rule that holds the Ride back through a climb and lets go of it all at once at the
-    // top. From above takes its height from the same number, so the camera jumped 900 m in one frame.
+    // top. When From above still took its height from the same number, the camera jumped 900 m in one frame.
     for (const camera of ["from-above", "on-the-road"] as const) {
       for (const course of [nyc, berlin]) {
         let last = cruising(course, 0, camera);
@@ -149,7 +159,7 @@ describe("the Ride through a sharp turn", () => {
 });
 
 describe("Ride the course", () => {
-  it("plays from the start to the finish and stops there, in a couple of minutes from above", () => {
+  it("plays from the start to the finish and stops there, in about three minutes from above", () => {
     for (const course of [nyc, berlin]) {
       const { ride, moves, secondsUntilItStops } = rideOn(course);
 

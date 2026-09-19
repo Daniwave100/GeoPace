@@ -8,7 +8,7 @@
 // from photoreal imagery, which is for looking at only (PLAN.md D5).
 import type { CourseLine, NotMeasuredSpan } from "../bundle/types";
 import { relativeBearing } from "./bearing";
-import { cruising, type RideCamera, type RideCourse } from "./ride";
+import type { RideCamera, RideCourse } from "./ride";
 import { positionAtKm, type RoadPosition } from "./scrub";
 
 /**
@@ -46,9 +46,13 @@ const GRADE_READ_KM = { from: 0.05, to: 0.15 };
 const FROM_ABOVE = {
   /** Degrees below the horizon: enough tilt for the city to read as 3D, enough height to read the course like a map. */
   tiltDeg: 50,
-  /** How far from the runner the camera is: close at a Stop, further off at the cruise, where the ground goes by quicker. */
-  rangeAtAStopM: 900,
-  rangeAtTheCruiseM: 2200,
+  /**
+   * How far from the runner the camera is, all the way: at a Stop, up a climb and on the open road
+   * alike. First built coming down to 900 m at every Stop and back up to 2,200 m after it, which in
+   * New York is eighteen times: the owner, after riding both, keeps it at one level (issue #24).
+   * A Stop is still marked, by the Ride slowing for it (core/ride.ts).
+   */
+  rangeM: 1500,
   /**
    * The way the course is going, over 3 km of it: it faces along the straight line from 1 km behind
    * the runner to 2 km ahead. Zigzags of city blocks even out, the loop onto the Queensboro Bridge
@@ -159,8 +163,7 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
     return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, toRunnerM) / RAD };
   }
 
-  const course = { lengthKm: line.length_m / 1000, stops: scene.stops };
-  const rangeM = FROM_ABOVE.rangeAtAStopM + (FROM_ABOVE.rangeAtTheCruiseM - FROM_ABOVE.rangeAtAStopM) * cruising(course, km, camera);
+  const { rangeM } = FROM_ABOVE;
   // Back from the runner the way the camera faces, and up: the runner is in the middle of the view,
   // or, with the camera moved to its own left, as far right of the middle as was asked for.
   const behind = moved(runner, headingDeg + 180, rangeM * Math.cos(FROM_ABOVE.tiltDeg * RAD));
