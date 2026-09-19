@@ -8,6 +8,7 @@
 // shows it and passes the presses on.
 import type { RideCamera } from "../core/ride";
 import { html } from "../dom";
+import { segmented } from "../segmented";
 
 export interface RideActions {
   playPause(): void;
@@ -41,35 +42,52 @@ const CAMERAS: { camera: RideCamera; label: string }[] = [
 ];
 
 export function createRideControls(dock: HTMLElement, actions: RideActions): RideControls {
+  const ride = html("button", { type: "button", class: "button ride-start", text: "Ride the course" });
+  ride.addEventListener("click", actions.playPause);
+  const play = html("button", { type: "button", class: "button ride-play", text: "Pause", title: "Play or pause (space bar)" });
+  play.addEventListener("click", actions.playPause);
+
+  /**
+   * One of the player's other buttons. Pressed with a pointer, it hands the keyboard's focus to
+   * the play button, so the space bar still plays and pauses afterwards instead of pressing this
+   * one again (it went Back again, or rode to the next stop again, and never paused). Pressed from
+   * the keyboard (a click with no pointer behind it has `detail` 0) the focus stays where the
+   * runner put it: the space bar is how a keyboard presses a button.
+   */
   const button = (className: string, text: string, onPress: () => void) => {
     const node = html("button", { type: "button", class: className, text });
-    node.addEventListener("click", onPress);
+    node.addEventListener("click", (event) => {
+      onPress();
+      if (event.detail > 0 && !player.hidden) play.focus();
+    });
     return node;
   };
-  const ride = button("button ride-start", "Ride the course", actions.playPause);
-  const play = button("button ride-play", "Pause", actions.playPause);
-  play.title = "Play or pause (space bar)";
   const back = button("button", "Back", actions.back);
   back.title = "Back to the stop before";
   const next = button("button", "Ride to the next stop", actions.rideToNextStop);
   const leave = button("ride-leave", "Back to the map", actions.leave);
 
   const stopLine = html("p", { class: "ride-stop" });
-  // What a screen reader is told, and only that: arriving at a Stop is the Ride's news. The line
-  // above changes with every 50 m to the next Stop, which said aloud would be a stream of numbers.
-  const arrived = html("p", { class: "visually-hidden", role: "status" });
-  const inputs = CAMERAS.map(({ camera }) => html("input", { type: "radio", name: "ride-camera", value: camera }));
-  inputs.forEach((input, index) => input.addEventListener("change", () => input.checked && actions.useCamera(CAMERAS[index].camera)));
-  const cameras = html("fieldset", { class: "ride-cameras" }, html("legend", { class: "visually-hidden", text: "Camera" }), ...CAMERAS.map(({ label }, index) => html("label", {}, inputs[index], label)));
-
-  const bar = html(
-    "div",
-    { class: "ride-bar", role: "group", "aria-label": "The Ride" },
-    html("div", { class: "ride-bar-head" }, stopLine, leave, arrived),
-    html("div", { class: "ride-bar-row" }, html("div", { class: "ride-buttons" }, back, play, next), cameras),
+  const cameras = segmented(
+    "Camera",
+    "ride-camera",
+    CAMERAS.map(({ camera, label }) => ({ value: camera, label, explained: "" })),
+    (value) => actions.useCamera(value as RideCamera),
+    "ride-cameras",
   );
-  bar.hidden = true;
-  dock.replaceChildren(ride, bar);
+  const player = html(
+    "div",
+    { class: "ride-player", role: "group", "aria-label": "The Ride" },
+    html("div", { class: "ride-player-head" }, stopLine, leave),
+    html("div", { class: "ride-player-row" }, html("div", { class: "ride-buttons" }, back, play, next), cameras.box),
+  );
+  player.hidden = true;
+  // What a screen reader is told, and only that: arriving at a Stop is the Ride's news. The line in
+  // the player changes with every 50 m to the next Stop, which said aloud would be a stream of
+  // numbers. It is on the page from the start, outside the player: a status that appears together
+  // with its first words is often not read out at all.
+  const arrived = html("p", { class: "visually-hidden", role: "status" });
+  dock.replaceChildren(ride, player, arrived);
 
   let wasOn = false;
   return {
@@ -77,7 +95,7 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
       // Whoever had the focus keeps a control under their hands when the two swap places.
       const hadFocus = dock.contains(document.activeElement);
       ride.hidden = showing.on;
-      bar.hidden = !showing.on;
+      player.hidden = !showing.on;
       if (hadFocus && wasOn !== showing.on) (showing.on ? play : ride).focus();
       wasOn = showing.on;
 
@@ -89,10 +107,7 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
       // A button that stops applying keeps the focus it has: `aria-disabled`, not `disabled`, which would drop it.
       back.setAttribute("aria-disabled", String(!showing.canGoBack));
       next.setAttribute("aria-disabled", String(!showing.canRideOn));
-      inputs.forEach((input, index) => {
-        const checked = CAMERAS[index].camera === showing.camera;
-        if (input.checked !== checked) input.checked = checked;
-      });
+      cameras.check(showing.camera);
     },
   };
 }

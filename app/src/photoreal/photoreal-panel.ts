@@ -30,7 +30,8 @@ const NOT_A_KEY =
 
 const CAMERA_HEIGHT_CAVEAT = "Measured from open terrain data, not from the imagery, and good to a few metres. On a bridge it counts from the ground or water underneath.";
 
-export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Photoreal, "useKey" | "turnOn" | "turnOff" | "forgetKey">): PhotorealPanel {
+/** `onOpen` is called as the key panel opens over the page: whatever is playing under it should wait (a Ride: issue #8). */
+export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Photoreal, "useKey" | "turnOn" | "turnOff" | "forgetKey">, onOpen: () => void = () => undefined): PhotorealPanel {
   let state: PhotorealState | undefined;
   let units: Units = "km";
   let cameraMeters: number | null = null;
@@ -120,7 +121,9 @@ export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Pho
 
   function openPanel(): void {
     error.textContent = "";
-    if (!dialog.open) dialog.showModal();
+    if (dialog.open) return;
+    onOpen();
+    dialog.showModal();
   }
 
   /** While the runner types: which kind of key this is, and the one place it will be sent. */

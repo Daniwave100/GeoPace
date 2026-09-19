@@ -182,11 +182,15 @@ input {
 }
 
 /* A switch between a few choices: real radio buttons, drawn as one row of blocks. */
+/* On the black banner it is paper on black in both themes; a block on the map sets its own (.ride-cameras). */
 .segmented {
+  --segmented-line: #f4f4f0;
+  --segmented-on: #000;
+  --segmented-on-ground: #f4f4f0;
   display: flex;
   margin: 0;
   padding: 0;
-  border: 2px solid #f4f4f0;
+  border: 2px solid var(--segmented-line);
 }
 
 .segmented label {
@@ -198,7 +202,7 @@ input {
 }
 
 .segmented label + label {
-  border-left: 2px solid #f4f4f0;
+  border-left: 2px solid var(--segmented-line);
 }
 
 .segmented input {
@@ -210,8 +214,8 @@ input {
 }
 
 .segmented label:has(input:checked) {
-  color: #000;
-  background: #f4f4f0;
+  color: var(--segmented-on);
+  background: var(--segmented-on-ground);
 }
 
 .segmented label:has(input:focus-visible) {
@@ -365,21 +369,34 @@ input {
 
 /* ── The Ride: its button, and its player, on the top of the map (PLAN.md D34, D53) ─────── */
 
-/* In the middle of the part of the map that the readout block and "Make it photoreal" leave
-   clear. At the top: the bottom of the map belongs to the map's own credits, to the near end of
+/* Along the top of the map, clear of the readout block: "Ride the course" (in the Ride, its
+   player) in the middle of what is left, and "Make it photoreal" at the right with whatever it has
+   to say. One row, so that neither can ever cover the other: the player gives way first, folding
+   its buttons onto more lines, and only on a narrow window does the photoreal block go under it.
+   At the top because the bottom of the map belongs to the map's own credits, to the near end of
    the course, and, On the road, to the road. */
-.ride-dock {
+.map-top {
   position: absolute;
   top: 12px;
   left: max(300px, calc(var(--col) * 3));
-  right: 170px;
+  right: 12px;
   display: flex;
-  justify-content: center;
-  pointer-events: none; /* only the block itself takes the pointer: the map beside it still drags */
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  pointer-events: none; /* only the blocks themselves take the pointer: the map between them still drags */
 }
 
-.explore[data-full-map] .ride-dock {
+.explore[data-full-map] .map-top {
   left: 0;
+}
+
+.ride-dock {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+  padding-left: 12px;
 }
 
 /* In Explore: one solid block, "Ride the course", the one thing on the screen that asks to be pressed. */
@@ -401,11 +418,11 @@ input {
 }
 
 /* In the Ride: the player, an opaque block like every other block on the map. */
-.ride-bar {
+.ride-player {
   display: grid;
   gap: 6px;
   box-sizing: border-box;
-  max-width: calc(100% - 24px);
+  max-width: 100%;
   padding: 8px 10px 10px;
   color: var(--ink);
   background: var(--paper);
@@ -413,7 +430,7 @@ input {
   pointer-events: auto;
 }
 
-.ride-bar-head {
+.ride-player-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -428,25 +445,26 @@ input {
   line-height: 1.25;
 }
 
-.ride-bar-row {
+.ride-player-row {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: 6px 12px;
 }
 
+/* Narrower than the three side by side, "Ride to the next stop" takes a line of its own. The
+   buttons share one 2px rule with each neighbour, across and down, however the row wraps. */
 .ride-buttons {
   display: flex;
   flex: 1 1 auto;
+  flex-wrap: wrap;
+  padding: 0 2px 2px 0;
 }
 
 .ride-buttons .button {
   flex: 1 1 auto;
+  margin: 0 -2px -2px 0;
   white-space: nowrap;
-}
-
-.ride-buttons .button + .button {
-  border-left: 0;
 }
 
 /* Play and pause: the solid one of the three, and wide enough that "Pause" and "Ride on" don't move its neighbours. */
@@ -471,48 +489,20 @@ input {
   background: var(--paper);
 }
 
-/* The two cameras: real radio buttons drawn as blocks, like the banner's switches, in ink on paper. */
+/* The two cameras: the banner's segmented control (segmented.ts), in ink on paper instead of paper on black. */
 .ride-cameras {
-  display: flex;
   flex: 1 1 auto;
-  margin: 0;
-  padding: 0;
-  border: 2px solid var(--ink);
+  --segmented-line: var(--ink);
+  --segmented-on: var(--paper);
+  --segmented-on-ground: var(--ink);
 }
 
 .ride-cameras label {
-  position: relative;
   display: grid;
   flex: 1 1 0;
   place-items: center;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-weight: 700;
   font-stretch: 88%;
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.ride-cameras label + label {
-  border-left: 2px solid var(--ink);
-}
-
-.ride-cameras input {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.ride-cameras label:has(input:checked) {
-  color: var(--paper);
-  background: var(--ink);
-}
-
-.ride-cameras label:has(input:focus-visible) {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .ride-leave {
@@ -710,10 +700,9 @@ button.map-label {
 }
 
 #photoreal {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  max-width: min(340px, calc(100% - 24px));
+  flex: 0 1 auto;
+  max-width: min(340px, 100%);
+  pointer-events: none; /* the gap between its button and its notice is still the map */
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -741,6 +730,10 @@ button.map-label {
 
 .map-controls .map-whole {
   font-size: 12px;
+}
+
+#photoreal > * {
+  pointer-events: auto;
 }
 
 .photoreal-control {
@@ -1180,13 +1173,13 @@ button.map-label {
   stroke-dasharray: 1 2;
 }
 
-.strip-landmark {
+.strip-stop {
   font: 700 11.5px "Archivo Variable", Arial, sans-serif;
   font-stretch: 78%;
   fill: var(--ink);
 }
 
-.strip-landmark-tick {
+.strip-stop-tick {
   stroke: var(--ink);
   stroke-width: 1;
 }
@@ -1333,6 +1326,13 @@ button.map-label {
   flex-basis: 100%;
 }
 
+/* Too narrow for the player to fold any further beside a photoreal notice: the notice goes under it. */
+@media (max-width: 960px) {
+  .map-top {
+    flex-wrap: wrap;
+  }
+}
+
 /* ── Narrow or short screens: the blocks stop overlapping the map and stack under it ────── */
 
 @media (max-width: 760px), (max-height: 620px) {
@@ -1375,14 +1375,26 @@ button.map-label {
     border-right: 0;
     border-bottom: 0;
     border-top: var(--rule) solid var(--ink);
-    order: 1;
+    order: 2;
   }
 
-  /* "Ride the course", and the Ride's player, come straight under the map, ahead of the readout block. */
+  /* The row along the top dissolves. "Make it photoreal" stays on the map's top right; "Ride the
+     course", and the Ride's player, come straight under the map, ahead of the readout block. */
+  .map-top {
+    display: contents;
+  }
+
+  #photoreal {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    max-width: min(340px, calc(100% - 24px));
+  }
+
   .ride-dock {
-    position: static;
     display: block;
     order: 1;
+    padding-left: 0;
   }
 
   .ride-start {
@@ -1391,7 +1403,7 @@ button.map-label {
     border-width: var(--rule) 0 0;
   }
 
-  .ride-bar {
+  .ride-player {
     max-width: none;
     border-width: var(--rule) 0 0;
   }

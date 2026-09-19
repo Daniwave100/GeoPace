@@ -16,22 +16,24 @@ export interface WhereThePressLands {
   /** A dialog is open over the page: the keyboard is its own. */
   dialogOpen: boolean;
   /**
-   * What has the keyboard's focus: the Ride's player ("Ride the course", or any control of the
-   * bar), the map, the strip, some other control (a button, a box, a menu, a link), or nothing
-   * in particular.
+   * What has the keyboard's focus. "play": the player's play button, "Ride the course", or one of
+   * the two cameras (the space bar does nothing of its own on a camera that is already chosen).
+   * "control": any other control, the player's other buttons included. Or the map, the strip, or
+   * nothing in particular.
    */
-  focus: "player" | "map" | "strip" | "control" | "page";
+  focus: "play" | "map" | "strip" | "control" | "page";
 }
 
 /**
  * "play-pause": play or pause the Ride, and keep the press from the browser. "swallow": keep it
  * from the browser and do nothing (a held-down key repeating). null: not the Ride's; leave it alone.
  *
- * In the player the space bar is always play or pause, whichever control was pressed last: a
- * space bar that went Back again, or rode to the next stop again, because that button still had
- * the focus would mostly not pause. Enter presses the control that has the focus. In Explore the
- * space bar is the Ride's only from the map, the strip or the player: on a page that scrolls
- * (a phone, where the blocks stack under the map) it still pages down.
+ * The space bar presses whichever button has the focus, the player's included: a runner who Tabs
+ * to "Back to the map" and presses it must leave the Ride, not pause it. What keeps the space bar
+ * pausing after a pointer has pressed Back or "Ride to the next stop" is that the player hands the
+ * focus to its play button then (ride-controls.ts). In Explore the space bar is the Ride's only
+ * from the map, the strip or "Ride the course": on a page that scrolls (a phone, where the blocks
+ * stack under the map) it still pages down.
  */
 export function spaceBarForTheRide(press: SpacePress, where: WhereThePressLands): "play-pause" | "swallow" | null {
   if (press.key !== " " || press.altKey || press.ctrlKey || press.metaKey) return null;

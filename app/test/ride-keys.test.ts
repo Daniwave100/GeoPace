@@ -9,11 +9,15 @@ const riding = { rideOn: true, dialogOpen: false };
 const exploring = { rideOn: false, dialogOpen: false };
 
 describe("the space bar", () => {
-  it("plays and pauses the Ride wherever the focus is in the player, whichever of its buttons was pressed last", () => {
-    // After "Ride to the next stop", Back or a camera, the focus is on that control. Space there is
-    // still play or pause; Enter is what presses the control itself.
-    expect(spaceBarForTheRide(space(), { ...riding, focus: "player" })).toBe("play-pause");
-    expect(spaceBarForTheRide(space(), { ...exploring, focus: "player" })).toBe("play-pause"); // on "Ride the course"
+  it("plays and pauses from the play button, from \"Ride the course\", and from a camera, where it would otherwise do nothing", () => {
+    // A press of the player's buttons with a pointer hands the focus to the play button
+    // (ride-controls.ts), so after "Ride to the next stop" or Back the space bar still pauses.
+    expect(spaceBarForTheRide(space(), { ...riding, focus: "play" })).toBe("play-pause");
+    expect(spaceBarForTheRide(space(), { ...exploring, focus: "play" })).toBe("play-pause"); // on "Ride the course"
+  });
+
+  it("presses the button the keyboard is on, in the player as anywhere: Tab to Back to the map, space, and the Ride is left", () => {
+    expect(spaceBarForTheRide(space(), { ...riding, focus: "control" })).toBeNull();
   });
 
   it("plays and pauses from the map, the strip and the page while the Ride is on", () => {
@@ -25,10 +29,10 @@ describe("the space bar", () => {
   it("is left alone where it already means something: another button, a box, a menu, an open dialog", () => {
     expect(spaceBarForTheRide(space(), { ...riding, focus: "control" })).toBeNull();
     expect(spaceBarForTheRide(space(), { rideOn: true, dialogOpen: true, focus: "page" })).toBeNull();
-    expect(spaceBarForTheRide(space(), { rideOn: true, dialogOpen: true, focus: "player" })).toBeNull();
+    expect(spaceBarForTheRide(space(), { rideOn: true, dialogOpen: true, focus: "play" })).toBeNull();
   });
 
-  it("in Explore still pages down: it starts the Ride only from the map, the strip or the player", () => {
+  it("in Explore still pages down: it starts the Ride only from the map, the strip or \"Ride the course\"", () => {
     expect(spaceBarForTheRide(space(), { ...exploring, focus: "page" })).toBeNull();
     expect(spaceBarForTheRide(space(), { ...exploring, focus: "map" })).toBe("play-pause");
     expect(spaceBarForTheRide(space(), { ...exploring, focus: "strip" })).toBe("play-pause");
@@ -42,6 +46,6 @@ describe("the space bar", () => {
     for (const modifier of ["altKey", "ctrlKey", "metaKey"] as const) {
       expect(spaceBarForTheRide(space({ [modifier]: true }), { ...riding, focus: "page" }), modifier).toBeNull();
     }
-    expect(spaceBarForTheRide(space({ key: "Enter" }), { ...riding, focus: "player" })).toBeNull();
+    expect(spaceBarForTheRide(space({ key: "Enter" }), { ...riding, focus: "play" })).toBeNull();
   });
 });

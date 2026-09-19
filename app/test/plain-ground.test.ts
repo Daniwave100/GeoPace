@@ -2,7 +2,7 @@
 // all while it waits for a terrain service, so one that can't be reached would leave the map
 // black for good, and the draped course line with it (issue #8: a tile failure must leave the
 // course on screen). The terrain here is a real CesiumJS one, given a service that answers or doesn't.
-import { EllipsoidTerrainProvider, Terrain, type TerrainProvider } from "cesium";
+import { EllipsoidTerrainProvider, Terrain, type TerrainProvider, TileProviderError } from "cesium";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { plainGroundIfTerrainFails } from "../src/scene/plain-ground";
 
@@ -19,6 +19,23 @@ describe("the ground of the keyless map", () => {
 
     expect(globe.terrainProvider).toBeInstanceOf(EllipsoidTerrainProvider);
     expect(printed).not.toHaveBeenCalled(); // handled, not left for CesiumJS to print
+  });
+
+  it("is the plain ellipsoid too when the service answers but one of its top tiles fails: nothing can stand in for a tile that has no parent", async () => {
+    const service = new EllipsoidTerrainProvider(); // stands in for the open terrain: what matters is its own report of failed tiles
+    const globe: { terrainProvider: TerrainProvider | undefined } = { terrainProvider: service };
+    const terrain = new Terrain(Promise.resolve(service));
+    plainGroundIfTerrainFails(terrain, globe);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // A tile deep in the tree fails: CesiumJS fills it in from the tile above it, and the ground stays.
+    service.errorEvent.raiseEvent(new TileProviderError(service, "Failed to obtain terrain tile X: 301 Y: 384 Level: 9.", 301, 384, 9, 0));
+    expect(globe.terrainProvider).toBe(service);
+
+    // A top tile fails: CesiumJS gives up on it for good, and half the world, course included, has no ground.
+    service.errorEvent.raiseEvent(new TileProviderError(service, "Failed to obtain terrain tile X: 0 Y: 0 Level: 0.", 0, 0, 0, 0));
+    expect(globe.terrainProvider).toBeInstanceOf(EllipsoidTerrainProvider);
+    expect(globe.terrainProvider).not.toBe(service);
   });
 
   it("is left to the open terrain when that arrives", async () => {

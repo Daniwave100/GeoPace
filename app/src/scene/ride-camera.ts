@@ -19,6 +19,7 @@
 // is never asked anything.
 import { Cartesian3, Cartographic, type Event, Math as CesiumMath } from "cesium";
 import { relativeBearing } from "../core/bearing";
+import type { HowItMoved } from "../core/ride";
 import type { HeightAt, RideView } from "../core/ride-view";
 
 /** As much of the CesiumJS viewer as the Ride's camera touches. */
@@ -40,13 +41,13 @@ export interface RideCameraOptions {
   now(): number;
 }
 
-export interface RideCamera {
+export interface CameraInTheScene {
   /**
    * Hold the camera on the Ride. `view` is asked again before every frame until the next `follow`
    * or `letGo`. `how` is what the Ride just did: "riding", it moved on and the camera is put there;
    * "jump", it is somewhere else and the camera glides there (or cuts, with reduced motion).
    */
-  follow(view: () => RideView, how: "riding" | "jump"): void;
+  follow(view: () => RideView, how: HowItMoved): void;
   /** The runner has taken hold of the map, or the Ride is over: the camera is theirs from this moment, even in the middle of a glide. */
   letGo(): void;
 }
@@ -59,7 +60,7 @@ const MOST_RISE_M = 1200;
 /** Closer to the view than this, in metres and in degrees, the camera is there already: nothing to glide. */
 const THERE = { meters: 1, degrees: 1 };
 
-export function createRideCamera(viewer: SceneForRide, options: RideCameraOptions): RideCamera {
+export function createRideCamera(viewer: SceneForRide, options: RideCameraOptions): CameraInTheScene {
   const { camera } = viewer;
   /** Where the Ride wants the camera, asked each frame; null while the camera is the runner's. */
   let wanted: (() => RideView) | null = null;

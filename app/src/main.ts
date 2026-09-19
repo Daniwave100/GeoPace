@@ -40,7 +40,7 @@ import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labe
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import type { Placement } from "./scene/placement";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
-import { createRideCamera, type RideCamera as CameraInTheScene, roadHeightOnTheMap } from "./scene/ride-camera";
+import { type CameraInTheScene, createRideCamera, roadHeightOnTheMap } from "./scene/ride-camera";
 import { createStrip, type KeyEntry, rowsHeightAtSizeOne } from "./strip/strip";
 import type { Viewer } from "cesium";
 
@@ -84,6 +84,8 @@ let placement: Placement = "draped";
 let rideCameraChoice: RideCamera = "from-above";
 /** Whether the screen was in the Ride when its controls were last shown: leaving it gives the whole course back. */
 let wasRiding = false;
+/** How much of the map's left side the readout block covers; null until it is next measured (`coveredLeftPx`). */
+let coveredLeft: number | null = null;
 let rideCamera: CameraInTheScene | undefined;
 let viewer: Viewer | undefined;
 let mapControls: MapControls | undefined;
@@ -138,12 +140,12 @@ async function start(): Promise<void> {
     if (event.key === "Escape" && fullMap && !document.querySelector("dialog[open]")) useFullMap(false);
     const forTheRide = spaceBarForTheRide(event, { rideOn: showing?.ride.on ?? false, dialogOpen: document.querySelector("dialog[open]") !== null, focus: focusIsOn(event.target) });
     if (forTheRide === null) return;
-    event.preventDefault(); // or the space bar scrolls the page, or presses whichever of the player's buttons has the focus
+    event.preventDefault(); // or the space bar scrolls the page, or presses the play button a second time
     if (forTheRide === "play-pause") showing?.ride.playPause();
   });
-  // A button is pressed when the space bar comes up, not when it goes down: in the player that press is the Ride's.
+  // A button is pressed when the space bar comes up, not when it goes down: on the play button that press is already made.
   document.addEventListener("keyup", (event) => {
-    if (event.key === " " && focusIsOn(event.target) === "player" && !document.querySelector("dialog[open]")) event.preventDefault();
+    if (event.key === " " && focusIsOn(event.target) === "play" && !document.querySelector("dialog[open]")) event.preventDefault();
   });
   systemDark.addEventListener("change", showTheme); // "Auto" keeps following the system while the app is open
   switches.show(units, themeChoice);
@@ -353,12 +355,15 @@ function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
 function scrubTo(km: number): void {
   if (!showing) return;
   showing.ride.scrubbedTo(km);
-  showWhere(km);
+  showWhere(km, true);
   if (showing.ride.on) followTheRide("jump");
 }
 
-/** Where the runner is: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */
-function showWhere(km: number): void {
+/**
+ * Where the runner is: the strip's cursor, the readout, the sentence, the runner on the map and the
+ * sun, moved as one. `byHand` when the runner put themselves there, which is always worth saying.
+ */
+function showWhere(km: number, byHand = false): void {
   if (!showing || !viewer) return;
   const { planner, bundle } = showing;
   const readout = planner.at(km);
@@ -367,11 +372,11 @@ function showWhere(km: number): void {
   const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: showing.screen.clause });
 
   // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
-  // While the Ride plays it is left unsaid: sixty new sentences a second is noise, and the Ride says
-  // each Stop as it arrives (ride-controls.ts). Paused, the strip says where that left the runner.
+  // A Ride that is playing moves the strip quietly: sixty new sentences a second is noise, and the
+  // Ride says each Stop as it arrives (ride-controls.ts). A scrub by hand during it is said.
   const carriedOver = planner.carriedOver ? `, from the ${planner.carriedOver.fromEdition} start time, carried over` : "";
-  const spoken = showing.ride.playing ? null : `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`;
-  strip.setKm(readout.km, spoken);
+  const spoken = `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`;
+  strip.setKm(readout.km, spoken, showing.ride.playing && !byHand);
   readoutView.show(planner, readout, units);
   sentenceView.show(sentence);
   mapDots?.show([...endDots(bundle), { id: "runner", look: "runner", place }], placement);
@@ -464,7 +469,7 @@ function pauseTheRideWhenTheMapIsMoved(): void {
 /** What has the keyboard's focus, as far as the space bar cares (core/ride-keys.ts). */
 function focusIsOn(target: EventTarget | null): WhereThePressLands["focus"] {
   if (!(target instanceof Element)) return "page";
-  if (target.closest("#ride")) return "player";
+  if (target.closest(".ride-play, .ride-start, .ride-cameras")) return "play";
   if (target.closest("button, input, select, textarea, summary, a[href]")) return "control";
   if (target.closest("#globe")) return "map";
   if (target.closest("#strip")) return "strip";
@@ -508,7 +513,6 @@ function coveredLeftPx(): number {
   }
   return coveredLeft;
 }
-let coveredLeft: number | null = null;
 window.addEventListener("resize", () => (coveredLeft = null));
 
 /**
@@ -517,7 +521,8 @@ window.addEventListener("resize", () => (coveredLeft = null));
  */
 function startPhotoreal(globe: Viewer): Photoreal {
   const controller = createPhotoreal({ storage, loadTiles: (key) => loadPhotorealTiles(globe, key, (inPlace) => usePlacement(inPlace ? "road-height" : "draped")) });
-  const panel = (photorealPanel = createPhotorealPanel(byId("photoreal"), controller));
+  // A Ride doesn't play on behind the key panel, any more than behind the plan.
+  const panel = (photorealPanel = createPhotorealPanel(byId("photoreal"), controller, () => showing?.ride.pause()));
   panel.showUnits(units);
   // The camera's height is only wanted, and only asked of the terrain service, while photoreal is showing.
   let stopWatchingHeight: (() => void) | undefined;
