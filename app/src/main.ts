@@ -8,7 +8,7 @@ import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
-import { createRide, type HowItMoved, type Ride, type RideCamera } from "./core/ride";
+import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera, rideSpeedKmPerS } from "./core/ride";
 import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
 import { rideCourseFor, type RideScene, rideView } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
@@ -393,8 +393,12 @@ function showWhere(km: number, byHand = false): void {
  * and it needs nothing from the map, so it carries on whatever happens to the map's tiles.
  */
 function startRide(scene: RideScene): Ride {
+  const course = rideCourseFor(scene);
+  // How fast the Ride goes at every metre is worked out the first time it is asked, about 30 ms a
+  // camera: done now, while nothing is moving, rather than in the frame that follows the first Play.
+  setTimeout(() => RIDE_CAMERAS.forEach((camera) => rideSpeedKmPerS(course, 0, camera)), 0);
   const ride = createRide({
-    course: rideCourseFor(scene),
+    course,
     frames: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
     reducedMotion: () => reducedMotion.matches,
     onMove: (km, how) => {

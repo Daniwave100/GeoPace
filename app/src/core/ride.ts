@@ -7,7 +7,8 @@ import { clamp } from "./series";
 import { ON_THE_STOP_KM, stopsAround } from "./stops";
 
 /** The Ride's two cameras (PLAN.md D33). */
-export type RideCamera = "from-above" | "on-the-road";
+export const RIDE_CAMERAS = ["from-above", "on-the-road"] as const;
+export type RideCamera = (typeof RIDE_CAMERAS)[number];
 
 /** As much of a course as the Ride needs: how long it is, where its Stops are, and where it turns. */
 export interface RideCourse {
