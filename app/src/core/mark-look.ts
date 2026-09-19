@@ -26,7 +26,7 @@ export interface MarkLook {
   widthPx: number;
   /** #rrggbb */
   color: string;
-  /** A hairline round it, so it reads on any ground. */
+  /** A hairline round it, so it reads on any ground. `edgePx` is both sides together: half on each, as CesiumJS's outlined line counts it. */
   edge: string;
   edgePx: number;
   /** Dashes, with this between them; null for a solid line. */

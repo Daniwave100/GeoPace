@@ -73,8 +73,8 @@ export function kmAtFraction(fraction: number, lengthKm: number): number {
 export interface RoadPosition {
   lat: number;
   lon: number;
-  /** The road's height in the 3D scene: meters above the ellipsoid, not above sea level. Never shown to the runner. */
-  roadHeightM: number;
+  /** The road's height above the ellipsoid: where the 3D scene counts heights from, not sea level. For placing things in the scene; never shown to the runner. */
+  ellipsoidHeightM: number;
   /** Direction of travel, degrees clockwise from true north. */
   bearingDeg: number;
 }
@@ -101,7 +101,7 @@ export function positionAtKm(line: CourseLine, km: number): RoadPosition {
   return {
     lat: between(line.lat),
     lon: between(line.lon),
-    roadHeightM: between(line.ellipsoid_height_m),
+    ellipsoidHeightM: between(line.ellipsoid_height_m),
     // The heading of the stretch being run. Blending headings would cut every corner.
     bearingDeg: line.bearing_deg[low],
   };

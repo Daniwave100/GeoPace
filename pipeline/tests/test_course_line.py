@@ -157,7 +157,7 @@ def test_on_a_double_deck_bridge_the_course_is_on_the_deck_runners_use(synthetic
 
 
 def test_the_height_above_the_ellipsoid_is_still_the_deck_runners_use(synthetic_facts):
-    """New York: sea level is 32.5 m *below* the ellipsoid. The 3D line has to come out on the
+    """New York: sea level is 32.5 m *below* the ellipsoid. The line at road height has to come out on the
     Queensboro's lower deck, 6.4 m under the upper one, not on top of the bridge."""
     two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
     new_york = synthetic_geoid(lambda lat, lon: np.full(np.shape(lat), -32.5))

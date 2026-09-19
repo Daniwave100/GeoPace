@@ -20,8 +20,8 @@ import { type Placement, scenePosition } from "./placement";
 export interface MapLabel {
   lat: number;
   lon: number;
-  /** The road's height there in the 3D scene, from the Course Bundle: where the label stands when the course is drawn at road height. */
-  roadHeightM: number;
+  /** The road's height above the ellipsoid there, from the Course Bundle: where the label stands when the course is drawn at road height. */
+  ellipsoidHeightM: number;
   text: string;
   /** The kind of claim it makes, drawn as everywhere else; or "place" for the start and the finish, which are the course's own. */
   look: Encoding | "place";

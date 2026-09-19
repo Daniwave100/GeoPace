@@ -1,6 +1,6 @@
 // The 3D globe: keyless basemap and terrain, the camera, and the runner. The course itself is
-// drawn by course-line.ts; both are draped on the ground of the keyless map and stand at the
-// road's own height in photoreal (placement.ts).
+// drawn by course-line.ts; both are draped over the keyless map and stand at road height in
+// photoreal (placement.ts).
 //
 // The scene has no clock of its own. Cesium's clock is stopped and set from the Planner's race
 // clock every time the runner moves, so Cesium's sun is where the sun will be when the runner
@@ -32,9 +32,9 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
-import { heightReference, type SceneForCourse } from "./course-line";
+import type { SceneForCourse } from "./course-line";
 import { COURSE_BLUE, registerCourseRibbon } from "./course-ribbon";
-import { type Placement, scenePosition } from "./placement";
+import { heightReference, type Placement, scenePosition } from "./placement";
 import { BASEMAP, TERRAIN } from "./providers";
 
 const RUNNER_ID = "runner";
@@ -93,7 +93,7 @@ export function createGlobe(container: HTMLElement): Viewer {
 
 /** Put the runner at a place on the course at a moment: the marker and the sun move together. */
 export function showRunner(viewer: SceneForCourse, place: RoadPosition, instant: Date, placement: Placement): void {
-  // A marker clamped to the ground and one standing at a height are different things to CesiumJS:
+  // A marker resting on the terrain and one standing at a height are different things to CesiumJS:
   // when the placement changes, the old one goes.
   if (runnerPlacement.get(viewer) !== placement) viewer.entities.removeById(RUNNER_ID);
   runnerPlacement.set(viewer, placement);

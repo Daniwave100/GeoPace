@@ -65,8 +65,11 @@ def check_nyc_ellipsoid_heights(line: dict) -> None:
     # On the Queensboro the course is on the lower deck, 6.4 m under the upper one (D23). The
     # conversion shifts the whole bridge by one amount to within a few centimeters, so the line
     # is still on that deck: nothing on it moved by anything like the gap between the two.
-    on_the_queensboro = sea_level[(km >= 24.2) & (km <= 25.8)]
-    assert on_the_queensboro.max() - on_the_queensboro.min() < 0.1
+    on_the_queensboro = (km >= 24.2) & (km <= 25.8)
+    assert sea_level[on_the_queensboro].max() - sea_level[on_the_queensboro].min() < 0.1
+    # The lower deck crests about 44 m above sea level, which is about 12 m above the ellipsoid.
+    # The upper deck would be 6.4 m more, about 18 m: the line must not come out up there.
+    assert np.array(line["ellipsoid_height_m"])[on_the_queensboro].max() == pytest.approx(44.4 - 32.5, abs=1.5)
 
 
 def check_nyc_not_measured(spans: list[dict]) -> None:

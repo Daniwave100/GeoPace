@@ -7,6 +7,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import { howSteep } from "../src/core/hills";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
 import { markLook, rampColor } from "../src/core/mark-look";
+import { COURSE_WIDTH_PX } from "../src/scene/course-ribbon";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -104,8 +105,9 @@ describe("a dashed mark, over a pale map and over dark imagery", () => {
       // a dash is never next to the map, whatever the map looks like there.
       expect(look.rimPx).toBeGreaterThanOrEqual(1.5);
       expect(contrast(look.color, look.gap)).toBeGreaterThanOrEqual(3); // what a mark needs to be told from its ground (WCAG 1.4.11)
-      // Enough of each dash still shows beside the blue course line (6 px) laid over its middle.
-      expect((look.widthPx - 2 * (look.edgePx + look.rimPx) - 6) / 2).toBeGreaterThanOrEqual(3);
+      // Enough of each dash shows either side of the blue course line, which runs down the middle
+      // of the same line. From the middle outwards: the course, the dash, the rim, half the edge.
+      expect(look.widthPx / 2 - look.edgePx / 2 - look.rimPx - COURSE_WIDTH_PX / 2).toBeGreaterThanOrEqual(3);
     });
 
     it(`${encoding}: the band shows on any ground: by itself where the ground is dark, by its edge where it is pale`, () => {

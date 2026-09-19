@@ -65,7 +65,7 @@ let themeChoice: ThemeChoice = loadThemeChoice(storage);
 let layerState: LayerState = NO_LAYERS;
 let stripSize = loadStripSize(storage);
 let fullMap = false;
-/** How the course is drawn on the map now: draped on the keyless map's ground, at the road's own height over photoreal imagery (issue #22). */
+/** How the course is drawn on the map now: draped over the keyless map, at road height over photoreal imagery (issue #22). */
 let placement: Placement = "draped";
 let viewer: Viewer | undefined;
 let mapControls: MapControls | undefined;
@@ -286,13 +286,13 @@ function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
 function endLabels(bundle: CourseBundle): MapLabel[] {
   const line = bundle.measured.course_line;
   const last = line.km.length - 1;
-  const place = (text: string, i: number): MapLabel => ({ lat: line.lat[i], lon: line.lon[i], roadHeightM: line.ellipsoid_height_m[i], text, look: "place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
+  const place = (text: string, i: number): MapLabel => ({ ...positionAtKm(line, line.km[i]), text, look: "place", priority: Number.POSITIVE_INFINITY, onPick: () => scrubTo(line.km[i]) });
   return [place("Start", 0), place("Finish", last)];
 }
 
 function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
   const at = positionAtKm(bundle.measured.course_line, label.atKm);
-  return { lat: at.lat, lon: at.lon, roadHeightM: at.roadHeightM, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
+  return { ...at, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
 }
 
 /** Scrubbing: the strip's cursor, the readout, the sentence, the runner on the map and the sun, moved as one. */

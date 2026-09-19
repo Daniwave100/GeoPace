@@ -79,21 +79,22 @@ export function registerCourseRibbon(): void {
   new Material({ fabric: { type: TYPE, uniforms: uniformsFor(null, 1), source: SOURCE } });
 }
 
-/** How wide the line for a stretch is: the plain course, or as wide as the layer's mark. */
-export function ribbonWidthPx(mark: MarkLook | null): number {
-  return mark ? mark.widthPx : COURSE_WIDTH_PX;
+/** How wide the line for a stretch is: the plain course, or as wide as the look of the layer's mark. */
+export function ribbonWidthPx(look: MarkLook | null): number {
+  return look ? look.widthPx : COURSE_WIDTH_PX;
 }
 
 /**
- * What CesiumJS's entities take as a line's material. `strength` is 1 for the line as it is, less
- * for what is left of it where something stands in front (placement.ts).
+ * What CesiumJS's entities take as a line's material. `look` is how the layer's mark on this
+ * stretch is drawn, or null for the plain course. `strength` is 1 for the line as it is, less for
+ * what is left of it where something stands in front (placement.ts).
  */
 export class CourseRibbonProperty implements MaterialProperty {
   readonly isConstant = true;
   readonly definitionChanged = new Event();
 
   constructor(
-    readonly mark: MarkLook | null,
+    readonly look: MarkLook | null,
     readonly strength: number,
   ) {}
 
@@ -102,16 +103,21 @@ export class CourseRibbonProperty implements MaterialProperty {
   }
 
   getValue(_time?: JulianDate, result: Record<string, unknown> = {}): Record<string, unknown> {
-    return Object.assign(result, uniformsFor(this.mark, this.strength));
+    return Object.assign(result, uniformsFor(this.look, this.strength));
   }
 
   /** CesiumJS draws lines whose materials are equal in one go, so this is worth getting right: ten shades of hill, not 327 lines. */
   equals(other?: unknown): boolean {
-    return other instanceof CourseRibbonProperty && other.strength === this.strength && JSON.stringify(other.mark) === JSON.stringify(this.mark);
+    return other instanceof CourseRibbonProperty && other.strength === this.strength && sameLook(other.look, this.look);
   }
 }
 
-function uniformsFor(mark: MarkLook | null, strength: number): Record<string, unknown> {
+function sameLook(a: MarkLook | null, b: MarkLook | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.widthPx === b.widthPx && a.color === b.color && a.edge === b.edge && a.edgePx === b.edgePx && a.gap === b.gap && a.rimPx === b.rimPx;
+}
+
+function uniformsFor(look: MarkLook | null, strength: number): Record<string, unknown> {
   const core = {
     coreColor: Color.fromCssColorString(COURSE_BLUE),
     coreEdgeColor: Color.fromCssColorString(COURSE_EDGE),
@@ -121,18 +127,18 @@ function uniformsFor(mark: MarkLook | null, strength: number): Record<string, un
     strength,
   };
   // The plain course: nothing beside the white edge, so "beside" is more of the white edge.
-  if (!mark) return { ...core, bandColor: core.coreEdgeColor, dashColor: Color.TRANSPARENT, dashEndPx: COURSE_WIDTH_PX / 2, edgeColor: core.coreEdgeColor, edgePx: 0 };
+  if (!look) return { ...core, bandColor: core.coreEdgeColor, dashColor: Color.TRANSPARENT, dashEndPx: COURSE_WIDTH_PX / 2, edgeColor: core.coreEdgeColor, edgePx: 0 };
   // A mark's edge is `edgePx` in all, half on each side, as CesiumJS's own outlined line counts it.
-  const edgePx = mark.edgePx / 2;
-  const dashed = mark.gap !== null;
+  const edgePx = look.edgePx / 2;
+  const dashed = look.gap !== null;
   return {
     ...core,
     // A solid mark is its colour right up to the edge. A dashed one is a band in the colour
     // between the dashes, with the dashes stopping short of the edge by the rim (mark-look.ts).
-    bandColor: Color.fromCssColorString(dashed ? (mark.gap as string) : mark.color),
-    dashColor: dashed ? Color.fromCssColorString(mark.color) : Color.TRANSPARENT,
-    dashEndPx: mark.widthPx / 2 - edgePx - (dashed ? mark.rimPx : 0),
-    edgeColor: Color.fromCssColorString(mark.edge),
+    bandColor: Color.fromCssColorString(look.gap ?? look.color),
+    dashColor: dashed ? Color.fromCssColorString(look.color) : Color.TRANSPARENT,
+    dashEndPx: look.widthPx / 2 - edgePx - (dashed ? look.rimPx : 0),
+    edgeColor: Color.fromCssColorString(look.edge),
     edgePx,
   };
 }

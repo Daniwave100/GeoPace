@@ -16,7 +16,7 @@ between the two is a do-nothing placeholder. Measured on 2026-09-18 along both c
 comes out 0.21 m above Germany's official GCG2016 everywhere in Berlin, and about 0.37 m above
 GEOID18 plus that frame step in New York (NAVD88 is known to sit about half a meter off global
 models). Both are inside what the line is drawn against: Google publishes no height reference or
-accuracy for its photographed city, and the app floats the line a little above the road anyway.
+accuracy for its photographed city, and the app lifts the line a little above the road anyway.
 
 The grid is the 2.5-arc-minute one (a value every ~4.6 km north-south), as a GeoTIFF from the
 PROJ project's file server: 80 MB, downloaded once into the cache. Its rows run north to south,

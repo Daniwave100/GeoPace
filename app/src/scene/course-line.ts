@@ -5,12 +5,13 @@
 // (core/encoding.ts) and, for a hill, by how steep it is (core/mark-look.ts). This file turns
 // that into things CesiumJS can draw: one line per stretch (core/course-stretches.ts), draped or
 // at the road's own height (placement.ts).
-import { Color, type Entity, type EntityCollection, HeightReference, type JulianDate } from "cesium";
+import { Color, type Entity, type EntityCollection, type JulianDate } from "cesium";
 import type { CourseBundle, CourseLine } from "../bundle/types";
 import { courseStretches } from "../core/course-stretches";
 import type { LineMark } from "../core/layers";
 import { markLook } from "../core/mark-look";
-import { type Placement, scenePosition, stretchGraphics } from "./placement";
+import { positionAtKm } from "../core/scrub";
+import { heightReference, type Placement, scenePosition, stretchGraphics } from "./placement";
 
 /** As much of the CesiumJS viewer as drawing the course and the runner touches: the list of what is drawn, and the clock. */
 export interface SceneForCourse {
@@ -29,21 +30,16 @@ export function showCourseLine(viewer: SceneForCourse, bundle: CourseBundle, mar
   drawn.set(viewer, [
     ...stretches.map((stretch) => {
       const look = stretch.mark ? markLook(stretch.mark.encoding, stretch.mark.howMuch) : null;
-      return viewer.entities.add({ name: `${bundle.course.name} course`, polyline: stretchGraphics(line, stretch.first, stretch.last, look, placement, stretch.measured) });
+      return viewer.entities.add({ name: `${bundle.course.name} course`, polyline: stretchGraphics(line, stretch, look, placement) });
     }),
-    endDot(viewer, line, 0, placement),
-    endDot(viewer, line, line.km.length - 1, placement),
+    endDot(viewer, line, line.km[0], placement),
+    endDot(viewer, line, line.km[line.km.length - 1], placement),
   ]);
 }
 
-function endDot(viewer: SceneForCourse, line: CourseLine, sample: number, placement: Placement): Entity {
+function endDot(viewer: SceneForCourse, line: CourseLine, km: number, placement: Placement): Entity {
   return viewer.entities.add({
-    position: scenePosition({ lat: line.lat[sample], lon: line.lon[sample], roadHeightM: line.ellipsoid_height_m[sample] }, placement),
+    position: scenePosition(positionAtKm(line, km), placement),
     point: { pixelSize: 8, color: Color.WHITE, outlineColor: Color.BLACK, outlineWidth: 3, heightReference: heightReference(placement), disableDepthTestDistance: Number.POSITIVE_INFINITY },
   });
-}
-
-/** A dot clamped to the ground and one standing at a height are different things to CesiumJS. */
-export function heightReference(placement: Placement): HeightReference {
-  return placement === "draped" ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE;
 }

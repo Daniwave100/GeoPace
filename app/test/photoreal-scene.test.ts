@@ -199,14 +199,15 @@ describe("where the course is drawn, as the imagery comes and goes", () => {
       expect(last(placements)).toBe("draped");
     });
 
-    it("the provider refuses the key: the line never left the ground", async () => {
-      const placements: string[] = ["draped"];
+    it("the provider refuses the key: there is never any imagery to take the ground's place, so nothing can move the line", async () => {
+      const viewer = fakeViewer();
       const controller = createPhotoreal({ storage: fakeStorage(), loadTiles: async () => Promise.reject(Object.assign(new Error("no"), { statusCode: 403 })) });
 
       await controller.useKey(GOOGLE.secret);
 
       expect(controller.state).toMatchObject({ look: "keyless", problem: "refused" });
-      expect(placements).toEqual(["draped"]);
+      expect(viewer.drawn).toEqual([]);
+      expect(viewer.scene.globe.show).toBe(true);
     });
 
     it("Forget my key", async () => {

@@ -6,9 +6,10 @@
 //
 // Google's terms (PLAN.md D5, §9): the imagery is for looking at only. Nothing here or anywhere
 // else stores it, works anything out from it, or fetches tiles the camera isn't looking at. The
-// course line and the runner are our own things drawn over it, which Google's policies allow; while
-// the imagery is in place they are drawn at the road's height from our own survey data, and never
-// rested on, or measured against, the imagery's surface (scene/placement.ts, issue #22).
+// course line and the runner are our own things drawn over it, which Google's policies allow. They
+// are never rested on, or measured against, the imagery's surface: while it is in place they are
+// at road height from our own survey data, and while it is still arriving they stay draped on our
+// own open terrain (scene/placement.ts, issue #22).
 import { Cesium3DTileset, createGooglePhotorealistic3DTileset, IonResource } from "cesium";
 import type { OwnKey } from "../photoreal/key";
 import type { PhotorealTiles } from "../photoreal/photoreal";
@@ -48,7 +49,7 @@ export async function requestPhotorealTileset(key: OwnKey): Promise<Cesium3DTile
 }
 
 /** One Load: ask the provider for the imagery, ready to be shown in this viewer. `onInPlace` as for `photorealTiles`. */
-export async function loadPhotorealTiles(viewer: SceneForPhotoreal, key: OwnKey, onInPlace: (inPlace: boolean) => void = () => undefined): Promise<PhotorealTiles> {
+export async function loadPhotorealTiles(viewer: SceneForPhotoreal, key: OwnKey, onInPlace: (inPlace: boolean) => void): Promise<PhotorealTiles> {
   return photorealTiles(viewer, await requestPhotorealTileset(key), onInPlace);
 }
 
