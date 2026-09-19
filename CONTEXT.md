@@ -38,7 +38,7 @@ A named, sourced place on the course.
 _Avoid_: point of interest, marker
 
 **Stop**:
-A place the Ride slows down for: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). For a stretch, the Stop is where it begins.
+A place the Ride slows down for: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). For a stretch, the Ride arrives where it begins, and stays slow to where it ends.
 _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 
 ### The runner's plan
