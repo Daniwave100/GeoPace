@@ -83,9 +83,16 @@ export interface RideScene {
   notMeasured: NotMeasuredSpan[];
 }
 
+/** A place in the 3D scene: `heightM` is above the ellipsoid, where the scene counts heights from. */
+export interface ScenePlace {
+  lat: number;
+  lon: number;
+  heightM: number;
+}
+
 export interface RideView {
-  /** Where the camera is. `heightM` is above the ellipsoid: where the 3D scene counts heights from. */
-  eye: { lat: number; lon: number; heightM: number };
+  /** Where the camera is. */
+  eye: ScenePlace;
   /** Which way it looks: degrees clockwise from true north. */
   headingDeg: number;
   /** Degrees above the horizon: negative looks down. */
@@ -188,12 +195,28 @@ function facingsAlong(line: CourseLine): Float64Array {
   return facings;
 }
 
+/**
+ * The road's height at a place on the course: whatever the caller says it is (the open terrain the
+ * course is draped on, which has no bridge in it to crest), or else the Course Bundle's own, and
+ * over a stretch where that is filled in, our estimate of how far the real road crests above it.
+ */
+function roadHeightM(scene: RideScene, place: RoadPosition, atKm: number, options: RideViewOptions): number {
+  return options.heightAt?.(place) ?? place.ellipsoidHeightM + crestOverTheFillM(scene, atKm);
+}
+
+/**
+ * Where the runner is in the scene: on the course line, at the road's height there. What free look
+ * turns the camera round (issue #28, PLAN.md D54), and the same height the Ride's own cameras ride
+ * over; ⛔ never read from photoreal imagery (PLAN.md D5).
+ */
+export function runnerInTheScene(scene: RideScene, km: number, options: RideViewOptions = {}): ScenePlace {
+  const runner = positionAtKm(scene.line, km);
+  return { lat: runner.lat, lon: runner.lon, heightM: roadHeightM(scene, runner, km, options) };
+}
+
 export function rideView(scene: RideScene, km: number, camera: RideCamera, options: RideViewOptions = {}): RideView {
   const { line } = scene;
-  // The road's height at a place on the course: whatever the caller says it is (the open terrain the
-  // course is draped on, which has no bridge in it to crest), or else the Course Bundle's own, and
-  // over a stretch where that is filled in, our estimate of how far the real road crests above it.
-  const roadM = (place: RoadPosition, atKm: number) => options.heightAt?.(place) ?? place.ellipsoidHeightM + crestOverTheFillM(scene, atKm);
+  const roadM = (place: RoadPosition, atKm: number) => roadHeightM(scene, place, atKm, options);
   const runner = positionAtKm(line, km);
   const headingDeg = headingAt(line, km, camera);
 

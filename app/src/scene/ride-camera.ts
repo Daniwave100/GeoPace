@@ -1,8 +1,8 @@
 // The Ride's camera in the 3D scene (issue #8). Where it should be is worked out in
 // core/ride-view.ts from the course line alone; this file only takes CesiumJS's camera there.
 //
-// From the moment the Ride takes the camera until the runner takes the map, the camera is the
-// Ride's, and it is put where the Ride wants it before every frame is drawn, playing or paused:
+// From the moment the Ride takes the camera until free look or the map's own buttons take it, the
+// camera is the Ride's, and it is put where the Ride wants it before every frame, playing or paused:
 //  - the view is asked for afresh each frame, so the road's height under it follows our terrain as
 //    finer tiles arrive, and the imagery as it comes and goes, with nobody having to say so;
 //  - and whatever else moves the camera in between is undone before anyone sees it. CesiumJS
@@ -12,24 +12,43 @@
 // The Ride says whether it simply rode on, in which case the camera is put there, or is somewhere
 // else (its start, Back, the other camera, a scrub, Play after the runner looked around), in which
 // case the camera gets there in a moment's glide rather than a cut; with reduced motion asked
-// for, it is a cut. Paused, the map is the runner's the instant they touch it: `letGo`.
+// for, it is a cut. Leaving the Ride gives the map back: `letGo`.
+//
+// The other way the camera follows the runner is free look (`lookAround`, issue #28, PLAN.md D54):
+// a hand on the map turns the camera round the runner while the Ride plays on. There the camera is
+// tied to a frame of reference that sits on the runner (east, north, up), and before every frame
+// the frame is moved to where the runner now is while the camera keeps its place within it. That
+// is what CesiumJS does for a tracked entity, and its own mouse controls, finding a camera tied to
+// a frame, orbit the frame's origin rather than the globe: there is no control code of ours. What
+// is ours is where the runner is (never read from photoreal imagery, PLAN.md D5), how far the
+// camera may be taken from them, and setting the frame back the moment the camera is anyone
+// else's, without which every flight and every view of the map afterwards is counted from the
+// runner instead of from the world.
 //
 // Nothing here waits for a tile. On the keyless map the road's height is asked of our own open
 // terrain, and where that has no answer the Course Bundle's own height is used. Photoreal imagery
 // is never asked anything.
-import { Cartesian3, Cartographic, type Event, Math as CesiumMath } from "cesium";
+import { Cartesian3, Cartographic, type Event, Math as CesiumMath, Matrix4, Transforms } from "cesium";
 import { relativeBearing } from "../core/bearing";
 import type { HowItMoved } from "../core/ride";
-import type { HeightAt, RideView } from "../core/ride-view";
+import type { HeightAt, RideView, ScenePlace } from "../core/ride-view";
 
 /** As much of the CesiumJS viewer as the Ride's camera touches. */
 export interface SceneForRide {
   camera: {
     readonly positionCartographic: Cartographic;
+    /** Where the camera is within the frame it is tied to: metres east, north and up of the runner while free look has it, and where it is in the world otherwise. */
+    readonly position: Cartesian3;
     readonly heading: number;
     readonly pitch: number;
     setView(options: { destination: Cartesian3; orientation: { heading: number; pitch: number; roll: number } }): void;
     cancelFlight(): void;
+    /**
+     * Tie the camera to a frame of reference, or, with `Matrix4.IDENTITY`, set it back to the
+     * world. Given an offset the camera is put there within the frame, looking at its origin;
+     * given none it stays exactly where it is, and its place is counted within the frame from now on.
+     */
+    lookAtTransform(transform: Matrix4, offset?: Cartesian3): void;
   };
   scene: { preRender: Event };
 }
@@ -43,12 +62,19 @@ export interface RideCameraOptions {
 
 export interface CameraInTheScene {
   /**
-   * Hold the camera on the Ride. `view` is asked again before every frame until the next `follow`
-   * or `letGo`. `how` is what the Ride just did: "riding", it moved on and the camera is put there;
-   * "jump", it is somewhere else and the camera glides there (or cuts, with reduced motion).
+   * Hold the camera on the Ride. `view` is asked again before every frame until the next `follow`,
+   * `lookAround` or `letGo`. `how` is what the Ride just did: "riding", it moved on and the camera
+   * is put there; "jump", it is somewhere else and the camera glides there (or cuts, with reduced
+   * motion). Coming out of free look it is a jump, so the camera glides back.
    */
   follow(view: () => RideView, how: HowItMoved): void;
-  /** The runner has taken hold of the map, or the Ride is over: the camera is theirs from this moment, even in the middle of a glide. */
+  /**
+   * Free look: the camera is the runner's to turn from now on, tied to wherever `runner` says they
+   * are, which is asked again before every frame. A drag orbits them, a scroll moves in and out,
+   * and the Ride plays on. Called again while it is already on, it only takes the new runner.
+   */
+  lookAround(runner: () => ScenePlace): void;
+  /** The Ride is over, or the map is someone else's to fly: the camera is untied and left where it is, even in the middle of a glide. */
   letGo(): void;
 }
 
@@ -60,13 +86,46 @@ const MOST_RISE_M = 1200;
 /** Closer to the view than this, in metres and in degrees, the camera is there already: nothing to glide. */
 const THERE = { meters: 1, degrees: 1 };
 
+/**
+ * Free look's bounds. CesiumJS's controls orbit the frame's origin and stop at nothing: dragged
+ * far enough the camera goes under the road, or out over the next county with the runner a speck.
+ * So the camera is kept between these: `lowestDeg` above the runner's own level (On the road's
+ * camera, 3 m up and 25 m behind, sits at about 7°, so the bound is under every view the Ride
+ * hands over), `highestDeg` short of straight down, where which way round the camera is stops
+ * meaning anything, and between `nearestM` and `farthestM` of them. Only what is outside is moved:
+ * the view the runner turned to is theirs.
+ *
+ * The angle is measured at the runner's own level, so it keeps the camera out of the road *there*;
+ * what keeps it out of a hillside between the two is CesiumJS's own collision, which free look
+ * leaves alone, since in free look the camera's place is whatever those controls left (which is
+ * also why free look over photoreal is unknown until the owner's key shows it: D54).
+ *
+ * `centringSeconds` is what the one turn of free look's own takes: From above holds the runner off
+ * the middle of the map (the readout block covers its left, core/framing.ts) and free look orbits
+ * them, so entering it carries them to the middle over that half second instead of snapping.
+ */
+export const FREE_LOOK = { nearestM: 15, farthestM: 6000, lowestDeg: 5, highestDeg: 85, centringSeconds: 0.5 };
+
+/** The camera tied to the runner: free look. */
+interface Tied {
+  runner: () => ScenePlace;
+  /** Where the camera was looking when free look began, metres east and north of the runner: what the one turn of its own brings to the middle. */
+  offCentre: Cartesian3;
+  startedMs: number;
+  /** How much of `offCentre` the frame the camera was tied to last frame carried: 0 as free look begins (the frame was put on the runner), then the turn's own share of it. */
+  carriedLastFrame: number;
+}
+
 export function createRideCamera(viewer: SceneForRide, options: RideCameraOptions): CameraInTheScene {
   const { camera } = viewer;
-  /** Where the Ride wants the camera, asked each frame; null while the camera is the runner's. */
+  /** Where the Ride wants the camera, asked each frame; null while the camera is the runner's or anyone else's. */
   let wanted: (() => RideView) | null = null;
   let glide: { from: RideView; startedMs: number; riseM: number } | null = null;
+  /** The runner the camera is tied to while free look has it; null otherwise. */
+  let tied: Tied | null = null;
 
   viewer.scene.preRender.addEventListener(() => {
+    if (tied) return holdOnTheRunner(tied);
     if (!wanted) return;
     const view = wanted();
     if (!glide) return put(view);
@@ -77,6 +136,35 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
     if (t >= 1) glide = null;
   });
 
+  /**
+   * Free look, before a frame: the frame of reference is put where the runner now is, and the
+   * camera keeps the place it holds from the runner, bounded, looking at the frame's origin.
+   *
+   * Which is the runner, once the one turn of free look's own is done. Until then the origin sits
+   * a little off them, where the camera was looking when free look began, and closes that gap: the
+   * camera doesn't move at all through it, it turns. What the runner's hand left the camera at is
+   * read within the frame of the frame before, so a hand on the map in the middle of that turn is
+   * still their own drag and nothing else.
+   */
+  function holdOnTheRunner(tie: Tied): void {
+    const along = options.reducedMotion() ? 1 : Math.min((options.now() - tie.startedMs) / (FREE_LOOK.centringSeconds * 1000), 1);
+    const toCome = 1 - along * along * (3 - 2 * along); // how much of the turn is still to come: even at both ends, so neither end of it is a jolt
+    // Where the camera stands from the runner: the place the hand left it at, which is counted
+    // within last frame's own frame, and that frame's origin was this much off the runner.
+    const fromRunner = keptNearTheRunner(Cartesian3.add(camera.position, Cartesian3.multiplyByScalar(tie.offCentre, tie.carriedLastFrame, new Cartesian3()), new Cartesian3()));
+    const offCentre = Cartesian3.multiplyByScalar(tie.offCentre, toCome, new Cartesian3());
+    const frame = Matrix4.multiplyByTranslation(frameOn(tie.runner()), offCentre, new Matrix4());
+    tie.carriedLastFrame = toCome;
+    camera.lookAtTransform(frame, Cartesian3.subtract(fromRunner, offCentre, fromRunner));
+  }
+
+  /** Untie the camera from the runner: it stays exactly where it is, in the world. */
+  function untie(): void {
+    if (!tied) return;
+    tied = null;
+    camera.lookAtTransform(Matrix4.IDENTITY);
+  }
+
   function put(view: RideView): void {
     camera.setView({
       destination: Cartesian3.fromDegrees(view.eye.lon, view.eye.lat, view.eye.heightM),
@@ -86,6 +174,7 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
 
   return {
     follow(view, how) {
+      untie(); // a glide is a move through the world, and so is every view the Ride asks for
       wanted = view;
       if (options.reducedMotion()) glide = null;
       else if (how === "jump") {
@@ -97,11 +186,68 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
         if (glide) camera.cancelFlight();
       }
     },
+    lookAround(runner) {
+      if (tied) {
+        tied.runner = runner; // dragged again, or a new course: the camera is already theirs
+        return;
+      }
+      wanted = null;
+      glide = null;
+      camera.cancelFlight();
+      // With no offset the camera stays exactly where it is in the world, and its place is counted
+      // within the frame from now on: which is what `whereItIsLooking` then reads.
+      camera.lookAtTransform(frameOn(runner()));
+      tied = { runner, offCentre: whereItIsLooking(camera), startedMs: options.now(), carriedLastFrame: 0 };
+    },
     letGo() {
+      untie();
       wanted = null;
       glide = null;
     },
   };
+}
+
+/** The frame of reference that sits on a place: east, north and up, in metres, from there. */
+function frameOn(at: ScenePlace): Matrix4 {
+  return Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(at.lon, at.lat, at.heightM));
+}
+
+/**
+ * Where a camera that has just been tied to a frame is looking, as metres east and north of the
+ * frame's origin: where its view meets the level of the origin. Nothing where it looks level or
+ * up, or where it stands at the origin's own level; and never further off than half the ground
+ * between them, past which the view may as well simply centre what it is tied to.
+ */
+function whereItIsLooking(camera: SceneForRide["camera"]): Cartesian3 {
+  const at = camera.position;
+  const down = -camera.pitch;
+  if (down <= 0 || at.z <= 0) return new Cartesian3();
+  const alongM = at.z / Math.tan(down);
+  const off = new Cartesian3(at.x + alongM * Math.sin(camera.heading), at.y + alongM * Math.cos(camera.heading), 0);
+  const offM = Math.hypot(off.x, off.y);
+  const mostM = Math.hypot(at.x, at.y) / 2;
+  return offM > mostM ? Cartesian3.multiplyByScalar(off, mostM / offM, off) : off;
+}
+
+/**
+ * A place within the runner's frame, kept where the runner can still be seen (`FREE_LOOK`): out of
+ * the road, off the runner's own head, and near enough that they are not a speck. What is already
+ * within the bounds is kept exactly as it is, so that the camera doesn't creep frame by frame.
+ * Always a place of its own: CesiumJS moves the camera's own place into the new frame before it
+ * reads the one it is given, so handing it back its own would leave it behind the runner.
+ */
+function keptNearTheRunner(at: Cartesian3): Cartesian3 {
+  const awayM = Cartesian3.magnitude(at);
+  const flatM = Math.hypot(at.x, at.y);
+  const lowest = CesiumMath.toRadians(FREE_LOOK.lowestDeg);
+  const highest = CesiumMath.toRadians(FREE_LOOK.highestDeg);
+  const climbed = awayM === 0 ? lowest : Math.asin(at.z / awayM);
+  if (awayM >= FREE_LOOK.nearestM && awayM <= FREE_LOOK.farthestM && climbed >= lowest && climbed <= highest) return Cartesian3.clone(at, new Cartesian3());
+  // Which way round the runner the camera is, is the runner's own: only how far off and how high are bounded.
+  const round = flatM === 0 ? Math.PI : Math.atan2(at.x, at.y); // straight over the runner, it comes down to the south, where From above stands
+  const away = CesiumMath.clamp(awayM, FREE_LOOK.nearestM, FREE_LOOK.farthestM);
+  const up = CesiumMath.clamp(climbed, lowest, highest);
+  return new Cartesian3(away * Math.cos(up) * Math.sin(round), away * Math.cos(up) * Math.cos(round), away * Math.sin(up));
 }
 
 function whereItIs(camera: SceneForRide["camera"]): RideView {

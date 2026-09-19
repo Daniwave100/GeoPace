@@ -6,15 +6,21 @@
 // screen; at the top, because the bottom of the map is the map's own credits, the near end of the
 // course, and, On the road, the road. What the Ride does is decided in core/ride.ts; this only
 // shows it and passes the presses on.
-import type { RideCamera } from "../core/ride";
+//
+// The two cameras are three choices (issue #28, PLAN.md D54): the Ride's two, and Look around, the
+// camera the runner turns themselves. A hand on the map chooses that one, and choosing either of
+// the others is how the camera is handed back to the Ride.
+import { type RideCamera, RIDE_CAMERAS } from "../core/ride";
 import { html } from "../dom";
-import { segmented } from "../segmented";
+import { type Choice, segmented } from "../segmented";
 
 export interface RideActions {
   playPause(): void;
   back(): void;
   rideToNextStop(): void;
   useCamera(camera: RideCamera): void;
+  /** The camera is the runner's to turn: what a hand on the map does, and what this says out loud for anyone not using one. */
+  lookAround(): void;
   leave(): void;
 }
 
@@ -23,6 +29,8 @@ export interface RideShowing {
   on: boolean;
   playing: boolean;
   camera: RideCamera;
+  /** Whether the camera is the runner's to turn rather than the Ride's (core/ride.ts). */
+  freeLook: boolean;
   /** "Stop 9 of 18: Ed Koch Queensboro Bridge", or "Next stop: Barclays Center, in 7.1 km". */
   stopLine: string;
   /** The Stop the runner is on, as it is said aloud on arriving; null between Stops. */
@@ -36,9 +44,13 @@ export interface RideControls {
   show(showing: RideShowing): void;
 }
 
-const CAMERAS: { camera: RideCamera; label: string }[] = [
-  { camera: "from-above", label: "From above" },
-  { camera: "on-the-road", label: "On the road" },
+/** The third choice beside the two cameras: not one of the Ride's, so not a `RideCamera`. */
+const LOOK_AROUND = "look-around";
+
+const CAMERAS: Choice[] = [
+  { value: "from-above", label: "From above", explained: "" },
+  { value: "on-the-road", label: "On the road", explained: "" },
+  { value: LOOK_AROUND, label: "Look around", explained: "drag the map to turn the camera round yourself; the Ride plays on" },
 ];
 
 export function createRideControls(dock: HTMLElement, actions: RideActions): RideControls {
@@ -73,8 +85,12 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   const cameras = segmented(
     "Camera",
     "ride-camera",
-    CAMERAS.map(({ camera, label }) => ({ value: camera, label, explained: "" })),
-    (value) => actions.useCamera(value as RideCamera),
+    CAMERAS,
+    (value) => {
+      const picked = RIDE_CAMERAS.find((camera) => camera === value);
+      if (picked) actions.useCamera(picked);
+      else actions.lookAround();
+    },
     "ride-cameras",
   );
   const player = html(
@@ -109,7 +125,7 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
       // A button that stops applying keeps the focus it has: `aria-disabled`, not `disabled`, which would drop it.
       back.setAttribute("aria-disabled", String(!showing.canGoBack));
       next.setAttribute("aria-disabled", String(!showing.canRideOn));
-      cameras.check(showing.camera);
+      cameras.check(showing.freeLook ? LOOK_AROUND : showing.camera);
     },
   };
 }

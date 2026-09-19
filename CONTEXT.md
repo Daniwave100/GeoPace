@@ -85,6 +85,10 @@ _Avoid_: flyover, tour, playback, video, walkthrough
 The Ride's two cameras. From above looks down on the runner from the air; On the road follows from a few metres up and behind, the way a lead vehicle films a race.
 _Avoid_: bird's-eye mode, drive cam, runner's-eye, first-person
 
+**Free look**:
+The camera in the Ride while it is the runner's to turn rather than the Ride's: a hand on the map orbits the runner, a scroll moves in and out, and the Ride plays on. The player calls it **Look around**, beside the two cameras; picking either of them hands the camera back to the Ride. It is still a camera that follows the runner: it never becomes the free map, which is Explore's.
+_Avoid_: free cam, orbit mode, manual camera, detached camera
+
 **Time-lapse**:
 How the Ride passes the course: far quicker than any runner, and gentler On the road than From above. From above it is one pace from start to finish; On the road it is quick between Stops, slow at them, and slows into corners.
 _Avoid_: fast-forward, speed-up, animation
@@ -93,7 +97,7 @@ _Avoid_: fast-forward, speed-up, animation
 The time-lapse's speed on the open road between Stops. From above it is the Ride's speed everywhere.
 
 **Player**:
-The Ride's controls, on the top of the map: Back, play or pause, Ride to the next stop, the two cameras, and Back to the map. In Explore the same place holds the one button, "Ride the course".
+The Ride's controls, on the top of the map: Back, play or pause, Ride to the next stop, which camera (the two, and Look around), and Back to the map. In Explore the same place holds the one button, "Ride the course".
 _Avoid_: transport bar, toolbar, media controls
 
 **Glide**:

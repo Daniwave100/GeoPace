@@ -656,3 +656,109 @@ describe("the Ride as a mode of the screen", () => {
     expect(ride.on).toBe(false);
   });
 });
+
+// Issue #28: in the Ride the camera always follows the runner, either as the Ride's own camera or
+// as the runner's own to turn. This is the second of those as far as the Ride itself knows it: a
+// hand on the map in the Ride, and the way back. What the camera then does is in scene/ride-camera.ts.
+describe("free look", () => {
+  it("is not on until a hand is on the map, and a hand in Explore doesn't start it", () => {
+    const { ride } = rideOn(nyc);
+
+    ride.lookAround(); // Explore: the map is the map, and there is no runner to turn round
+    expect(ride.freeLook).toBe(false);
+
+    ride.playPause();
+    ride.lookAround();
+    expect(ride.freeLook).toBe(true);
+  });
+
+  it("leaves the Ride playing, at the pace of the camera it was entered from", () => {
+    const { ride, run } = rideOn(nyc);
+    ride.useCamera("on-the-road");
+    ride.playPause();
+    run(1);
+    const before = ride.km;
+
+    ride.lookAround();
+    run(1);
+
+    expect(ride.playing).toBe(true);
+    expect(ride.camera).toBe("on-the-road"); // the time-lapse is the one it was entered from
+    expect(ride.km - before).toBeCloseTo(rideSpeedKmPerS(nyc, before, "on-the-road"), 2);
+  });
+
+  it("is given back to the Ride by choosing a camera, the one the Ride is already on included", () => {
+    const { ride, changes } = rideOn(nyc);
+    ride.playPause();
+    ride.lookAround();
+    const told = changes();
+
+    // The player shows free look as a third choice beside the two cameras, so the way back is
+    // choosing one of them; the one already chosen is the commonest press of the two.
+    ride.useCamera("from-above");
+
+    expect(ride.freeLook).toBe(false);
+    expect(ride.camera).toBe("from-above");
+    expect(changes()).toBe(told + 1); // the player has to hear about it: its choice has moved
+  });
+
+  it("tells the controls when it comes and when it goes, and says nothing when a hand is on the map again", () => {
+    const { ride, changes } = rideOn(nyc);
+    ride.playPause();
+    const told = changes();
+
+    ride.lookAround();
+    expect(changes()).toBe(told + 1);
+    ride.lookAround(); // the runner drags again, and again: the camera is already theirs
+    ride.lookAround();
+    expect(changes()).toBe(told + 1);
+
+    ride.useCamera("on-the-road");
+    expect(changes()).toBe(told + 2);
+  });
+
+  it("stays through a pause, a scrub, Back and a Ride to the next stop: the camera goes on following the runner", () => {
+    const { ride, run } = rideOn(nyc);
+    ride.playPause();
+    run(2);
+    ride.lookAround();
+
+    ride.playPause(); // paused, a hand on the map is still free look: one rule
+    expect(ride.freeLook).toBe(true);
+    ride.scrubbedTo(20);
+    expect(ride.freeLook).toBe(true);
+    ride.back();
+    expect(ride.freeLook).toBe(true);
+    ride.rideToNextStop();
+    run(1);
+    expect(ride.freeLook).toBe(true);
+  });
+
+  it("is handed back by the map's own buttons without changing which camera the Ride is on", () => {
+    const { ride, changes } = rideOn(nyc);
+    ride.useCamera("on-the-road");
+    ride.playPause();
+    ride.lookAround();
+    const told = changes();
+
+    ride.handTheCameraBack(); // Whole course, Where I am, zoom, Straight down, the arrow keys
+
+    expect(ride.freeLook).toBe(false);
+    expect(ride.camera).toBe("on-the-road");
+    expect(changes()).toBe(told + 1);
+    ride.handTheCameraBack(); // and again: the camera is the Ride's already, and the player has nothing to hear
+    expect(changes()).toBe(told + 1);
+  });
+
+  it("is over when the runner leaves the Ride: the next Ride starts on the Ride's own camera", () => {
+    const { ride } = rideOn(nyc);
+    ride.playPause();
+    ride.lookAround();
+
+    ride.leave();
+
+    expect(ride.freeLook).toBe(false);
+    ride.playPause();
+    expect(ride.freeLook).toBe(false);
+  });
+});

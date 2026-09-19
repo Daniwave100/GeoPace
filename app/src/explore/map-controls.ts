@@ -8,12 +8,14 @@ import { html } from "../dom";
 import { isLookingStraightDown, panMap, zoomMap } from "../scene/globe";
 
 /** Said by a screen reader on the map, and printed in the small print under the strip. */
-export const MAP_HELP = "Drag to move, scroll to zoom, Ctrl + drag to tilt. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back, F gives the map the full screen.";
+export const MAP_HELP =
+  "Drag to move, scroll to zoom, Ctrl + drag to tilt. In the Ride, dragging turns the camera round you instead and scrolling moves it in and out, while the Ride plays on. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back, F gives the map the full screen.";
 
 export interface MapActions {
   /**
    * Called before any of these buttons or keys moves the map: a Ride that is playing gives way to
-   * it (issue #8). Full map moves nothing, so it isn't one of them: the Ride plays on.
+   * it, free look included (issues #8, #28). Full map moves nothing, so it isn't one of them: the
+   * Ride plays on.
    */
   takesTheMap(): void;
   wholeCourse(): void;

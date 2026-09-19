@@ -8,7 +8,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import type { CourseLine } from "../src/bundle/types";
 import { relativeBearing } from "../src/core/bearing";
 import { type RideCamera, rideSpeedKmPerS } from "../src/core/ride";
-import { ON_THE_ROAD_HEIGHT_M, rideCourseFor, type RideScene, rideView } from "../src/core/ride-view";
+import { ON_THE_ROAD_HEIGHT_M, rideCourseFor, type RideScene, rideView, runnerInTheScene } from "../src/core/ride-view";
 import { positionAtKm } from "../src/core/scrub";
 import { stopsFor } from "../src/core/stops";
 
@@ -343,5 +343,45 @@ describe("From above", () => {
       expect(swing.atItsSlowestM).toBe(0);
       expect(swing.fastestAtItsSlowestDegPerS).toBe(0);
     }
+  });
+});
+
+// What free look orbits (issue #28): the runner on the road, at the road's own height. The same
+// heights the Ride's own cameras ride over, from the same places — the Course Bundle, or the open
+// terrain the course is draped on — and never anything read from photoreal imagery (PLAN.md D5).
+describe("where the runner is in the scene", () => {
+  it("is the place on the course line, at the road's own height above the ellipsoid", () => {
+    const place = runnerInTheScene(berlin, 10);
+    const onTheLine = positionAtKm(berlin.line, 10);
+
+    expect(place.lat).toBeCloseTo(onTheLine.lat, 9);
+    expect(place.lon).toBeCloseTo(onTheLine.lon, 9);
+    expect(place.heightM).toBeCloseTo(onTheLine.ellipsoidHeightM, 6);
+    expect(place.heightM).toBeGreaterThan(70); // Berlin's streets, 30 to 50 m above sea level, plus 39.5 (D51)
+  });
+
+  it("stands on the Verrazzano's deck, not on the water the bare-earth model would put there", () => {
+    expect(runnerInTheScene(nyc, 0.6).heightM).toBeGreaterThan(20);
+  });
+
+  it("is lifted onto the crest where the height is filled in, exactly as the Ride's own camera is", () => {
+    const scene = bridgeCourse();
+
+    // Up at 2%, down at 3%, 1000 m between: the crest over the straight fill is 6.25 m at mid-span.
+    expect(runnerInTheScene(scene, 1.5).heightM - positionAtKm(scene.line, 1.5).ellipsoidHeightM).toBeCloseTo(6.25, 1);
+    expect(runnerInTheScene(scene, 0.5).heightM).toBeCloseTo(positionAtKm(scene.line, 0.5).ellipsoidHeightM, 6);
+  });
+
+  it("takes the road's height from whoever is asked for it: on the keyless map, the open terrain", () => {
+    const asked: number[] = [];
+    const place = runnerInTheScene(bridgeCourse(), 1.5, {
+      heightAt: (at) => {
+        asked.push(at.ellipsoidHeightM);
+        return 12;
+      },
+    });
+
+    expect(place.heightM).toBe(12); // and not the crest: the terrain the course is draped on has no bridge in it to crest
+    expect(asked).toHaveLength(1);
   });
 });
