@@ -446,6 +446,40 @@ svg .trace-how-much {
 
 /* ── Labels and controls on the map ─────────────────────────────────────────────────────── */
 
+/* The runner and the two ends of the course: laid over the map, under the labels. The map is
+   dragged straight through them. Each is centred on the place the scene hands it. */
+.map-dots {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.map-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border-radius: 50%;
+}
+
+/* The course's blue, the same in both themes on the map (scene/course-ribbon.ts). */
+.map-dot-runner {
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  background: #1546ff;
+  border: 3px solid #fff;
+}
+
+.map-dot-end {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: #fff;
+  border: 3px solid #000;
+}
+
 .map-labels {
   position: absolute;
   inset: 0;

@@ -15,7 +15,7 @@ export interface EncodingLook {
   /** The class on a strip mark or on words in text. */
   cssClass: string;
   /** How a stretch of the course line is drawn on the map. */
-  mapLine: "solid" | "hollow" | "grey-dashes" | "stripes";
+  mapLine: "solid" | "hollow" | "grey" | "stripes";
   /** Words added after a statement of this kind, for a reader (or a screen reader) who can't rely on the look. */
   saidAfter: string;
 }
@@ -39,7 +39,7 @@ export const ENCODINGS: Record<Encoding, EncodingLook> = {
     name: "Grey, dashed or struck through is not measured here",
     meaning: "The survey has nothing at this spot, so the value is filled in and says so.",
     cssClass: "enc-not-measured",
-    mapLine: "grey-dashes",
+    mapLine: "grey",
     saidAfter: "Not measured here.",
   },
   sample: {

@@ -12,13 +12,19 @@
 //   - both ways it gets darker as it gets deeper, never green against red (the pair one man in
 //     twelve can't tell apart), so the scale still reads in a grey screenshot.
 //
-// A dashed mark (not measured here; a sample) carries its own ground (issue #22). Dashes laid
-// straight onto the map are two different pictures: over dark imagery the grey dashes vanished and
-// the paper-coloured gaps stood out as a row of white squares, and over the pale keyless map it
-// was the other way round. So the colour between the dashes is a band with a hairline edge, and
-// the dashes are narrower than the band: it runs unbroken down both sides of them. A dash is then
-// always seen against the band, and the band shows on any ground, by itself where the ground is
-// dark and by its edge where it is pale.
+// Not measured here is the hill's band with the colour taken out: flat grey, the same width, the
+// same hairline edge, no pattern. (It was grey dashes. Twice the owner took them for a fault in
+// the drawing, "checkered boxes" and then "weird rectangles": blocks beside a line look like a
+// glitch. Greying out is what "not measured" means everywhere else in the app.) Mid grey is the
+// one tone a road in a photograph may match exactly, so the band never relies on the ground to be
+// seen: it stands between its black hairline and the course's white edge.
+//
+// A dashed mark (a sample) carries its own ground (issue #22). Dashes laid straight onto the map
+// are two different pictures: over dark imagery the dark dashes vanish and the paper-coloured gaps
+// stand out as a row of white squares, and over a pale map it is the other way round. So the
+// colour between the dashes is a band with a hairline edge, and the dashes are narrower than the
+// band: it runs unbroken down both sides of them. A dash is then always seen against the band, and
+// the band shows on any ground, by itself where the ground is dark and by its edge where it is pale.
 import type { Encoding } from "./encoding";
 import type { HowMuch } from "./layers";
 
@@ -74,7 +80,7 @@ export function markLook(encoding: Encoding, howMuch?: HowMuch): MarkLook {
     case "runner-report":
       return { widthPx: WIDTH_PX, color: PAPER, edge: INK, edgePx: 3, gap: null, rimPx: 0 };
     case "not-measured":
-      return { widthPx: DASHED_WIDTH_PX, color: GREY, edge: INK, edgePx: 1.5, gap: PAPER, rimPx: RIM_PX };
+      return { widthPx: WIDTH_PX, color: GREY, edge: INK, edgePx: 1.5, gap: null, rimPx: 0 };
     case "sample":
       return { widthPx: DASHED_WIDTH_PX, color: INK, edge: INK, edgePx: 1.5, gap: PAPER, rimPx: RIM_PX };
   }

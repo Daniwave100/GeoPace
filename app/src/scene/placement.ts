@@ -13,7 +13,7 @@
 //
 // Either way the height comes from our own data. Nothing here reads, or rests anything on, Google's
 // surface, which is for looking at only (PLAN.md D5).
-import { ArcType, Cartesian3, ClassificationType, HeightReference, type PolylineGraphics } from "cesium";
+import { ArcType, Cartesian3, ClassificationType, type PolylineGraphics } from "cesium";
 import type { CourseLine } from "../bundle/types";
 import type { MarkLook } from "../core/mark-look";
 import type { RoadPosition } from "../core/scrub";
@@ -25,8 +25,9 @@ export type Placement = "draped" | "road-height";
 export type Behind = "hidden" | "faint" | "solid";
 
 /**
- * The look at road height. 🟡 Claude's starting values: the owner settles them by eye, with their
- * own key, from the trial on the branch prototype/line-on-road (PLAN.md D52).
+ * The look at road height (PLAN.md D52). The owner looked at it over real imagery on 2026-09-18
+ * and kept these: the lift, and the line staying on the map, fainter, behind whatever stands in
+ * front of it ("the line is always there, even if it's behind a building, but it's faded").
  */
 export const ROAD_LOOK = {
   /**
@@ -52,27 +53,27 @@ export function scenePosition(place: Pick<RoadPosition, "lat" | "lon" | "ellipso
   return placement === "draped" ? Cartesian3.fromDegrees(place.lon, place.lat) : Cartesian3.fromDegrees(place.lon, place.lat, place.ellipsoidHeightM + ROAD_LOOK.liftM);
 }
 
-/** How a dot (the runner, the start, the finish) is held at `scenePosition`: a dot resting on terrain and one standing at a height are different things to CesiumJS. */
-export function heightReference(placement: Placement): HeightReference {
-  return placement === "draped" ? HeightReference.CLAMP_TO_TERRAIN : HeightReference.NONE;
-}
-
 /**
  * What CesiumJS draws for one stretch of the course line: one line, the plain course or, with a
  * `look`, the course with a layer's mark beside it.
  */
 export function stretchGraphics(line: CourseLine, stretch: { first: number; last: number; measured: boolean }, look: MarkLook | null, placement: Placement): PolylineGraphics.ConstructorOptions {
-  const asItIs = { positions: positionsAlong(line, stretch, placement), width: ribbonWidthPx(look), material: new CourseRibbonProperty(look, 1) };
-  if (placement === "draped") return { ...asItIs, clampToGround: true, classificationType: ClassificationType.TERRAIN };
-  const behind = stretch.measured ? ROAD_LOOK.behind : ROAD_LOOK.behindWhereNotMeasured;
+  const asItIs = { positions: positionsAlong(line, stretch, placement), width: ribbonWidthPx(look) };
+  if (placement === "draped") return { ...asItIs, material: new CourseRibbonProperty(look, null), clampToGround: true, classificationType: ClassificationType.TERRAIN };
+  const material = new CourseRibbonProperty(look, STRENGTH_BEHIND[stretch.measured ? ROAD_LOOK.behind : ROAD_LOOK.behindWhereNotMeasured]());
   return {
     ...asItIs,
     clampToGround: false,
     // Samples are metres apart: a straight line between two of them never leaves the road.
     arcType: ArcType.NONE,
-    depthFailMaterial: behind === "hidden" ? undefined : new CourseRibbonProperty(look, behind === "faint" ? ROAD_LOOK.faintAlpha : 1),
+    // The pixels CesiumJS calls hidden are drawn by the same material as the rest: the material
+    // itself decides, once for the whole width, how strong the line is (course-ribbon.ts).
+    material,
+    depthFailMaterial: material,
   };
 }
+
+const STRENGTH_BEHIND: Record<Behind, () => number> = { hidden: () => 0, faint: () => ROAD_LOOK.faintAlpha, solid: () => 1 };
 
 function positionsAlong(line: CourseLine, stretch: { first: number; last: number }, placement: Placement): Cartesian3[] {
   const positions: Cartesian3[] = [];

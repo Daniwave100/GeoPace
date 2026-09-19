@@ -29,7 +29,8 @@ import { createPlanPanel } from "./plan/plan-panel";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isStillFramed, showMapTheme, showRunner, toggleStraightDown, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isStillFramed, showMapTheme, showMoment, toggleStraightDown, watchCameraHeight } from "./scene/globe";
+import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import type { Placement } from "./scene/placement";
@@ -70,6 +71,7 @@ let placement: Placement = "draped";
 let viewer: Viewer | undefined;
 let mapControls: MapControls | undefined;
 let mapLabels: MapLabels | undefined;
+let mapDots: MapDots | undefined;
 let photoreal: Photoreal | undefined;
 let photorealPanel: PhotorealPanel | undefined;
 let showing: Showing | undefined;
@@ -142,6 +144,7 @@ async function show(courseId: string): Promise<void> {
   if (!viewer) {
     viewer = createGlobe(byId("globe"));
     mapLabels = createMapLabels(viewer, byId("map-labels"));
+    mapDots = createMapDots(viewer, byId("map-dots"));
     const map = viewer;
     mapControls = createMapControls(byId("map-controls"), byId("globe"), map, {
       wholeCourse: () => frameWholeCourse(flightSeconds()),
@@ -257,7 +260,7 @@ function showLayers(): void {
 function usePlacement(next: Placement): void {
   if (placement === next) return;
   placement = next;
-  showLayers(); // the course line with its marks, the labels, and through scrubTo the runner
+  showLayers(); // the course line with its marks, the labels, and through scrubTo the runner and the end dots
 }
 
 /** The strip as it should be now: its rows, its key, and the size the runner has made it. */
@@ -309,7 +312,17 @@ function scrubTo(km: number): void {
   strip.setKm(readout.km, `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`);
   readoutView.show(planner, readout, units);
   sentenceView.show(sentence);
-  showRunner(viewer, place, readout.instant, placement);
+  mapDots?.show([...endDots(bundle), { id: "runner", look: "runner", place }], placement);
+  showMoment(viewer, readout.instant);
+}
+
+/** The small dots at the start and at the finish of the course. */
+function endDots(bundle: CourseBundle): MapDot[] {
+  const line = bundle.measured.course_line;
+  return [
+    { id: "start", look: "end", place: positionAtKm(line, line.km[0]) },
+    { id: "finish", look: "end", place: positionAtKm(line, line.km[line.km.length - 1]) },
+  ];
 }
 
 /** How long the camera takes to get somewhere. With reduced motion asked for, it doesn't travel: it is there. */

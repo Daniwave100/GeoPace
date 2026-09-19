@@ -7,7 +7,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import { howSteep } from "../src/core/hills";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
 import { markLook, rampColor } from "../src/core/mark-look";
-import { COURSE_WIDTH_PX } from "../src/scene/course-ribbon";
+import { COURSE_EDGE, COURSE_WIDTH_PX } from "../src/scene/course-ribbon";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -80,43 +80,73 @@ describe("the colour of a hill", () => {
     }
   });
 
-  it("leaves a measured mark that says nothing about how much as plain ink, and a not-measured one as grey dashes", () => {
+  it("leaves a measured mark that says nothing about how much as plain ink", () => {
     expect(markLook("measured")).toMatchObject({ color: "#000000", gap: null });
     expect(markLook("measured", -0.5)).toMatchObject({ color: rampColor(-0.5), gap: null });
-    expect(markLook("not-measured")).toMatchObject({ color: "#8a8a86", gap: "#f4f4f0" });
   });
 });
 
-describe("a dashed mark, over a pale map and over dark imagery", () => {
-  // The owner, looking at New York in photoreal: the grey dashes had vanished into the dark bridge
-  // and only the paper-coloured gaps showed, "checkered boxes". Over the pale keyless map it was the
-  // other way round. A dashed mark has to be the same picture on any ground (issue #22).
+describe("a stretch that is not measured, on the map", () => {
+  // Twice the owner, looking at New York in photoreal, took the dashes for a fault in the drawing:
+  // "checkered boxes", then "weird rectangles". Blocks beside a line look like a glitch, and on the
+  // Queensboro's 80 m gap they were a white box with three squares in it. So on the map "not
+  // measured here" is what greying out means everywhere else: the hill's band with the colour taken
+  // out. The strip still dashes its trace and the sentence still strikes its words through (D47).
+  const contrast = (a: string, b: string) => {
+    const [dark, light] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => x - y);
+    return (light + 0.05) / (dark + 0.05);
+  };
+
+  it("is a flat grey band, built like a hill's: the same width, the same hairline edge, no pattern", () => {
+    const [grey, hill] = [markLook("not-measured"), markLook("measured", 0.5)];
+    expect(grey).toMatchObject({ color: "#8a8a86", gap: null });
+    expect(grey).toMatchObject({ widthPx: hill.widthPx, edge: hill.edge, edgePx: hill.edgePx });
+  });
+
+  it("shows on any ground without help from it: the grey stands between the hairline and the course's white edge, and reads against both", () => {
+    // Mid grey is the one tone a road in a photograph may match exactly. The band is still there
+    // to see, because what bounds it is ours: black outside, white inside.
+    const grey = markLook("not-measured");
+    expect(grey.edgePx).toBeGreaterThan(0);
+    expect(contrast(grey.color, grey.edge)).toBeGreaterThanOrEqual(3); // what a mark needs to be told from its neighbour (WCAG 1.4.11)
+    expect(contrast(grey.color, COURSE_EDGE)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("can't be taken for a hill: no hill is ever grey", () => {
+    const [red, green, blue] = rgb(markLook("not-measured").color);
+    expect(Math.max(red, green, blue) - Math.min(red, green, blue)).toBeLessThan(12);
+    for (const amount of [-1, -0.5, -0.1, 0.1, 0.5, 1]) {
+      const [r, g, b] = rgb(rampColor(amount));
+      expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeGreaterThan(60);
+    }
+  });
+});
+
+describe("a dashed mark (a sample), over a pale map and over dark imagery", () => {
   const contrast = (a: string, b: string) => {
     const [dark, light] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => x - y);
     return (light + 0.05) / (dark + 0.05);
   };
   const greys = Array.from({ length: 52 }, (_, i) => `#${(i * 5).toString(16).padStart(2, "0").repeat(3)}`);
 
-  for (const encoding of ["not-measured", "sample"] as const) {
-    it(`${encoding}: carries its own ground, so the dashes are always seen against the same thing`, () => {
-      const look = markLook(encoding);
-      if (look.gap === null) throw new Error("expected a dashed mark");
-      // The colour between the dashes is a band that also runs unbroken down both sides of them:
-      // a dash is never next to the map, whatever the map looks like there.
-      expect(look.rimPx).toBeGreaterThanOrEqual(1.5);
-      expect(contrast(look.color, look.gap)).toBeGreaterThanOrEqual(3); // what a mark needs to be told from its ground (WCAG 1.4.11)
-      // Enough of each dash shows either side of the blue course line, which runs down the middle
-      // of the same line. From the middle outwards: the course, the dash, the rim, half the edge.
-      expect(look.widthPx / 2 - look.edgePx / 2 - look.rimPx - COURSE_WIDTH_PX / 2).toBeGreaterThanOrEqual(3);
-    });
+  it("carries its own ground, so the dashes are always seen against the same thing", () => {
+    const look = markLook("sample");
+    if (look.gap === null) throw new Error("expected a dashed mark");
+    // The colour between the dashes is a band that also runs unbroken down both sides of them:
+    // a dash is never next to the map, whatever the map looks like there.
+    expect(look.rimPx).toBeGreaterThanOrEqual(1.5);
+    expect(contrast(look.color, look.gap)).toBeGreaterThanOrEqual(3);
+    // Enough of each dash shows either side of the blue course line, which runs down the middle
+    // of the same line. From the middle outwards: the course, the dash, the rim, half the edge.
+    expect(look.widthPx / 2 - look.edgePx / 2 - look.rimPx - COURSE_WIDTH_PX / 2).toBeGreaterThanOrEqual(3);
+  });
 
-    it(`${encoding}: the band shows on any ground: by itself where the ground is dark, by its edge where it is pale`, () => {
-      const look = markLook(encoding);
-      if (look.gap === null) throw new Error("expected a dashed mark");
-      expect(look.edgePx).toBeGreaterThan(0);
-      for (const ground of greys) expect(Math.max(contrast(ground, look.gap), contrast(ground, look.edge)), `over ${ground}`).toBeGreaterThanOrEqual(3);
-    });
-  }
+  it("shows its band on any ground: by itself where the ground is dark, by its edge where it is pale", () => {
+    const look = markLook("sample");
+    if (look.gap === null) throw new Error("expected a dashed mark");
+    expect(look.edgePx).toBeGreaterThan(0);
+    for (const ground of greys) expect(Math.max(contrast(ground, look.gap), contrast(ground, look.edge)), `over ${ground}`).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe("the Hills layer's marks, by steepness", () => {

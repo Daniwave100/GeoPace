@@ -179,7 +179,7 @@ _Avoid_: crowd, crowding, busyness
 A place where congestion is known to happen.
 
 **Line mark**:
-A stretch of the course line that a layer marks on the map: the line is drawn wider there, with the layer's colour or dashes either side of the blue.
+A stretch of the course line that a layer marks on the map: the line is drawn wider there, with the layer's colour either side of the blue, or flat grey where the layer's value is not measured.
 _Avoid_: highlight, segment, overlay
 
 **Hill**:

@@ -7,7 +7,7 @@
 // comes from the Course Bundle, never from the imagery (PLAN.md D5). The scene is a stand-in with
 // the two things drawing touches: the list of what is drawn, and the clock.
 import { readFileSync } from "node:fs";
-import { Cartographic, ClassificationType, type Entity, EntityCollection, HeightReference, JulianDate } from "cesium";
+import { Cartographic, ClassificationType, type Entity, EntityCollection, JulianDate } from "cesium";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { hillsLayer } from "../src/core/hills-layer";
@@ -17,7 +17,7 @@ import { positionAtKm } from "../src/core/scrub";
 import { nearestIndex } from "../src/core/series";
 import { showCourseLine } from "../src/scene/course-line";
 import { COURSE_BLUE } from "../src/scene/course-ribbon";
-import { showRunner } from "../src/scene/globe";
+import { dotPosition } from "../src/scene/map-dots";
 import { ROAD_LOOK } from "../src/scene/placement";
 
 const bundleFor = (course: string) =>
@@ -26,12 +26,11 @@ const nyc = bundleFor("nyc");
 const line = nyc.measured.course_line;
 const NOW = JulianDate.now();
 
-const scene = () => ({ entities: new EntityCollection(), clock: { currentTime: new JulianDate() } });
+const scene = () => ({ entities: new EntityCollection() });
 const lines = (map: { entities: EntityCollection }) => map.entities.values.filter((entity) => entity.polyline);
-const points = (map: { entities: EntityCollection }) => map.entities.values.filter((entity) => entity.point);
 const isDraped = (entity: Entity) => entity.polyline?.clampToGround?.getValue(NOW) === true;
-/** How strongly a line is still drawn where something stands in front of it; undefined when it is hidden there. */
-const strengthBehind = (entity: Entity) => entity.polyline?.depthFailMaterial?.getValue(NOW)?.strength as number | undefined;
+/** How strongly a line is still drawn where something stands in front of it: 0 is hidden, 1 is as if nothing were there. */
+const strengthBehind = (entity: Entity) => entity.polyline?.material?.getValue(NOW)?.behindStrength as number | undefined;
 /** Every corner of a drawn line, as [km along the course, height above the ellipsoid]. */
 function heightsAlong(entity: Entity): [number, number][] {
   const corners: Cartographic[] = entity.polyline!.positions!.getValue(NOW).map((corner: never) => Cartographic.fromCartesian(corner));
@@ -55,6 +54,17 @@ describe("the course line on the keyless map", () => {
     expect(lines(map).every(isDraped)).toBe(true);
   });
 
+  it("has no notion of being behind anything: it is paint on the ground", () => {
+    const map = scene();
+
+    showCourseLine(map, nyc, hillsLayer(nyc).lineMarks(), "draped");
+
+    for (const entity of lines(map)) {
+      expect(entity.polyline?.depthFailMaterial).toBeUndefined();
+      expect(strengthBehind(entity)).toBeUndefined();
+    }
+  });
+
   it("rests on our own open terrain only, never on photoreal imagery: while that imagery is still arriving, both are on screen", () => {
     // Between turning photoreal on and its first view arriving, Google's tiles are already in the
     // scene and the course is still draped. "The ground" would then include Google's surface, which
@@ -62,11 +72,16 @@ describe("the course line on the keyless map", () => {
     const map = scene();
 
     showCourseLine(map, nyc, hillsLayer(nyc).lineMarks(), "draped");
-    showRunner(map, positionAtKm(line, 1.0), new Date("2026-11-01T14:10:00Z"), "draped");
 
     expect(lines(map).every((entity) => entity.polyline?.classificationType?.getValue(NOW) === ClassificationType.TERRAIN)).toBe(true);
-    expect(points(map)).toHaveLength(3); // start, finish, runner
-    expect(points(map).every((dot) => dot.point?.heightReference?.getValue(NOW) === HeightReference.CLAMP_TO_TERRAIN)).toBe(true);
+  });
+
+  it("is lines and nothing else: the runner and the start and finish dots are laid over the map, where no line can be painted over them", () => {
+    const map = scene();
+
+    showCourseLine(map, nyc, hillsLayer(nyc).lineMarks(), "road-height");
+
+    expect(map.entities.values.every((entity) => entity.polyline)).toBe(true);
   });
 });
 
@@ -103,20 +118,6 @@ describe("the course line in photoreal", () => {
     for (const [, height] of there) expect(height - ROAD_LOOK.liftM).toBeCloseTo(44.4 - 32.54, 0);
   });
 
-  it("puts the start and the finish at the road's height too", () => {
-    const map = scene();
-
-    showCourseLine(map, nyc, [], "road-height");
-
-    const dots = points(map);
-    expect(dots).toHaveLength(2);
-    expect(dots.every((dot) => dot.point?.heightReference?.getValue(NOW) === HeightReference.NONE)).toBe(true);
-    const finish = Cartographic.fromCartesian(dots[1].position!.getValue(NOW)!);
-    const aboveTheRoad = finish.height - line.ellipsoid_height_m[line.km.length - 1];
-    expect(aboveTheRoad).toBeGreaterThanOrEqual(ROAD_LOOK.liftM - 0.01);
-    expect(aboveTheRoad).toBeLessThan(ROAD_LOOK.liftM + 0.5);
-  });
-
   it("stays on the map, fainter, where a tree, a tower or the deck above stands in front of it", () => {
     const map = scene();
 
@@ -125,6 +126,24 @@ describe("the course line in photoreal", () => {
     for (const strength of lines(map).map(strengthBehind)) expect(strength).toBe(ROAD_LOOK.faintAlpha);
     expect(ROAD_LOOK.faintAlpha).toBeGreaterThan(0.2);
     expect(ROAD_LOOK.faintAlpha).toBeLessThan(0.7);
+  });
+
+  it("is judged behind something once, at its middle, for its whole width: never solid on one side and faded on the other", () => {
+    // The line is flat to the camera and the road recedes under it, so at a tilt the road itself
+    // is nearer than the lower half of a wide line. Left to CesiumJS, which asks pixel by pixel,
+    // that half came out faded and the other half solid (the owner's screenshots, 09-18). So the
+    // pixels CesiumJS calls hidden and the ones it doesn't are drawn by one and the same material,
+    // and that material decides, from the middle of the line, how strong the whole width is.
+    const map = scene();
+
+    showCourseLine(map, nyc, hillsLayer(nyc).lineMarks(), "road-height");
+
+    for (const entity of lines(map)) {
+      const [seen, hidden] = [entity.polyline!.material!, entity.polyline!.depthFailMaterial!];
+      expect(hidden).toBeDefined();
+      expect(hidden.equals(seen)).toBe(true);
+      expect(hidden.getType(NOW)).toBe(seen.getType(NOW));
+    }
   });
 
   it("is never hidden where its height is not measured, even if everything else is; and never stronger there than where it is measured", () => {
@@ -145,8 +164,8 @@ describe("the course line in photoreal", () => {
     const filledIn = stretches.filter((stretch) => stretch.samples.includes(nearestIndex(line.km, 1.0)));
     const measured = stretches.filter((stretch) => stretch.samples.includes(nearestIndex(line.km, 30)));
     expect(filledIn.map((stretch) => stretch.behind)).toEqual([ROAD_LOOK.faintAlpha]);
-    expect(measured.map((stretch) => stretch.behind)).toEqual([undefined]); // hidden, as asked
-    expect(stretches.filter((stretch) => stretch.behind !== undefined)).toHaveLength(nyc.measured.elevation_not_measured.length);
+    expect(measured.map((stretch) => stretch.behind)).toEqual([0]); // hidden, as asked
+    expect(stretches.filter((stretch) => stretch.behind !== 0)).toHaveLength(nyc.measured.elevation_not_measured.length);
     expect(ROAD_LOOK.behindWhereNotMeasured).not.toBe("hidden");
   });
 
@@ -227,43 +246,36 @@ describe("a layer's marks on the course line", () => {
     for (const entity of lines(map)) expect(uniforms(entity).coreColor.toCssHexString()).toBe(COURSE_BLUE);
   });
 
-  it("look like what they claim: a hill in its colour, a filled-in stretch as grey dashes on a paper band", () => {
+  it("look like what they claim: a hill in its colour, a filled-in stretch as the same band in flat grey", () => {
     const map = scene();
 
     showCourseLine(map, nyc, marks, "road-height");
 
     const at = (km: number) => lines(map).find((entity) => heightsAlong(entity).some(([sample]) => sample === nearestIndex(line.km, km)))!;
-    expect(uniforms(at(1.0))).toMatchObject({ dashColor: { alpha: 1 } }); // the Verrazzano's unscanned main span
-    expect(uniforms(at(1.0)).bandColor.toCssHexString()).toBe("#f4f4f0");
+    expect(uniforms(at(1.0)).bandColor.toCssHexString()).toBe("#8a8a86"); // the Verrazzano's unscanned main span
+    expect(uniforms(at(1.0)).dashColor.alpha).toBe(0); // no pattern: twice the owner took dashes for a fault in the drawing
     expect(uniforms(at(24.6)).dashColor.alpha).toBe(0); // halfway up the Queensboro: a measured climb
     expect(uniforms(at(24.6)).bandColor.toCssHexString()).toBe(markLook("measured", marks.find((mark) => mark.fromKm <= 24.6 && mark.toKm >= 24.6)!.howMuch).color);
   });
 });
 
-describe("the runner", () => {
+describe("the runner, and the dots at the start and the finish", () => {
+  // Plain HTML laid over the map, like the labels, and placed each frame. In the 3D scene the
+  // runner was painted over by the course line wherever the line shows through what is in front
+  // of it (CesiumJS paints "shows through" over everything nearer, the runner included): with
+  // Hills on, the owner's runner was a pale ghost under the band. Where a dot stands is still the
+  // scene's business, and ours to get right.
   const onTheVerrazzano = positionAtKm(line, 1.0);
-  const instant = new Date("2026-11-01T14:10:00Z");
+  const heightOf = (placement: "draped" | "road-height", terrainHeightM?: number) => Cartographic.fromCartesian(dotPosition(onTheVerrazzano, placement, terrainHeightM)).height;
 
-  it("rests on the ground of the keyless map", () => {
-    const map = scene();
-
-    showRunner(map, onTheVerrazzano, instant, "draped");
-
-    expect(points(map)[0].point?.heightReference?.getValue(NOW)).toBe(HeightReference.CLAMP_TO_TERRAIN);
+  it("stand on our own open terrain while the course is draped, never on anything photographed", () => {
+    // The open terrain knows nothing of the bridge: it says the water, 60 m under the deck. That
+    // is where the draped line is painted too, so that is where the dot belongs.
+    expect(heightOf("draped", -31.2)).toBeCloseTo(-31.2, 3);
+    expect(heightOf("draped", undefined)).toBeCloseTo(0, 3); // terrain not loaded yet: on the ellipsoid, as the labels do
   });
 
-  it("stands at the road's height in photoreal, and moves there when the placement changes", () => {
-    const map = scene();
-    showRunner(map, onTheVerrazzano, instant, "draped");
-
-    showRunner(map, onTheVerrazzano, instant, "road-height");
-
-    expect(points(map)).toHaveLength(1);
-    expect(points(map)[0].point?.heightReference?.getValue(NOW)).toBe(HeightReference.NONE);
-    const aboveTheRoad = Cartographic.fromCartesian(points(map)[0].position!.getValue(NOW)!).height - onTheVerrazzano.ellipsoidHeightM;
-    expect(aboveTheRoad).toBeGreaterThanOrEqual(ROAD_LOOK.liftM - 0.01);
-    expect(aboveTheRoad).toBeLessThan(ROAD_LOOK.liftM + 0.5);
-    // Scrubbing still sets the scene's clock, whichever way the runner is drawn.
-    expect(JulianDate.toDate(map.clock.currentTime).toISOString()).toBe(instant.toISOString());
+  it("stand at the road's height, lifted with the line, while the course is", () => {
+    expect(heightOf("road-height", -31.2) - onTheVerrazzano.ellipsoidHeightM).toBeCloseTo(ROAD_LOOK.liftM, 3);
   });
 });

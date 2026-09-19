@@ -1,6 +1,5 @@
-// The 3D globe: keyless basemap and terrain, the camera, and the runner. The course itself is
-// drawn by course-line.ts; both are draped over the keyless map and stand at road height in
-// photoreal (placement.ts).
+// The 3D globe: keyless basemap and terrain, the camera, and the scene's clock. The course is
+// drawn by course-line.ts, and the runner is laid over the map by map-dots.ts.
 //
 // The scene has no clock of its own. Cesium's clock is stopped and set from the Planner's race
 // clock every time the runner moves, so Cesium's sun is where the sun will be when the runner
@@ -12,8 +11,6 @@ import {
   Cartesian4,
   Cartographic,
   CesiumTerrainProvider,
-  Color,
-  ConstantPositionProperty,
   Credit,
   HeadingPitchRange,
   ImageryLayer,
@@ -32,18 +29,13 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
-import type { SceneForCourse } from "./course-line";
-import { COURSE_BLUE, registerCourseRibbon } from "./course-ribbon";
-import { heightReference, type Placement, scenePosition } from "./placement";
+import { registerCourseRibbon } from "./course-ribbon";
 import { BASEMAP, TERRAIN } from "./providers";
 
-const RUNNER_ID = "runner";
 const EARTH_RADIUS_M = 6_371_000;
 /** How far down the camera looks when it frames the course: from above, tilted enough that the city reads as 3D. */
 const CAMERA_TILT_RAD = CesiumMath.toRadians(60);
 
-/** How the runner on each map is drawn now. */
-const runnerPlacement = new WeakMap<SceneForCourse, Placement>();
 /** Where the camera was left by the last framing of the whole course, to tell whether the runner has moved the map since. */
 const framedFrom = new WeakMap<Viewer, Cartesian3>();
 
@@ -91,31 +83,8 @@ export function createGlobe(container: HTMLElement): Viewer {
   return viewer;
 }
 
-/** Put the runner at a place on the course at a moment: the marker and the sun move together. */
-export function showRunner(viewer: SceneForCourse, place: RoadPosition, instant: Date, placement: Placement): void {
-  // A marker resting on the terrain and one standing at a height are different things to CesiumJS:
-  // when the placement changes, the old one goes.
-  if (runnerPlacement.get(viewer) !== placement) viewer.entities.removeById(RUNNER_ID);
-  runnerPlacement.set(viewer, placement);
-  const position = scenePosition(place, placement);
-  const runner = viewer.entities.getById(RUNNER_ID);
-  if (runner) {
-    runner.position = new ConstantPositionProperty(position);
-  } else {
-    viewer.entities.add({
-      id: RUNNER_ID,
-      name: "Runner",
-      position,
-      point: {
-        pixelSize: 18,
-        color: Color.fromCssColorString(COURSE_BLUE),
-        outlineColor: Color.WHITE,
-        outlineWidth: 3,
-        heightReference: heightReference(placement),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY, // never hidden behind a hill or a bridge
-      },
-    });
-  }
+/** Set the scene's clock to the moment the runner is where they are: the scene's sun is that moment's sun (PLAN.md D39). */
+export function showMoment(viewer: Viewer, instant: Date): void {
   viewer.clock.currentTime = JulianDate.fromDate(instant);
 }
 
