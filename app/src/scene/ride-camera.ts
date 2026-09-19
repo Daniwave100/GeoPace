@@ -36,6 +36,8 @@ export interface RideCameraOptions {
 export interface RideCamera {
   /** Take the camera to this view: at once if it is a frame's ride away, in a moment's glide if it is further. */
   show(view: RideView): void;
+  /** The runner has taken hold of the map: the camera is theirs from this moment, even in the middle of a glide. */
+  letGo(): void;
 }
 
 /** How long the glide to a far-off view takes: the map's own flights take the same (main.ts). */
@@ -93,6 +95,10 @@ export function createRideCamera(viewer: SceneForRide, options: RideCameraOption
         glide = { from, startedMs: options.now(), riseM: Math.min(awayM * RISE_PER_M, MOST_RISE_M) };
       }
       wanted = lastAsked = view;
+    },
+    letGo() {
+      wanted = null;
+      glide = null;
     },
   };
 }

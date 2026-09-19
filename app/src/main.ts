@@ -94,7 +94,10 @@ let showing: Showing | undefined;
 let loading = "";
 
 const planDialog = byId("plan-dialog") as HTMLDialogElement;
-const planSummary = createPlanSummary(byId("plan-summary"), () => planDialog.showModal());
+const planSummary = createPlanSummary(byId("plan-summary"), () => {
+  showing?.ride.pause(); // a Ride doesn't play on behind the plan
+  planDialog.showModal();
+});
 const planPanel = createPlanPanel(byId("plan"), usePlan);
 const splitsTable = createSplitsTable(byId("splits"), (km) => {
   planDialog.close(); // the runner picked a split to look at: get the plan out of the way of it
@@ -134,7 +137,7 @@ async function start(): Promise<void> {
     if (event.key === "Escape" && fullMap && !document.querySelector("dialog[open]")) useFullMap(false);
     if (isSpaceForTheRide(event)) {
       event.preventDefault(); // the space bar would otherwise scroll the page
-      showing?.ride.playPause();
+      if (!event.repeat) showing?.ride.playPause(); // held down, a key repeats: one press is one play or one pause
     }
   });
   systemDark.addEventListener("change", showTheme); // "Auto" keeps following the system while the app is open
@@ -177,6 +180,7 @@ async function show(courseId: string): Promise<void> {
     mapDots = createMapDots(viewer, byId("map-dots"));
     const map = viewer;
     mapControls = createMapControls(byId("map-controls"), byId("globe"), map, {
+      takesTheMap: takeTheMap,
       wholeCourse: () => frameWholeCourse(flightSeconds()),
       whereIAm: goToRunner,
       straightDown: () => toggleStraightDown(map, flightSeconds()),
@@ -255,6 +259,7 @@ function useStripSize(size: number): void {
 function useFullMap(on: boolean): void {
   const untouched = viewer !== undefined && isStillFramed(viewer);
   fullMap = on;
+  coveredLeft = null; // the readout block has stepped aside, or come back
   byId("explore").toggleAttribute("data-full-map", on);
   // The credits fold to one word, one press away; the map's own credits stay on the map.
   (byId("credits-more") as HTMLDetailsElement).open = !on;
@@ -356,8 +361,11 @@ function showWhere(km: number): void {
   const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: showing.screen.clause });
 
   // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
+  // While the Ride plays it is left unsaid: sixty new sentences a second is noise, and the Ride says
+  // each Stop as it arrives (ride-controls.ts). Paused, the strip says where that left the runner.
   const carriedOver = planner.carriedOver ? `, from the ${planner.carriedOver.fromEdition} start time, carried over` : "";
-  strip.setKm(readout.km, `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`);
+  const spoken = showing.ride.playing ? null : `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`;
+  strip.setKm(readout.km, spoken);
   readoutView.show(planner, readout, units);
   sentenceView.show(sentence);
   mapDots?.show([...endDots(bundle), { id: "runner", look: "runner", place }], placement);
@@ -388,7 +396,8 @@ function startRide(scene: RideScene): Ride {
 /** The Ride was started, paused, left, or given the other camera. */
 function showRide(): void {
   if (!showing) return;
-  showRideControls();
+  showWhere(showing.km); // paused, the strip says where that is; and the controls follow
+
   if (showing.ride.on) followTheRide();
   // Left: Explore gets the whole course back, as it opens.
   else if (wasRiding) frameWholeCourse(flightSeconds());
@@ -399,7 +408,15 @@ function showRideControls(): void {
   if (!showing) return;
   const { ride, stops } = showing;
   const around = stopsAround(stops, ride.km);
-  rideControls.show({ on: ride.on, playing: ride.playing, camera: ride.camera, stopLine: stopLine(stops, ride.km, units), canGoBack: around.back !== null, canRideOn: around.next !== null });
+  rideControls.show({
+    on: ride.on,
+    playing: ride.playing,
+    camera: ride.camera,
+    stopLine: stopLine(stops, ride.km, units),
+    arrivedAt: around.on === null ? null : stopLine(stops, stops[around.on].km, units),
+    canGoBack: around.back !== null,
+    canRideOn: around.next !== null,
+  });
 }
 
 /**
@@ -414,17 +431,19 @@ function followTheRide(): void {
 }
 
 /**
- * A hand on the map outranks the Ride: dragging it, scrolling it, its keys and its buttons pause
- * a Ride that is playing, and the map is then the runner's to orbit, pan and zoom until they ride on.
+ * A hand on the map outranks the Ride: dragging it, scrolling it, and the map's own keys and
+ * buttons that move it pause a Ride that is playing, and stop a glide where it is. The map is
+ * then the runner's to orbit, pan and zoom until they ride on.
  */
+function takeTheMap(): void {
+  showing?.ride.pause();
+  rideCamera?.letGo(); // after the pause, which asks for one last view of its own
+}
+
 function pauseTheRideWhenTheMapIsMoved(): void {
-  const pause = () => showing?.ride.pause();
   const map = byId("globe");
-  map.addEventListener("pointerdown", pause, { capture: true });
-  map.addEventListener("wheel", pause, { capture: true, passive: true });
-  // Every key but the space bar, which is the Ride's own, and Tab, which only passes through.
-  map.addEventListener("keydown", (event) => event.key !== " " && event.key !== "Tab" && pause(), { capture: true });
-  byId("map-controls").addEventListener("click", pause, { capture: true });
+  map.addEventListener("pointerdown", takeTheMap, { capture: true });
+  map.addEventListener("wheel", takeTheMap, { capture: true, passive: true });
 }
 
 /** The space bar plays and pauses the Ride, except where it already means something: in a button, a box, a dialog. */
@@ -459,11 +478,20 @@ function frameWholeCourse(seconds: number): void {
   frameCourse(viewer, showing.bundle.measured.course_line, coveredLeftPx(), seconds);
 }
 
-/** How much of the map's left side is under the readout block: none where the blocks stack under the map, or with the map on the full screen. */
+/**
+ * How much of the map's left side is under the readout block: none where the blocks stack under
+ * the map, or with the map on the full screen. Measured once per layout, not on every frame of
+ * the Ride: asking the page for a size in the middle of a frame makes it lay itself out again.
+ */
 function coveredLeftPx(): number {
-  const block = document.querySelector<HTMLElement>(".where");
-  return block && getComputedStyle(block).position === "absolute" ? block.offsetWidth : 0;
+  if (coveredLeft === null) {
+    const block = document.querySelector<HTMLElement>(".where");
+    coveredLeft = block && getComputedStyle(block).position === "absolute" ? block.offsetWidth : 0;
+  }
+  return coveredLeft;
 }
+let coveredLeft: number | null = null;
+window.addEventListener("resize", () => (coveredLeft = null));
 
 /**
  * Photoreal is an extra on top of the scene, made once. Nothing else in the app waits for it or

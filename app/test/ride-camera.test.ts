@@ -141,6 +141,19 @@ describe("the Ride's camera in the scene", () => {
     expect(shots).toHaveLength(told);
   });
 
+  it("lets go at once when the runner takes hold of the map: a glide under way stops where it is", () => {
+    const { viewer, shots, now, run } = fakeViewer();
+    const camera = createRideCamera(viewer, { reducedMotion: () => false, now });
+    camera.show(view(40.6));
+    run(0.2); // part of the way there
+
+    camera.letGo();
+    const told = shots.length;
+    run(2);
+
+    expect(shots).toHaveLength(told); // nothing pulls against the runner's drag
+  });
+
   it("glides back from wherever the runner left the camera when the Ride resumes", () => {
     const { viewer, shots, now, run } = fakeViewer();
     const camera = createRideCamera(viewer, { reducedMotion: () => false, now });

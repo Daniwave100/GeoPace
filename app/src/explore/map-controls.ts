@@ -11,6 +11,11 @@ import { isLookingStraightDown, panMap, zoomMap } from "../scene/globe";
 export const MAP_HELP = "Drag to move, scroll to zoom, Ctrl + drag to tilt. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back, F gives the map the full screen.";
 
 export interface MapActions {
+  /**
+   * Called before any of these buttons or keys moves the map: a Ride that is playing gives way to
+   * it (issue #8). Full map moves nothing, so it isn't one of them: the Ride plays on.
+   */
+  takesTheMap(): void;
   wholeCourse(): void;
   whereIAm(): void;
   straightDown(): void;
@@ -28,14 +33,18 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
     node.addEventListener("click", onPress);
     return node;
   };
-  const zoomIn = button("+", "Zoom in", () => zoomMap(viewer, 1), "button");
-  const zoomOut = button("−", "Zoom out", () => zoomMap(viewer, -1), "button");
+  const moving = (move: () => void) => () => {
+    actions.takesTheMap();
+    move();
+  };
+  const zoomIn = button("+", "Zoom in", moving(() => zoomMap(viewer, 1)), "button");
+  const zoomOut = button("−", "Zoom out", moving(() => zoomMap(viewer, -1)), "button");
   zoomIn.setAttribute("aria-label", "Zoom in");
   zoomOut.setAttribute("aria-label", "Zoom out");
-  const whole = button("Whole course", "Show the whole course", actions.wholeCourse);
+  const whole = button("Whole course", "Show the whole course", moving(actions.wholeCourse));
   // The map moves freely, so scrubbing can leave the runner off the edge of it: this brings them back.
-  const whereIAm = button("Where I am", "Bring the map to where you are on the course", actions.whereIAm);
-  const straightDown = button("Straight down", "Look straight down, north up, like a paper map (B)", actions.straightDown);
+  const whereIAm = button("Where I am", "Bring the map to where you are on the course", moving(actions.whereIAm));
+  const straightDown = button("Straight down", "Look straight down, north up, like a paper map (B)", moving(actions.straightDown));
   const fullMap = button("Full map", "Give the map the full screen (F)", actions.fullMap);
   fullMap.setAttribute("aria-pressed", "false");
   container.replaceChildren(zoomIn, zoomOut, whole, whereIAm, straightDown, fullMap);
@@ -51,10 +60,10 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
   map.addEventListener("keydown", (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.target !== map) return;
     const pan: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
-    if (event.key in pan) panMap(viewer, ...pan[event.key]);
-    else if (event.key === "+" || event.key === "=") zoomMap(viewer, 1);
-    else if (event.key === "-" || event.key === "_") zoomMap(viewer, -1);
-    else if (event.key === "b" || event.key === "B") actions.straightDown();
+    if (event.key in pan) moving(() => panMap(viewer, ...pan[event.key]))();
+    else if (event.key === "+" || event.key === "=") moving(() => zoomMap(viewer, 1))();
+    else if (event.key === "-" || event.key === "_") moving(() => zoomMap(viewer, -1))();
+    else if (event.key === "b" || event.key === "B") moving(actions.straightDown)();
     else if (event.key === "f" || event.key === "F") actions.fullMap();
     else return;
     event.preventDefault(); // the arrows would otherwise scroll the page

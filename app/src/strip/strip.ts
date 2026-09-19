@@ -62,8 +62,11 @@ export function rowsHeightAtSizeOne(content: Pick<StripContent, "layerRows">): n
 
 export interface Strip {
   show(content: StripContent): void;
-  /** Put the cursor at `km`. `spoken` is what a screen reader says: "kilometre 21.1, 11:10, 2:00:00 elapsed". */
-  setKm(km: number, spoken: string): void;
+  /**
+   * Put the cursor at `km`. `spoken` is what a screen reader says: "kilometre 21.1, 11:10, 2:00:00
+   * elapsed"; null leaves what it last said alone, which is what a Ride that is playing wants.
+   */
+  setKm(km: number, spoken: string | null): void;
 }
 
 /**
@@ -136,8 +139,10 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
     },
     setKm(value, spoken) {
       km = value;
-      if (content) slider.setAttribute("aria-valuenow", distanceNumber(value, content.units));
-      slider.setAttribute("aria-valuetext", spoken);
+      if (spoken !== null) {
+        if (content) slider.setAttribute("aria-valuenow", distanceNumber(value, content.units));
+        slider.setAttribute("aria-valuetext", spoken);
+      }
       moveCursor?.();
     },
   };

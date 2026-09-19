@@ -24,6 +24,8 @@ export interface RideShowing {
   camera: RideCamera;
   /** "Stop 9 of 18: Ed Koch Queensboro Bridge", or "Next stop: Barclays Center, in 7.1 km". */
   stopLine: string;
+  /** The Stop the runner is on, as it is said aloud on arriving; null between Stops. */
+  arrivedAt: string | null;
   /** Whether there is a Stop to go back to, and one to ride on to. */
   canGoBack: boolean;
   canRideOn: boolean;
@@ -52,9 +54,10 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   const next = button("button", "Ride to the next stop", actions.rideToNextStop);
   const leave = button("ride-leave", "Back to the map", actions.leave);
 
-  // Said aloud when it changes: arriving at a Stop is the Ride's news. Between Stops it changes
-  // only when the distance to the next one rounds to a new number, not sixty times a second.
-  const stopLine = html("p", { class: "ride-stop", role: "status" });
+  const stopLine = html("p", { class: "ride-stop" });
+  // What a screen reader is told, and only that: arriving at a Stop is the Ride's news. The line
+  // above changes with every 50 m to the next Stop, which said aloud would be a stream of numbers.
+  const arrived = html("p", { class: "visually-hidden", role: "status" });
   const inputs = CAMERAS.map(({ camera }) => html("input", { type: "radio", name: "ride-camera", value: camera }));
   inputs.forEach((input, index) => input.addEventListener("change", () => input.checked && actions.useCamera(CAMERAS[index].camera)));
   const cameras = html("fieldset", { class: "ride-cameras" }, html("legend", { class: "visually-hidden", text: "Camera" }), ...CAMERAS.map(({ label }, index) => html("label", {}, inputs[index], label)));
@@ -62,7 +65,7 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   const bar = html(
     "div",
     { class: "ride-bar", role: "group", "aria-label": "The Ride" },
-    html("div", { class: "ride-bar-head" }, stopLine, leave),
+    html("div", { class: "ride-bar-head" }, stopLine, leave, arrived),
     html("div", { class: "ride-bar-row" }, html("div", { class: "ride-buttons" }, back, play, next), cameras),
   );
   bar.hidden = true;
@@ -81,6 +84,8 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
       play.textContent = showing.playing ? "Pause" : showing.canRideOn ? "Ride on" : "Ride it again";
       // Only set when it changes: the Ride calls this on every frame.
       if (stopLine.textContent !== showing.stopLine) stopLine.textContent = showing.stopLine;
+      const said = showing.on ? (showing.arrivedAt ?? "") : "";
+      if (arrived.textContent !== said) arrived.textContent = said;
       // A button that stops applying keeps the focus it has: `aria-disabled`, not `disabled`, which would drop it.
       back.setAttribute("aria-disabled", String(!showing.canGoBack));
       next.setAttribute("aria-disabled", String(!showing.canRideOn));
