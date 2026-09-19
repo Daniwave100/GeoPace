@@ -62,8 +62,19 @@ function rideOn(course: RideCourse, options: { reducedMotion?: boolean } = {}) {
 }
 
 describe("the Ride's time-lapse", () => {
-  it("is slower at a Stop than anywhere between Stops, on both courses and from both cameras, every corner included", () => {
-    for (const camera of ["from-above", "on-the-road"] as const) {
+  it("from above, keeps one pace from the start to the finish: it slows for no Stop, no climb and no turn", () => {
+    // The owner, after riding it (issue #24): "I don't like how it slows down on the turns slash
+    // stops, whatever it is. Just keep one smooth pace throughout." First built slowing to 80 m/s at
+    // every Stop, staying slow up each big climb, and easing off through sharp turns.
+    for (const course of [nyc, berlin]) {
+      const pace = rideSpeedKmPerS(course, 6, "from-above");
+      for (let km = 0; km <= course.lengthKm; km += 0.01) expect(rideSpeedKmPerS(course, km, "from-above"), `km ${km.toFixed(2)}`).toBe(pace);
+      for (const stop of course.stops) expect(rideSpeedKmPerS(course, stop.km, "from-above"), `the Stop at km ${stop.km}`).toBe(pace);
+    }
+  });
+
+  it("on the road, is slower at a Stop than anywhere between Stops, on both courses, every corner included", () => {
+    for (const camera of ["on-the-road"] as const) {
       for (const course of [nyc, berlin]) {
         const atAStop = Math.max(...course.stops.map((stop) => rideSpeedKmPerS(course, stop.km, camera)));
         let placesBetweenStops = 0;
@@ -124,10 +135,10 @@ describe("the Ride's time-lapse", () => {
     }
   });
 
-  it("stays slow through the whole of a stretch that is a Stop: up the Queensboro Bridge's climb, not only at its foot", () => {
+  it("on the road, stays slow through the whole of a stretch that is a Stop: up the Queensboro Bridge's climb, not only at its foot", () => {
     const climb = nyc.stops.find((stop) => Math.abs(stop.km - 23.53) < 0.01);
     expect(climb?.toKm).toBeCloseTo(24.81, 2);
-    for (const camera of ["from-above", "on-the-road"] as const) {
+    for (const camera of ["on-the-road"] as const) {
       const openRoad = rideSpeedKmPerS({ lengthKm: nyc.lengthKm, stops: nyc.stops }, 6, camera);
       for (const km of [23.9, 24.2, 24.6]) {
         const upTheClimb = rideSpeedKmPerS({ lengthKm: nyc.lengthKm, stops: nyc.stops }, km, camera);
@@ -159,7 +170,7 @@ describe("the Ride through a sharp turn", () => {
 });
 
 describe("Ride the course", () => {
-  it("plays from the start to the finish and stops there, in about three minutes from above", () => {
+  it("plays from the start to the finish and stops there, in about a minute and a half from above", () => {
     for (const course of [nyc, berlin]) {
       const { ride, moves, secondsUntilItStops } = rideOn(course);
 
@@ -169,11 +180,38 @@ describe("Ride the course", () => {
 
       expect(ride.km).toBe(course.lengthKm);
       expect(ride.playing).toBe(false);
-      expect(seconds).toBeGreaterThan(90);
-      expect(seconds).toBeLessThan(210);
+      expect(seconds).toBeGreaterThan(80);
+      expect(seconds).toBeLessThan(120);
       // Every frame moved the runner on, and never backwards.
-      expect(moves.length).toBeGreaterThan(90 * 60 - 60);
+      expect(moves.length).toBeGreaterThan(80 * 60 - 60);
       expect(moves.every((km, i) => i === 0 || km > moves[i - 1])).toBe(true);
+    }
+  });
+
+  it("comes to rest where it stops, at the next Stop it was asked to ride to and at the finish: a second of braking, not a dead stop from full pace", () => {
+    // The trap: at one pace the Ride arrives at 450 m a second, and a Ride that simply ends there
+    // stops the camera dead. It sheds its speed over the last of the road instead, and still lands exactly on the Stop.
+    for (const arrive of ["at the next Stop", "at the finish"] as const) {
+      const { ride, moves, secondsUntilItStops } = rideOn(nyc);
+      if (arrive === "at the next Stop") {
+        ride.scrubbedTo(5);
+        ride.rideToNextStop(); // to the Barclays Center, km 12.1
+      } else {
+        ride.scrubbedTo(nyc.lengthKm - 3);
+        ride.playPause();
+      }
+      secondsUntilItStops();
+
+      expect(ride.km, arrive).toBe(arrive === "at the next Stop" ? 12.1 : nyc.lengthKm);
+      const steps = moves.slice(1).map((km, i) => km - moves[i]);
+      const atFullPace = Math.max(...steps);
+      // The last frame hardly moves, half a second out it is already well off its pace, and it only ever slows on the way in.
+      expect(steps[steps.length - 1], arrive).toBeLessThan(atFullPace / 10);
+      expect(steps[steps.length - 30], arrive).toBeLessThan(atFullPace * 0.6);
+      const theWayIn = steps.slice(-60);
+      expect(theWayIn.every((step, i) => i === 0 || step <= theWayIn[i - 1] + 1e-12), arrive).toBe(true);
+      // And it is no crawl: from full pace to rest in about a second.
+      expect(steps.filter((step) => step < atFullPace * 0.99).length, arrive).toBeLessThan(120);
     }
   });
 
@@ -306,7 +344,7 @@ describe("Back and Ride to the next stop", () => {
   it("has nowhere to go back to from the start, and so does nothing: a Back that is greyed out doesn't quietly pause the Ride", () => {
     const { ride, run } = rideOn(nyc);
     ride.playPause();
-    run(0.1); // 8 m on: still on the Start, with no Stop behind it
+    run(0.03); // two frames, 8 m on at one pace from above: still on the Start, with no Stop behind it
 
     ride.back();
 

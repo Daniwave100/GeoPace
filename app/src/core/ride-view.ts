@@ -50,7 +50,7 @@ const FROM_ABOVE = {
    * How far from the runner the camera is, all the way: at a Stop, up a climb and on the open road
    * alike. First built coming down to 900 m at every Stop and back up to 2,200 m after it, which in
    * New York is eighteen times: the owner, after riding both, keeps it at one level (issue #24).
-   * A Stop is still marked, by the Ride slowing for it (core/ride.ts).
+   * A Stop is still marked: the strip and the player name it as it goes by.
    */
   rangeM: 1500,
   /**
@@ -59,12 +59,22 @@ const FROM_ABOVE = {
    * goes by unnoticed, and a real change of direction is a slow sweep.
    */
   facing: { behindM: 1000, aheadM: 2000 },
+  /**
+   * The most the view turns for the course that goes by, degrees per km: at the Ride's one pace
+   * from above, 450 m a second (core/ride.ts), 18 degrees a second. Where the course doubles back
+   * within those 3 km (New York's last two, round the foot of Central Park) the two ends of that
+   * line come close together and it spins, at that pace faster than 90 degrees a second. The Ride
+   * used to slow down there; since the owner asked for one pace all the way (issue #24) the camera
+   * is held back instead: it begins its turn a little early and ends it a little late. The runner
+   * stays in the middle of the view whichever way it faces.
+   */
+  mostTurnDegPerKm: 40,
 };
 
 const M_PER_DEG_LAT = 111_320;
 const RAD = Math.PI / 180;
 
-/** As much of a course as the Ride's cameras and its time-lapse need: the course line, where the Stops are (the Ride slows for them; no camera looks at them), and where the height is filled in. */
+/** As much of a course as the Ride's cameras and its time-lapse need: the course line, where the Stops are (On the road the Ride slows for them; no camera looks at them), and where the height is filled in. */
 export interface RideScene {
   line: CourseLine;
   /** In course order (core/stops.ts). */
@@ -141,7 +151,41 @@ export function rideCourseFor(scene: RideScene): RideCourse {
 /** Which way a camera faces at `km`: On the road, at the runner from the road behind them; From above, the way the course is going. */
 function headingAt(line: CourseLine, km: number, camera: RideCamera): number {
   if (camera === "on-the-road") return bearingDeg(placeAlong(line, km - ON_THE_ROAD.behindM / 1000), placeAlong(line, km));
-  return bearingDeg(placeAlong(line, km - FROM_ABOVE.facing.behindM / 1000), placeAlong(line, km + FROM_ABOVE.facing.aheadM / 1000));
+  const facings = facingsAlong(line);
+  const at = Math.min(Math.max(km * 1000, 0), facings.length - 1);
+  const before = Math.floor(at);
+  const after = Math.min(before + 1, facings.length - 1);
+  return (((facings[before] + (facings[after] - facings[before]) * (at - before)) % 360) + 360) % 360;
+}
+
+/** For each course line, which way From above faces at every metre: degrees, counted on past 360 rather than wrapped, so that they can be told apart and averaged. Worked out once: the camera asks on every frame. */
+const FACINGS = new WeakMap<CourseLine, Float64Array>();
+
+/**
+ * From above's facing along a course: the way the course is going over 3 km, turning no faster
+ * than `mostTurnDegPerKm`. A turn that would be faster is spread over the road before it and after
+ * it alike: the facing that follows the course as fast as it may, and the one that, read from the
+ * finish backwards, leads it as early as it must, each keep to the bound, and so does the mean of
+ * the two. Wherever the course turns slowly enough, all three are the same. Still a plain function
+ * of the km: the same place gives the same view, however the Ride got there.
+ */
+function facingsAlong(line: CourseLine): Float64Array {
+  let facings = FACINGS.get(line);
+  if (!facings) {
+    const meters = Math.ceil(line.length_m);
+    const theWayTheCourseGoes = (m: number) => bearingDeg(placeAlong(line, (m - FROM_ABOVE.facing.behindM) / 1000), placeAlong(line, (m + FROM_ABOVE.facing.aheadM) / 1000));
+    const wanted = new Float64Array(meters + 1);
+    wanted[0] = theWayTheCourseGoes(0);
+    for (let m = 1; m <= meters; m += 1) wanted[m] = wanted[m - 1] + relativeBearing(wanted[m - 1], theWayTheCourseGoes(m));
+    const most = FROM_ABOVE.mostTurnDegPerKm / 1000;
+    const following = Float64Array.from(wanted);
+    for (let m = 1; m <= meters; m += 1) following[m] = Math.min(Math.max(wanted[m], following[m - 1] - most), following[m - 1] + most);
+    const leading = Float64Array.from(wanted);
+    for (let m = meters - 1; m >= 0; m -= 1) leading[m] = Math.min(Math.max(wanted[m], leading[m + 1] - most), leading[m + 1] + most);
+    facings = following.map((follows, m) => (follows + leading[m]) / 2);
+    FACINGS.set(line, facings);
+  }
+  return facings;
 }
 
 export function rideView(scene: RideScene, km: number, camera: RideCamera, options: RideViewOptions = {}): RideView {
