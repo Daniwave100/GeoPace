@@ -27,7 +27,8 @@ import {
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { CourseLine } from "../bundle/types";
-import { rangeToFitM, sidewaysShiftM } from "../core/framing";
+import { CAMERA_TILT_RAD, type MapView, rangeToFitM, sidewaysShiftM } from "../core/framing";
+import { zoomStepM } from "../core/map-bounds";
 import type { RoadPosition } from "../core/scrub";
 import { registerCourseRibbon } from "./course-ribbon";
 import { groundUnderM } from "./ground-under";
@@ -36,11 +37,30 @@ import { plainGroundIfTerrainFails } from "./plain-ground";
 import { BASEMAP, TERRAIN } from "./providers";
 
 const EARTH_RADIUS_M = 6_371_000;
-/** How far down the camera looks when it frames the course: from above, tilted enough that the city reads as 3D. */
-const CAMERA_TILT_RAD = CesiumMath.toRadians(60);
 
 /** Where the camera was left by the last framing of the whole course, to tell whether the runner has moved the map since. */
 const framedFrom = new WeakMap<Viewer, Cartesian3>();
+
+/**
+ * When the map's own flight that is in the air is due to land, or nothing for none: the map's
+ * bounds leave a flight to land (scene/map-bounds.ts). Read off the clock rather than counted, so
+ * that a flight whose end nobody hears of is over when its own time is up and the bounds come back
+ * by themselves.
+ */
+const flightUntilMs = new WeakMap<Viewer, number>();
+
+function flying(viewer: Viewer, seconds: number): void {
+  flightUntilMs.set(viewer, performance.now() + seconds * 1000);
+}
+
+function landed(viewer: Viewer): void {
+  flightUntilMs.delete(viewer);
+}
+
+/** Whether one of the map's own flights is in the air: `frameCourse`, `goTo` or `toggleStraightDown`. */
+export function isFlying(viewer: Viewer): boolean {
+  return performance.now() < (flightUntilMs.get(viewer) ?? 0);
+}
 
 /** The viewer is made once; switching course only swaps what is drawn on it. */
 export function createGlobe(container: HTMLElement): Viewer {
@@ -101,17 +121,21 @@ export function showMoment(viewer: Viewer, instant: Date): void {
  */
 export function frameCourse(viewer: Viewer, line: CourseLine, coveredLeftPx: number, seconds = 0): void {
   const sphere = BoundingSphere.fromPoints(line.lat.map((lat, i) => Cartesian3.fromDegrees(line.lon[i], lat)));
-  const view = { fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx };
+  const view = mapView(viewer, coveredLeftPx);
   const rangeM = rangeToFitM({ ...view, radiusM: sphere.radius, tiltRad: CAMERA_TILT_RAD });
   // The camera faces north, so the course's left is west: aim that far west of its middle, and the
   // course lands in the clear part of the map. Aimed there from the start, a flight ends where it
   // should, with no jump sideways at the end.
   const east = Matrix4.getColumn(Transforms.eastNorthUpToFixedFrame(sphere.center), 0, new Cartesian4());
   const west = Cartesian3.multiplyByScalar(new Cartesian3(east.x, east.y, east.z), -sidewaysShiftM({ ...view, rangeM }), new Cartesian3());
+  flying(viewer, seconds);
   viewer.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.add(sphere.center, west, new Cartesian3()), sphere.radius), {
     offset: new HeadingPitchRange(0, -CAMERA_TILT_RAD, rangeM),
     duration: seconds,
-    complete: () => framedFrom.set(viewer, Cartesian3.clone(viewer.camera.positionWC)),
+    complete: () => {
+      landed(viewer);
+      framedFrom.set(viewer, Cartesian3.clone(viewer.camera.positionWC));
+    },
   });
 }
 
@@ -131,7 +155,12 @@ export function isStillFramed(viewer: Viewer): boolean {
  * Ride's From above camera keeps the runner there, as the framing of the whole course does the course.
  */
 export function leftOfMiddle(viewer: Viewer, coveredLeftPx: number): number {
-  return sidewaysShiftM({ fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx, rangeM: 1 });
+  return sidewaysShiftM({ ...mapView(viewer, coveredLeftPx), rangeM: 1 });
+}
+
+/** The map as the camera sees it (core/framing.ts): `coveredLeftPx` is how much of its left side the readout block covers. */
+export function mapView(viewer: Viewer, coveredLeftPx: number): MapView {
+  return { fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx };
 }
 
 function horizontalFov(viewer: Viewer): number {
@@ -145,9 +174,11 @@ function horizontalFov(viewer: Viewer): number {
 /** Bring a place on the course to the middle of the map, from the height the camera is already at. */
 export function goTo(viewer: Viewer, place: RoadPosition, seconds = 0): void {
   const rangeM = Math.max(heightAboveGround(viewer) / Math.sin(CAMERA_TILT_RAD), 300);
+  flying(viewer, seconds);
   viewer.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.fromDegrees(place.lon, place.lat), 1), {
     offset: new HeadingPitchRange(viewer.camera.heading, -CAMERA_TILT_RAD, rangeM),
     duration: seconds,
+    complete: () => landed(viewer),
   });
 }
 
@@ -170,7 +201,8 @@ export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
   if (!middle) return;
   const rangeM = Math.max(Cartesian3.distance(viewer.camera.positionWC, middle), 300);
   const tiltRad = isLookingStraightDown(viewer) ? CAMERA_TILT_RAD : CesiumMath.PI_OVER_TWO;
-  viewer.camera.flyToBoundingSphere(new BoundingSphere(middle, 1), { offset: new HeadingPitchRange(0, -tiltRad, rangeM), duration: seconds });
+  flying(viewer, seconds);
+  viewer.camera.flyToBoundingSphere(new BoundingSphere(middle, 1), { offset: new HeadingPitchRange(0, -tiltRad, rangeM), duration: seconds, complete: () => landed(viewer) });
 }
 
 /**
@@ -223,11 +255,21 @@ export function panMap(viewer: Viewer, right: number, up: number): void {
   camera.move(ahead, up * step);
 }
 
-/** Zoom the map in (`towards` = 1) or out (-1), never through the ground. */
+/** As far out as the map ever goes with no course on it to measure a floor from: the globe, whole. */
+const OUT_TO_THE_GLOBE_M = 20_000_000;
+
+/**
+ * Zoom the map in (`towards` = 1) or out (-1), never through the ground and never out past the
+ * floor the map's bounds hold the wheel to (scene/map-bounds.ts keeps that floor up to date). How
+ * much room is left to go out is measured from the ellipsoid, as the floor itself is; the step is
+ * a share of how far the camera is above the ground, which is what keeps it off the ground.
+ */
 export function zoomMap(viewer: Viewer, towards: number): void {
-  const height = heightAboveGround(viewer);
-  if (towards > 0 && height > 80) viewer.camera.zoomIn(height * 0.4);
-  if (towards < 0 && height < 20_000_000) viewer.camera.zoomOut(height * 0.7);
+  const floorM = Math.min(viewer.scene.screenSpaceCameraController.maximumZoomDistance, OUT_TO_THE_GLOBE_M);
+  const stepM = zoomStepM(towards, heightAboveGround(viewer), floorM - viewer.camera.positionCartographic.height);
+  if (stepM <= 0) return;
+  if (towards > 0) viewer.camera.zoomIn(stepM);
+  else viewer.camera.zoomOut(stepM);
 }
 
 /**

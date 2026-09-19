@@ -6,6 +6,7 @@ import type { CourseBundle } from "./bundle/types";
 import { type Encoding, ENCODINGS } from "./core/encoding";
 import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
+import { type Vicinity, vicinityOf } from "./core/map-bounds";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
 import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera, rideSpeedKmPerS } from "./core/ride";
@@ -34,7 +35,8 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isStillFramed, leftOfMiddle, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isFlying, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
+import { keepTheMapInTheVicinity } from "./scene/map-bounds";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
@@ -60,6 +62,8 @@ interface Showing {
   stops: Stop[];
   /** What the Ride's camera needs of the course: the course line and the Stops. */
   rideScene: RideScene;
+  /** How far from this course the map may be taken (core/map-bounds.ts, issue #25). */
+  vicinity: Vicinity;
   /** The Ride through this course: off until the runner rides, and then a mode of this same screen (PLAN.md D34). */
   ride: Ride;
 }
@@ -199,6 +203,15 @@ async function show(courseId: string): Promise<void> {
     // While photoreal hides the plain ground, the map's own moves count heights from the road where the runner is.
     useRoadAsGroundWhenHidden(map, () => (showing ? positionAtKm(showing.bundle.measured.course_line, showing.km).ellipsoidHeightM : undefined));
     rideCamera = createRideCamera(map, { reducedMotion: () => reducedMotion.matches, now: () => performance.now() });
+    // The map stays in the city (issue #25): the camera is kept in the vicinity of the course that
+    // is showing, and can't be taken further out than the whole course needs — except while it is
+    // the Ride's or the runner's in free look, both tied to the runner on the course, or in the
+    // middle of one of the map's own flights, which is left to land.
+    keepTheMapInTheVicinity(map, {
+      vicinity: () => showing?.vicinity,
+      theMapsOwn: () => !(rideCamera?.holdsTheCamera() ?? false) && !isFlying(map),
+      mapView: () => mapView(map, coveredLeftPx()),
+    });
     watchForAHandOnTheMap();
     showTheme();
   }
@@ -209,7 +222,7 @@ async function show(courseId: string): Promise<void> {
   const layers = layersFor(bundle);
   const stops = stopsFor(bundle);
   const rideScene: RideScene = { line: bundle.measured.course_line, stops, notMeasured: bundle.measured.elevation_not_measured };
-  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, ride: startRide(rideScene) };
+  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, vicinity: vicinityOf(bundle.measured.course_line), ride: startRide(rideScene) };
   wasRiding = false;
   wasPlaying = false;
   showPlan();

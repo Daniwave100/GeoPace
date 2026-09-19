@@ -77,6 +77,10 @@ _Avoid_: seeking, sliding
 The home mode: the city seen from above with the course on it, moved freely, with layers switched on and off.
 _Avoid_: dashboard, map mode, overview
 
+**The vicinity**:
+The part of the world the map may be taken to while a course is showing: that course's own box with about a city's width round it. The map looks freely within it, and cannot be dragged, panned or zoomed out of it; the Ride's camera and free look are tied to the runner and are never held by it.
+_Avoid_: the box, the geofence, the leash
+
 **Ride**:
 The mode that carries the runner along the course as a time-lapse, past its Stops.
 _Avoid_: flyover, tour, playback, video, walkthrough

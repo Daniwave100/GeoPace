@@ -3,6 +3,14 @@
 // left of it. The camera looks to the course's left by half of what is covered, which puts the
 // course in the middle of the part that is clear.
 
+/**
+ * How far down the camera looks when it frames the course: from above, tilted enough that the city
+ * reads as 3D. The map's own moves are measured against it — how much room a camera at a given
+ * height needs outside the vicinity it must stay in (core/map-bounds.ts), and how far out it may
+ * be taken — so that the bounds and the framing can never disagree.
+ */
+export const CAMERA_TILT_RAD = (60 * Math.PI) / 180;
+
 /** The map as the camera sees it, and how much of it is under a block. */
 export interface MapView {
   /** The camera's horizontal field of view, radians. */

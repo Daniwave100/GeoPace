@@ -9,7 +9,7 @@ import { isLookingStraightDown, panMap, zoomMap } from "../scene/globe";
 
 /** Said by a screen reader on the map, and printed in the small print under the strip. */
 export const MAP_HELP =
-  "Drag to move, scroll to zoom, Ctrl + drag to tilt. In the Ride, dragging turns the camera round you instead and scrolling moves it in and out, while the Ride plays on. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back, F gives the map the full screen.";
+  "Drag to move, scroll to zoom, Ctrl + drag to tilt; the map stays in the city the course is in. In the Ride, dragging turns the camera round you instead and scrolling moves it in and out, while the Ride plays on. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back, F gives the map the full screen.";
 
 export interface MapActions {
   /**
