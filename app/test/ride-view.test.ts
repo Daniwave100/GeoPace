@@ -94,6 +94,8 @@ interface Swing {
 function swingAlong(scene: RideScene, camera: RideCamera): Swing {
   const course = rideCourseFor(scene);
   const asSlowAsItGoes = { ...course, swingDegPerKm: () => Number.MAX_VALUE };
+  // Both worked out once: a fresh course object every metre would rebuild its whole table of speeds.
+  const withNoTurns = { ...course, swingDegPerKm: undefined };
   const swing: Swing = { degPerS: 0, km: 0, atItsSlowestM: 0, fastestAtItsSlowestDegPerS: 0 };
   let last = rideView(scene, 0, camera).headingDeg;
   for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
@@ -103,7 +105,10 @@ function swingAlong(scene: RideScene, camera: RideCamera): Swing {
     // Degrees in a metre of road, times how many metres go by in a second.
     const degPerS = Math.abs(relativeBearing(last, heading)) * speed * 1000;
     last = heading;
-    if (speed <= rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) {
+    // A camera whose Ride never eases off for a turn (From above keeps one pace, issue #24) is never
+    // "as slow as it may go": every metre of it is measured, or the bound below would mean nothing.
+    const slowedForThisTurn = speed < rideSpeedKmPerS(withNoTurns, km, camera) * 0.999;
+    if (slowedForThisTurn && speed <= rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) {
       // Only a turn counts: near a Stop the Ride is this slow on a dead straight road too.
       if (degPerS > 1) swing.atItsSlowestM += 1;
       swing.fastestAtItsSlowestDegPerS = Math.max(swing.fastestAtItsSlowestDegPerS, degPerS);
@@ -333,8 +338,10 @@ describe("From above", () => {
     for (const scene of [cornerCourse(), nyc, berlin]) {
       const swing = swingAlong(scene, "from-above");
       expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(21);
-      // From above the Ride never has to go as slow as it may to keep to that: nothing is excused.
-      expect(swing.fastestAtItsSlowestDegPerS).toBeLessThan(21);
+      // From above the Ride eases off for nothing (issue #24), so every metre is measured above and
+      // none is excused: what keeps the view from whipping round is the camera's own facing.
+      expect(swing.atItsSlowestM).toBe(0);
+      expect(swing.fastestAtItsSlowestDegPerS).toBe(0);
     }
   });
 });

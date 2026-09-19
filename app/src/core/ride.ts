@@ -121,6 +121,9 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
  * same km always gives the same speed, however the Ride got there.
  */
 export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
+  // One pace: the answer is the same everywhere, and there is no 42,000-entry table of it to build.
+  const { cruiseKmPerS, easesOff } = TIME_LAPSE[camera];
+  if (!easesOff) return cruiseKmPerS;
   const speeds = speedsAlong(course, camera);
   const at = clamp(km / SPEEDS_EVERY_KM, 0, speeds.length - 1);
   const before = Math.floor(at);
@@ -128,7 +131,7 @@ export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCame
   return speeds[before] + (speeds[after] - speeds[before]) * (at - before);
 }
 
-/** The Ride's speed is worked out every metre of the course, once for each course and camera: the Ride asks on every frame. */
+/** The Ride's speed is worked out every metre of the course, once for each course and camera that eases off for anything: the Ride asks on every frame. */
 const SPEEDS_EVERY_KM = 0.001;
 const SPEEDS = new WeakMap<RideCourse, Partial<Record<RideCamera, Float64Array>>>();
 
