@@ -37,6 +37,12 @@ interface TimeLapse {
    * Ride is slower at a Stop than anywhere between Stops (issue #8), and a street corner is not a Stop.
    */
   slowestThroughATurnKmPerS: number;
+  /**
+   * How hard the Ride brakes for what is coming and picks up after it, km/s per second. The speed a
+   * place allows can drop to a fifth within a few metres at a street corner; the Ride sees it
+   * coming and sheds speed at this rate, as a vehicle would, instead of all at once.
+   */
+  brakingKmPerS2: number;
 }
 
 /** About 5:30 a kilometre: the time-lapse is never slower than the race it is a time-lapse of. */
@@ -55,11 +61,11 @@ const MOST_CRUISE_THROUGH_A_STRETCH = 0.3;
  * so the time-lapse is gentler (PLAN.md D33, §6 "The ride"), and slows to a fast run at a Stop.
  */
 const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
-  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.1 },
+  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.1, brakingKmPerS2: 0.4 },
   // On the road the camera looks at the runner from 25 m behind, so a street corner swings the view
   // a quarter turn in those 25 m: the Ride takes it as a vehicle would, in a second and a half, at
   // some 13 m/s. A Stop is slower still: 12 m/s for the 60 m around it, five seconds to read it by.
-  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.012, slowWithinKm: 0.03, easeOverKm: 0.25, mostSwingDegPerS: 60, slowestThroughATurnKmPerS: 0.0125 },
+  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.012, slowWithinKm: 0.03, easeOverKm: 0.25, mostSwingDegPerS: 60, slowestThroughATurnKmPerS: 0.0125, brakingKmPerS2: 0.06 },
 };
 
 /**
@@ -73,9 +79,13 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
   let most = 1;
   let toNearestStop = Number.POSITIVE_INFINITY;
   for (const stop of course.stops) {
-    // Inside a stretch the Ride is on the Stop, but past the slow of arriving at its foot it may pick up a little.
-    const inTheStretch = stop.toKm !== undefined && km > stop.km && km < stop.toKm;
-    if (inTheStretch) most = MOST_CRUISE_THROUGH_A_STRETCH;
+    // Through a stretch the Ride is held back all the way up, and past its top it is let go of
+    // gradually, over the same distance it eases away from a Stop: never all at once, which From
+    // above, taking its height from this number, showed as a 900 m jump of the camera.
+    if (stop.toKm !== undefined && km > stop.km) {
+      const past = clamp((km - stop.toKm) / lapse.easeOverKm, 0, 1);
+      most = Math.min(most, MOST_CRUISE_THROUGH_A_STRETCH + (1 - MOST_CRUISE_THROUGH_A_STRETCH) * past * past * (3 - 2 * past));
+    }
     toNearestStop = Math.min(toNearestStop, Math.abs(stop.km - km));
   }
   const away = clamp((toNearestStop - lapse.slowWithinKm) / lapse.easeOverKm, 0, 1);
@@ -84,10 +94,43 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
 
 /**
  * How much course goes by in a second of the Ride at `km`: slow at a Stop, easing up to the cruise
- * away from one, and easing off through a turn sharp enough to whip the view round (at a
- * time-lapse's speed a city block's corner is one; New York's Bronx mile is five in a row).
+ * away from one, easing off through a turn sharp enough to whip the view round (at a time-lapse's
+ * speed a city block's corner is one; New York's Bronx mile is five in a row), and braking for
+ * whatever is coming rather than on top of it. Still a plain function of where the runner is: the
+ * same km always gives the same speed, however the Ride got there.
  */
 export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
+  const speeds = speedsAlong(course, camera);
+  const at = clamp(km / SPEEDS_EVERY_KM, 0, speeds.length - 1);
+  const before = Math.floor(at);
+  const after = Math.min(before + 1, speeds.length - 1);
+  return speeds[before] + (speeds[after] - speeds[before]) * (at - before);
+}
+
+/** The Ride's speed is worked out every metre of the course, once for each course and camera: the Ride asks on every frame. */
+const SPEEDS_EVERY_KM = 0.001;
+const SPEEDS = new WeakMap<RideCourse, Partial<Record<RideCamera, Float64Array>>>();
+
+function speedsAlong(course: RideCourse, camera: RideCamera): Float64Array {
+  const forThisCourse = SPEEDS.get(course) ?? {};
+  SPEEDS.set(course, forThisCourse);
+  let speeds = forThisCourse[camera];
+  if (!speeds) {
+    const braking = TIME_LAPSE[camera].brakingKmPerS2;
+    speeds = Float64Array.from({ length: Math.ceil(course.lengthKm / SPEEDS_EVERY_KM) + 1 }, (_, i) => speedThePlaceAllowsKmPerS(course, Math.min(i * SPEEDS_EVERY_KM, course.lengthKm), camera));
+    // No quicker at any place than it could have got to from the place before, nor than it can
+    // shed before the place after: one pass along the course and one pass back (v² = u² + 2as).
+    // Only ever slower than the place allows, so what the place was slowed for still holds.
+    const reachedFrom = (speed: number) => Math.sqrt(speed * speed + 2 * braking * SPEEDS_EVERY_KM);
+    for (let i = 1; i < speeds.length; i += 1) speeds[i] = Math.min(speeds[i], reachedFrom(speeds[i - 1]));
+    for (let i = speeds.length - 2; i >= 0; i -= 1) speeds[i] = Math.min(speeds[i], reachedFrom(speeds[i + 1]));
+    forThisCourse[camera] = speeds;
+  }
+  return speeds;
+}
+
+/** The most the Ride may do at `km` for what is there: how near a Stop it is, and how sharply the view is swinging. */
+function speedThePlaceAllowsKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
   const lapse = TIME_LAPSE[camera];
   const intoItsCruise = cruising(course, km, camera);
   const paced = lapse.slowKmPerS + (lapse.cruiseKmPerS - lapse.slowKmPerS) * intoItsCruise;
@@ -265,9 +308,10 @@ export function createRide(options: RideOptions): Ride {
       setPlaying(true);
     },
     back() {
-      setPlaying(false);
       const back = stopsAround(course.stops, km).back;
-      if (back !== null) moveTo(course.stops[back].km, "jump");
+      if (back === null) return; // on the first Stop there is nowhere to go back to, and nothing happens: the Ride isn't paused for it
+      setPlaying(false);
+      moveTo(course.stops[back].km, "jump");
     },
     scrubbedTo(next) {
       km = clamp(next, 0, course.lengthKm);

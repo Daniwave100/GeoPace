@@ -7,7 +7,7 @@ import { hillStretches } from "./hills";
 import { plainName } from "./sentence";
 import { formatHeight, formatNearby, type Units } from "./units";
 
-/** A climb that begins this close to a Stop is not a Stop of its own: the Ride would arrive at it before it had left the other. */
+/** A climb that begins this close to a Stop is not a Stop of its own: the Ride would arrive at it before it had left the other. That Stop takes the climb's end instead. */
 const SAME_PLACE_KM = 0.3;
 /**
  * Closer to a Stop than this, the runner is on it. Half of the 50 m that a distance to the next
@@ -24,7 +24,10 @@ const CLIMB_WORTH_A_STOP_M = 15;
 export interface Stop {
   /** Where the Ride arrives: km from the start along the course line. For a climb, its foot. */
   km: number;
-  /** For a stretch where something happens, where it ends: the Ride stays slow all the way through it. A landmark is a place and has none. */
+  /**
+   * Where the stretch that begins here ends: the Ride stays slow all the way through it. A place
+   * has none, unless a stretch begins at it: New York's Start stands at the foot of the Verrazzano's climb.
+   */
   toKm?: number;
   kind: "start" | "landmark" | "climb" | "finish";
   /** What it is called, in the runner's units: a climb is named by the height it gains. */
@@ -41,15 +44,19 @@ export interface Stop {
 export function stopsFor(bundle: CourseBundle): Stop[] {
   const lengthKm = bundle.measured.course_line.length_m / 1000;
   const stops = bundle.course.landmarks.map((landmark): Stop => ({ km: landmark.km, kind: "landmark", name: () => landmark.name }));
-  const add = (stop: Stop, withinKm: number) => {
-    if (!stops.some((other) => Math.abs(other.km - stop.km) <= withinKm)) stops.push(stop);
+  const addAnEnd = (stop: Stop) => {
+    if (!stops.some((other) => Math.abs(other.km - stop.km) <= ON_THE_STOP_KM)) stops.push(stop);
   };
-  add({ km: 0, kind: "start", name: () => "Start" }, ON_THE_STOP_KM);
-  add({ km: lengthKm, kind: "finish", name: () => "Finish" }, ON_THE_STOP_KM);
+  addAnEnd({ km: 0, kind: "start", name: () => "Start" });
+  addAnEnd({ km: lengthKm, kind: "finish", name: () => "Finish" });
   for (const hill of hillStretches(bundle)) {
     // A Stop named "Climb of 40 m" is a claim about height. Where any of that height is filled in
     // rather than measured, the number is a guess, and a guess names nothing (PLAN.md D45).
-    if (hill.kind === "climb" && hill.gainM >= CLIMB_WORTH_A_STOP_M && hill.notMeasuredKm === 0) add({ km: hill.fromKm, toKm: hill.toKm, kind: "climb", name: (units) => `Climb of ${formatHeight(hill.gainM, units)}` }, SAME_PLACE_KM);
+    if (hill.kind !== "climb" || hill.gainM < CLIMB_WORTH_A_STOP_M || hill.notMeasuredKm !== 0) continue;
+    // A climb that gives way to a Stop at its foot is still slow all the way up: that Stop keeps its name and takes the climb's end.
+    const atItsFoot = stops.find((other) => Math.abs(other.km - hill.fromKm) <= SAME_PLACE_KM);
+    if (atItsFoot) atItsFoot.toKm ??= hill.toKm;
+    else stops.push({ km: hill.fromKm, toKm: hill.toKm, kind: "climb", name: (units) => `Climb of ${formatHeight(hill.gainM, units)}` });
   }
   return stops.sort((a, b) => a.km - b.km);
 }

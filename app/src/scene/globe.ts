@@ -6,7 +6,6 @@
 // gets there, and never drifts from the readout.
 import {
   BoundingSphere,
-  Cartesian2,
   Cartesian3,
   Cartesian4,
   Cartographic,
@@ -31,6 +30,7 @@ import type { CourseLine } from "../bundle/types";
 import { rangeToFitM, sidewaysShiftM } from "../core/framing";
 import type { RoadPosition } from "../core/scrub";
 import { registerCourseRibbon } from "./course-ribbon";
+import { middleOfTheMap } from "./map-middle";
 import { plainGroundIfTerrainFails } from "./plain-ground";
 import { BASEMAP, TERRAIN } from "./providers";
 
@@ -164,9 +164,9 @@ export function isLookingStraightDown(viewer: Viewer): boolean {
  * like a map.
  */
 export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
-  const canvas = viewer.canvas;
-  const middle = viewer.camera.pickEllipsoid(new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
-  if (!middle) return; // looking at the sky: there is no place to keep in the middle
+  // On the ground under the camera, not on the ellipsoid, which a camera over a New York street is inside of (map-middle.ts).
+  const middle = middleOfTheMap(viewer.camera, viewer.canvas, viewer.camera.positionCartographic.height - heightAboveGround(viewer));
+  if (!middle) return;
   const rangeM = Math.max(Cartesian3.distance(viewer.camera.positionWC, middle), 300);
   const tiltRad = isLookingStraightDown(viewer) ? CAMERA_TILT_RAD : CesiumMath.PI_OVER_TWO;
   viewer.camera.flyToBoundingSphere(new BoundingSphere(middle, 1), { offset: new HeadingPitchRange(0, -tiltRad, rangeM), duration: seconds });
@@ -241,10 +241,21 @@ export function watchCameraHeight(viewer: Viewer, onHeight: (meters: number | nu
     }
     if (mine === asked) onHeight(meters);
   };
-  const stopListening = viewer.camera.moveEnd.addEventListener(() => void measure());
+  // CesiumJS says the camera has come to rest before the frame is drawn, and before the Ride, if it
+  // is holding the camera, has put it where that frame is drawn from (scene/ride-camera.ts): read
+  // then, it is the camera CesiumJS nudged, a view nobody sees. It is read once that frame is drawn.
+  let waitingForTheFrame: (() => void) | undefined;
+  const stopListening = viewer.camera.moveEnd.addEventListener(() => {
+    waitingForTheFrame ??= viewer.scene.postRender.addEventListener(() => {
+      waitingForTheFrame?.();
+      waitingForTheFrame = undefined;
+      void measure();
+    });
+  });
   void measure();
   return () => {
     asked += 1; // an answer still on its way is no longer wanted
     stopListening();
+    waitingForTheFrame?.();
   };
 }

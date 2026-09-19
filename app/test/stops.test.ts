@@ -85,6 +85,12 @@ describe("the Stops of a course", () => {
     expect(climbs[1].name("km")).toBe("Climb of 38 m");
     expect(climbs[1].toKm).toBeCloseTo(24.81, 2); // a stretch: the Ride is slow all the way up it
     expect(stopsFor(nyc).find((stop) => stop.kind === "landmark")?.toKm).toBeUndefined(); // a landmark is a place
+    // The Verrazzano's climb gives way to the Start, which stands at its foot: the Start keeps its
+    // name and takes the climb's end, so the course's first big hill is slow all the way up too.
+    const start = stopsFor(nyc)[0];
+    expect(start.name("km")).toBe("Start");
+    expect(start.toKm).toBeCloseTo(0.72, 2);
+    expect(stopsFor(berlin)[0].toKm).toBeUndefined();
     expect(climbs[1].name("mi")).toBe("Climb of 125 ft");
     expect(stopsFor(berlin).filter((stop) => stop.kind === "climb")).toEqual([]);
   });

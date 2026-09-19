@@ -94,9 +94,23 @@ export function createMapLabels(viewer: Viewer, container: HTMLElement): MapLabe
   // The web font arrives after the first labels are made, and changes how wide each one is.
   void document.fonts?.ready.then(measure);
 
+  // The ground can change under the labels: the open terrain arrives (the first labels are made
+  // before there is a terrain to ask, and used to stay at height zero for good: 73 m under Berlin's
+  // streets), or gives way to the plain ground (plain-ground.ts). What was known of it is forgotten,
+  // and draped labels are lifted onto the new one.
+  let draped = false;
+  viewer.scene.globe.terrainProviderChanged.addEventListener(() => {
+    groundHeights.clear();
+    if (!draped) return;
+    for (const item of placed) item.position = Cartesian3.fromDegrees(item.label.lon, item.label.lat, 0);
+    const mine = shown;
+    void liftOntoTheGround(viewer, placed, groundHeights, () => mine === shown);
+  });
+
   return {
     show(labels, placement) {
       const mine = ++shown;
+      draped = placement === "draped";
       placed = labels.map((label) => {
         const node = labelNode(label);
         node.hidden = true; // until the next frame says where it goes

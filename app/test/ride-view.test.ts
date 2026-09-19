@@ -69,16 +69,24 @@ function metersFrom(from: { lat: number; lon: number }, to: { lat: number; lon: 
   return { north: (to.lat - from.lat) * M_PER_DEG_LAT, east: (to.lon - from.lon) * M_PER_DEG_LAT * Math.cos((from.lat * Math.PI) / 180) };
 }
 
-/** The fastest the view swings round anywhere on a course, in degrees a second, at the speed the Ride goes there. */
+/**
+ * The fastest the view swings round anywhere on a course, in degrees a second, at the speed the
+ * Ride goes there; walked a metre at a time, because round Columbus Circle the whole swing falls
+ * within some 4 m. Places where the Ride is already as slow as it is allowed to go are left out:
+ * there the swing is whatever the road demands (PLAN.md D53).
+ */
 function fastestSwingDegPerS(scene: RideScene, camera: RideCamera): { degPerS: number; km: number } {
   const course = rideCourseFor(scene);
+  const asSlowAsItGoes = { ...course, swingDegPerKm: () => Number.MAX_VALUE };
   let fastest = { degPerS: 0, km: 0 };
   let last = rideView(scene, 0, camera).headingDeg;
-  for (let km = 0.01; km <= course.lengthKm; km += 0.01) {
+  for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
+    const km = m / 1000;
     const heading = rideView(scene, km, camera).headingDeg;
-    // Degrees in 10 m of road, times how many tens of metres go by in a second.
-    const degPerS = Math.abs(relativeBearing(last, heading)) * rideSpeedKmPerS(course, km, camera) * 100;
-    if (degPerS > fastest.degPerS) fastest = { degPerS, km };
+    const speed = rideSpeedKmPerS(course, km, camera);
+    // Degrees in a metre of road, times how many metres go by in a second.
+    const degPerS = Math.abs(relativeBearing(last, heading)) * speed * 1000;
+    if (degPerS > fastest.degPerS && speed > rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) fastest = { degPerS, km };
     last = heading;
   }
   return fastest;
@@ -133,7 +141,25 @@ describe("On the road", () => {
         const toRunnerDeg = (Math.atan2(toRunner.east, toRunner.north) * 180) / Math.PI;
         // CesiumJS's view is 60° across: more than 30° off the way the camera faces is out of shot.
         expect(Math.abs(relativeBearing(view.headingDeg, toRunnerDeg)), `km ${km.toFixed(2)}`).toBeLessThan(5);
+        // And up and down: where the road doubles back the runner is a few metres from a camera 3 m
+        // up, far below the horizon. The view is some 36° top to bottom; the camera looks at the
+        // road the runner is on. (The bundle's own height: over a filled-in stretch the camera
+        // allows for a crest the dot isn't drawn on, which is a few degrees.)
+        const flatM = Math.hypot(toRunner.north, toRunner.east);
+        const downToRunnerDeg = (Math.atan2(positionAtKm(scene.line, km).ellipsoidHeightM - view.eye.heightM, Math.max(flatM, 1)) * 180) / Math.PI;
+        expect(Math.abs(view.pitchDeg - downToRunnerDeg), `km ${km.toFixed(2)}, up and down`).toBeLessThan(12);
       }
+    }
+  });
+
+  it("still has the runner in shot where New York doubles back on itself at Columbus Circle, a metre at a time", () => {
+    for (let m = 41_960; m <= 42_030; m += 1) {
+      const km = m / 1000;
+      const view = rideView(nyc, km, "on-the-road");
+      const toRunner = metersFrom(view.eye, positionAtKm(nyc.line, km));
+      const flatM = Math.hypot(toRunner.north, toRunner.east);
+      const downToRunnerDeg = (Math.atan2(positionAtKm(nyc.line, km).ellipsoidHeightM - view.eye.heightM, Math.max(flatM, 1)) * 180) / Math.PI;
+      expect(Math.abs(view.pitchDeg - downToRunnerDeg), `km ${km}`).toBeLessThan(12);
     }
   });
 

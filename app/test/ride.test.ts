@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
-import { createRide, type Frames, type Ride, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
+import { createRide, cruising, type Frames, type Ride, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
 import { rideCourseFor } from "../src/core/ride-view";
 import { stopsFor } from "../src/core/stops";
 
@@ -76,6 +76,40 @@ describe("the Ride's time-lapse", () => {
         expect(placesBetweenStops).toBeGreaterThan(1500); // most of the course is between Stops
         // And on the open road it is several times as quick: Brooklyn's Fourth Avenue; Berlin between the Victory Column and Strausberger Platz.
         expect(rideSpeedKmPerS(course, 6, camera)).toBeGreaterThan(atAStop * 3);
+      }
+    }
+  });
+
+  it("never changes pace in a step: from one metre of either course to the next, how far into its cruise the Ride is barely moves", () => {
+    // The trap: a rule that holds the Ride back through a climb and lets go of it all at once at the
+    // top. From above takes its height from the same number, so the camera jumped 900 m in one frame.
+    for (const camera of ["from-above", "on-the-road"] as const) {
+      for (const course of [nyc, berlin]) {
+        let last = cruising(course, 0, camera);
+        for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
+          const now = cruising(course, m / 1000, camera);
+          expect(Math.abs(now - last), `${camera}, km ${(m / 1000).toFixed(3)}`).toBeLessThan(0.02);
+          last = now;
+        }
+      }
+    }
+  });
+
+  it("slows into a corner the way a vehicle does, and picks up again the same way: never a hard brake from one frame to the next", () => {
+    // The trap: a speed that is simply "what this place allows" drops from 120 to 25 m/s in a sixth
+    // of a second at every street corner. The Ride sees the corner coming.
+    for (const camera of ["from-above", "on-the-road"] as const) {
+      for (const course of [nyc, berlin]) {
+        let km = 0;
+        let worst = { ratio: 1, km: 0 };
+        while (km < course.lengthKm) {
+          const now = rideSpeedKmPerS(course, km, camera);
+          const next = Math.min(km + now / 60, course.lengthKm); // a frame later, sixty to the second
+          const ratio = Math.max(rideSpeedKmPerS(course, next, camera) / now, now / rideSpeedKmPerS(course, next, camera));
+          if (ratio > worst.ratio) worst = { ratio, km };
+          km = next === km ? course.lengthKm : next;
+        }
+        expect(worst.ratio, `${camera}, km ${worst.km.toFixed(3)}`).toBeLessThan(1.25);
       }
     }
   });
@@ -257,6 +291,16 @@ describe("Back and Ride to the next stop", () => {
     secondsUntilItStops();
 
     expect(ride.km).toBe(0.9);
+  });
+
+  it("has nowhere to go back to from the start, and so does nothing: a Back that is greyed out doesn't quietly pause the Ride", () => {
+    const { ride, run } = rideOn(nyc);
+    ride.playPause();
+    run(0.1); // 8 m on: still on the Start, with no Stop behind it
+
+    ride.back();
+
+    expect(ride.playing).toBe(true);
   });
 
   it("has nowhere to ride to from the finish", () => {

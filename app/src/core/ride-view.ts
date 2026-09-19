@@ -92,20 +92,45 @@ export interface RideViewOptions {
   leftOfRunner?: number;
 }
 
-/** The spacing of the course line's samples, near enough: a view's swing is measured from one to the next. */
-const SWING_OVER_KM = 0.01;
+/**
+ * How far a camera's view swings round for the course that goes by, worked out a metre at a time:
+ * where New York doubles back on itself at Columbus Circle the whole swing falls within some 4 m,
+ * and measured 10 m at a time it fell between two measurements, so the Ride sped up at its apex.
+ * The Ride is given the most of it from 10 m behind the runner to 20 m ahead: eased off a moment
+ * before the turn, not during it.
+ */
+const SWING_LOOK_M = { behind: 10, ahead: 20 };
+
+/** For each course line and camera, the swing at every metre, degrees per km. Worked out once: the Ride asks on every frame. */
+const SWINGS = new WeakMap<CourseLine, Partial<Record<RideCamera, Float64Array>>>();
+
+function swingsAlong(line: CourseLine, camera: RideCamera): Float64Array {
+  const forThisLine = SWINGS.get(line) ?? {};
+  SWINGS.set(line, forThisLine);
+  let swings = forThisLine[camera];
+  if (!swings) {
+    const meters = Math.ceil(line.length_m);
+    const headings = Array.from({ length: meters + SWING_LOOK_M.ahead + 2 }, (_, m) => headingAt(line, (m - SWING_LOOK_M.behind) / 1000, camera));
+    const perMetre = headings.slice(1).map((heading, i) => Math.abs(relativeBearing(headings[i], heading)) * 1000);
+    // perMetre[i] is the swing from (i - behind) m to the next metre, so the window for metre m is i = m .. m + behind + ahead.
+    swings = Float64Array.from({ length: meters + 1 }, (_, m) => Math.max(...perMetre.slice(m, m + SWING_LOOK_M.behind + SWING_LOOK_M.ahead)));
+    forThisLine[camera] = swings;
+  }
+  return swings;
+}
 
 /**
  * The course as the Ride needs it: its length, its Stops, and how far each camera's view swings
  * round for the course that goes by, so the Ride can ease off through a sharp turn.
  */
 export function rideCourseFor(scene: RideScene): RideCourse {
-  const swing = (km: number, camera: RideCamera) => Math.abs(relativeBearing(headingAt(scene.line, km, camera), headingAt(scene.line, km + SWING_OVER_KM, camera))) / SWING_OVER_KM;
   return {
     lengthKm: scene.line.length_m / 1000,
     stops: scene.stops,
-    // The most of the 10 m behind, the 10 m ahead and the 10 m after that: eased off a moment before the turn, not during it.
-    swingDegPerKm: (km, camera) => Math.max(swing(km - SWING_OVER_KM, camera), swing(km, camera), swing(km + SWING_OVER_KM, camera)),
+    swingDegPerKm: (km, camera) => {
+      const swings = swingsAlong(scene.line, camera);
+      return swings[Math.min(Math.max(Math.round(km * 1000), 0), swings.length - 1)];
+    },
   };
 }
 
@@ -128,8 +153,10 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
     const eyeKm = km - ON_THE_ROAD.behindM / 1000;
     const eye = placeAlong(line, eyeKm);
     const heightM = roadM(eye, eyeKm) + ON_THE_ROAD_HEIGHT_M;
-    // It looks at the road where the runner is: up a climb it looks up, over a crest it looks down.
-    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, ON_THE_ROAD.behindM) / RAD };
+    // It looks at the road where the runner is: up a climb it looks up, over a crest it looks down,
+    // and where the road doubles back, so that the runner is a few metres away, well down at them.
+    const toRunnerM = Math.max(flatDistanceM(eye, runner), 1);
+    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, toRunnerM) / RAD };
   }
 
   const course = { lengthKm: line.length_m / 1000, stops: scene.stops };
@@ -158,6 +185,11 @@ function moved(from: { lat: number; lon: number }, bearingDeg: number, meters: n
     lat: from.lat + (meters * Math.cos(bearingDeg * RAD)) / M_PER_DEG_LAT,
     lon: from.lon + (meters * Math.sin(bearingDeg * RAD)) / (M_PER_DEG_LAT * Math.cos(from.lat * RAD)),
   };
+}
+
+/** How far it is over the ground from one place to another. Flat-earth arithmetic, like `moved`. */
+function flatDistanceM(from: { lat: number; lon: number }, to: { lat: number; lon: number }): number {
+  return Math.hypot((to.lat - from.lat) * M_PER_DEG_LAT, (to.lon - from.lon) * M_PER_DEG_LAT * Math.cos(from.lat * RAD));
 }
 
 /** The direction from one place to another, degrees clockwise from true north. Flat-earth arithmetic, like `moved`. */

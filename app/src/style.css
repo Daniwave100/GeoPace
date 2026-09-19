@@ -700,7 +700,7 @@ button.map-label {
 }
 
 #photoreal {
-  flex: 0 1 auto;
+  flex: 0 0 auto; /* the player gives way first: this block never shrinks, so its button never breaks onto two lines */
   max-width: min(340px, 100%);
   pointer-events: none; /* the gap between its button and its notice is still the map */
   display: flex;
@@ -1326,10 +1326,16 @@ button.map-label {
   flex-basis: 100%;
 }
 
-/* Too narrow for the player to fold any further beside a photoreal notice: the notice goes under it. */
+/* Too narrow for the player to fold any further beside the photoreal block: that block goes under it. */
 @media (max-width: 960px) {
   .map-top {
     flex-wrap: wrap;
+  }
+
+  /* Under the player it would land in the column of the map's own buttons (99px of them, 12px each
+     side), which are drawn over whatever is there. In the Ride the row stops short of that column. */
+  .explore:not([data-full-map]) .map-top:has(.ride-player:not([hidden])) {
+    right: 123px;
   }
 }
 
@@ -1362,7 +1368,9 @@ button.map-label {
     order: 0;
   }
 
-  .map-labels {
+  /* What is laid over the map ends where the map ends: a dot that leaves it must not land on the player or the readout below. */
+  .map-labels,
+  .map-dots {
     height: 56vh;
     min-height: 300px;
     inset: 0 0 auto 0;

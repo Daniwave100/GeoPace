@@ -57,7 +57,9 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
   const button = (className: string, text: string, onPress: () => void) => {
     const node = html("button", { type: "button", class: className, text });
     node.addEventListener("click", (event) => {
-      onPress();
+      // Greyed out (there is no Stop to go back to, or to ride on to), it does nothing. It is
+      // `aria-disabled` rather than `disabled` so that it keeps the focus it has (see `show`).
+      if (node.getAttribute("aria-disabled") !== "true") onPress();
       if (event.detail > 0 && !player.hidden) play.focus();
     });
     return node;

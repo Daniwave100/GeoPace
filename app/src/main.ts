@@ -84,6 +84,8 @@ let placement: Placement = "draped";
 let rideCameraChoice: RideCamera = "from-above";
 /** Whether the screen was in the Ride when its controls were last shown: leaving it gives the whole course back. */
 let wasRiding = false;
+/** Whether the Ride was playing then: a pause is not a jump, and the camera must not be told it is one. */
+let wasPlaying = false;
 /** How much of the map's left side the readout block covers; null until it is next measured (`coveredLeftPx`). */
 let coveredLeft: number | null = null;
 let rideCamera: CameraInTheScene | undefined;
@@ -206,6 +208,7 @@ async function show(courseId: string): Promise<void> {
   const rideScene: RideScene = { line: bundle.measured.course_line, stops, notMeasured: bundle.measured.elevation_not_measured };
   showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, ride: startRide(rideScene) };
   wasRiding = false;
+  wasPlaying = false;
   showPlan();
   // Framed last: the strip has just taken its height, and the map is whatever is left.
   frameWholeCourse(0);
@@ -409,14 +412,18 @@ function showRide(): void {
   if (!showing) return;
   showWhere(showing.km); // paused, the strip says where that is; and the controls follow
   // Started, resumed after the runner looked around, or given the other camera: the camera glides
-  // to where the Ride is. Paused, it is there already and stays the Ride's until the map is touched.
-  if (showing.ride.on) followTheRide("jump");
+  // to where the Ride is. A pause is none of those. The camera is a frame behind the Ride when it
+  // comes (CesiumJS draws before the Ride's own frame runs), and told "jump" it would glide those
+  // last two metres with a rise in the middle: On the road, a nod of the whole view at every pause.
+  const paused = wasPlaying && !showing.ride.playing;
+  if (showing.ride.on) followTheRide(paused ? "riding" : "jump");
   else if (wasRiding) {
     // Left: the camera is the runner's again, and Explore gets the whole course back, as it opens.
     rideCamera?.letGo();
     frameWholeCourse(flightSeconds());
   }
   wasRiding = showing.ride.on;
+  wasPlaying = showing.ride.playing;
 }
 
 function showRideControls(): void {

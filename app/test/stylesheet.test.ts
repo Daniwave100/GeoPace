@@ -29,8 +29,15 @@ function classesIn(text: string): string[] {
 /** Classes that need no rule of their own: the whole-number part of the numeral takes its parent's look, and the camera's height is a plain status line. */
 const NO_RULE_NEEDED = new Set(["readout-km-whole", "photoreal-camera"]);
 
+/**
+ * Classes handed to a helper as an argument, where `classesIn` can't see them: the segmented
+ * control's own and the look passed to it (segmented.ts, ride-controls.ts), and the player's way
+ * back to the map. Without these, the banner's switches could lose their rules and nothing would fail.
+ */
+const PASSED_AS_ARGUMENTS = ["segmented", "ride-cameras", "ride-leave"];
+
 describe("the stylesheet", () => {
-  const used = new Set([...appFiles(SRC).flatMap((file) => classesIn(readFileSync(file, "utf8"))), ...classesIn(page)]);
+  const used = new Set([...appFiles(SRC).flatMap((file) => classesIn(readFileSync(file, "utf8"))), ...classesIn(page), ...PASSED_AS_ARGUMENTS]);
 
   it("has a rule for every class the app puts on an element", () => {
     const missing = [...used].filter((name) => !NO_RULE_NEEDED.has(name) && !new RegExp(`\\.${name}(?![a-z0-9-])`).test(css));
