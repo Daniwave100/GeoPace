@@ -24,6 +24,8 @@ const CLIMB_WORTH_A_STOP_M = 15;
 export interface Stop {
   /** Where the Ride arrives: km from the start along the course line. For a climb, its foot. */
   km: number;
+  /** For a stretch where something happens, where it ends: the Ride stays slow all the way through it. A landmark is a place and has none. */
+  toKm?: number;
   kind: "start" | "landmark" | "climb" | "finish";
   /** What it is called, in the runner's units: a climb is named by the height it gains. */
   name(units: Units): string;
@@ -47,7 +49,7 @@ export function stopsFor(bundle: CourseBundle): Stop[] {
   for (const hill of hillStretches(bundle)) {
     // A Stop named "Climb of 40 m" is a claim about height. Where any of that height is filled in
     // rather than measured, the number is a guess, and a guess names nothing (PLAN.md D45).
-    if (hill.kind === "climb" && hill.gainM >= CLIMB_WORTH_A_STOP_M && hill.notMeasuredKm === 0) add({ km: hill.fromKm, kind: "climb", name: (units) => `Climb of ${formatHeight(hill.gainM, units)}` }, SAME_PLACE_KM);
+    if (hill.kind === "climb" && hill.gainM >= CLIMB_WORTH_A_STOP_M && hill.notMeasuredKm === 0) add({ km: hill.fromKm, toKm: hill.toKm, kind: "climb", name: (units) => `Climb of ${formatHeight(hill.gainM, units)}` }, SAME_PLACE_KM);
   }
   return stops.sort((a, b) => a.km - b.km);
 }

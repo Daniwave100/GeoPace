@@ -83,6 +83,8 @@ describe("the Stops of a course", () => {
     // Lafayette Avenue after the Barclays Center, the Queensboro Bridge, and Fifth Avenue up to the park.
     expect(climbs.map((stop) => Number(stop.km.toFixed(1)))).toEqual([12.5, 23.5, 37.0]);
     expect(climbs[1].name("km")).toBe("Climb of 38 m");
+    expect(climbs[1].toKm).toBeCloseTo(24.81, 2); // a stretch: the Ride is slow all the way up it
+    expect(stopsFor(nyc).find((stop) => stop.kind === "landmark")?.toKm).toBeUndefined(); // a landmark is a place
     expect(climbs[1].name("mi")).toBe("Climb of 125 ft");
     expect(stopsFor(berlin).filter((stop) => stop.kind === "climb")).toEqual([]);
   });

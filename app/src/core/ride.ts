@@ -12,8 +12,8 @@ export type RideCamera = "from-above" | "on-the-road";
 /** As much of a course as the Ride needs: how long it is, where its Stops are, and where it turns. */
 export interface RideCourse {
   lengthKm: number;
-  /** In course order (core/stops.ts). */
-  stops: { km: number }[];
+  /** In course order (core/stops.ts). A stretch that is a Stop has an end as well as a beginning. */
+  stops: { km: number; toKm?: number }[];
   /**
    * How far a camera's view swings round for the course that goes by at `km`, in degrees per km
    * (core/ride-view.ts). Left out, the Ride takes every turn at full speed.
@@ -21,32 +21,45 @@ export interface RideCourse {
   swingDegPerKm?(km: number, camera: RideCamera): number;
 }
 
-interface Pace {
-  /** Between Stops: how much course goes by in a second. */
+/** One camera's time-lapse. Speeds are km of course a second, since positions along a course are km: 0.55 is 550 m of road a second. */
+interface TimeLapse {
+  /** The cruise: between Stops, how much course goes by in a second. */
   cruiseKmPerS: number;
-  /** At a Stop, and this close to one. */
+  /** At a Stop, and this close to one: the slowest the Ride ever goes. */
   slowKmPerS: number;
   slowWithinKm: number;
   /** The distance over which the Ride picks its speed back up, and sheds it again before the next Stop. */
   easeOverKm: number;
   /** The fastest the view may swing round, degrees a second: through a sharp turn the Ride eases off to keep to it. */
   mostSwingDegPerS: number;
-  /** However sharp the turn, the Ride keeps moving at least this fast: a view that must turn right round would otherwise stand still. */
+  /**
+   * However sharp the turn, the Ride keeps moving at least this fast. Quicker than at a Stop: the
+   * Ride is slower at a Stop than anywhere between Stops (issue #8), and a street corner is not a Stop.
+   */
   slowestThroughATurnKmPerS: number;
 }
+
+/** About 5:30 a kilometre: the time-lapse is never slower than the race it is a time-lapse of. */
+const THE_PACE_OF_THE_RUN_KM_PER_S = 0.003;
+
+/**
+ * Through a stretch that is a Stop (a climb), past the slow of arriving at its foot, the Ride gets
+ * no nearer its cruise than this: slow all the way up, so the hill is seen, without crawling for a
+ * kilometre. From above the camera stays down for the look with it (core/ride-view.ts).
+ */
+const MOST_CRUISE_THROUGH_A_STRETCH = 0.3;
 
 /**
  * How fast each camera's time-lapse goes. From above the whole course is a couple of minutes:
  * half a kilometre of road a second reads well from the air. On the road the same speed would be a blur,
  * so the time-lapse is gentler (PLAN.md D33, §6 "The ride"), and slows to a fast run at a Stop.
  */
-const PACE: Record<RideCamera, Pace> = {
-  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.08 },
+const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
+  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.1 },
   // On the road the camera looks at the runner from 25 m behind, so a street corner swings the view
-  // a quarter turn in those 25 m: the Ride takes it as a vehicle would, in about two seconds. Round
-  // the sharpest turn of all (New York's, back on itself at Columbus Circle) it is down to 3 m/s for
-  // a moment, which is the pace of the run itself: the time-lapse is never slower than the race.
-  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.015, slowWithinKm: 0.04, easeOverKm: 0.3, mostSwingDegPerS: 45, slowestThroughATurnKmPerS: 0.003 },
+  // a quarter turn in those 25 m: the Ride takes it as a vehicle would, in a second and a half, at
+  // some 13 m/s. A Stop is slower still: 12 m/s for the 60 m around it, five seconds to read it by.
+  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.012, slowWithinKm: 0.03, easeOverKm: 0.25, mostSwingDegPerS: 60, slowestThroughATurnKmPerS: 0.0125 },
 };
 
 /**
@@ -56,10 +69,17 @@ const PACE: Record<RideCamera, Pace> = {
  * exactly as the Ride slows (core/ride-view.ts).
  */
 export function cruising(course: RideCourse, km: number, camera: RideCamera): number {
-  const pace = PACE[camera];
-  const toNearestStop = Math.min(...course.stops.map((stop) => Math.abs(stop.km - km)));
-  const away = clamp((toNearestStop - pace.slowWithinKm) / pace.easeOverKm, 0, 1);
-  return away * away * (3 - 2 * away); // smoothstep
+  const lapse = TIME_LAPSE[camera];
+  let most = 1;
+  let toNearestStop = Number.POSITIVE_INFINITY;
+  for (const stop of course.stops) {
+    // Inside a stretch the Ride is on the Stop, but past the slow of arriving at its foot it may pick up a little.
+    const inTheStretch = stop.toKm !== undefined && km > stop.km && km < stop.toKm;
+    if (inTheStretch) most = MOST_CRUISE_THROUGH_A_STRETCH;
+    toNearestStop = Math.min(toNearestStop, Math.abs(stop.km - km));
+  }
+  const away = clamp((toNearestStop - lapse.slowWithinKm) / lapse.easeOverKm, 0, 1);
+  return Math.min(away * away * (3 - 2 * away), most); // smoothstep
 }
 
 /**
@@ -68,10 +88,16 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
  * time-lapse's speed a city block's corner is one; New York's Bronx mile is five in a row).
  */
 export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
-  const pace = PACE[camera];
-  const paced = pace.slowKmPerS + (pace.cruiseKmPerS - pace.slowKmPerS) * cruising(course, km, camera);
+  const lapse = TIME_LAPSE[camera];
+  const intoItsCruise = cruising(course, km, camera);
+  const paced = lapse.slowKmPerS + (lapse.cruiseKmPerS - lapse.slowKmPerS) * intoItsCruise;
   const swing = course.swingDegPerKm?.(km, camera) ?? 0;
-  return swing > 0 ? Math.min(paced, Math.max(pace.mostSwingDegPerS / swing, pace.slowestThroughATurnKmPerS)) : paced;
+  if (swing === 0) return paced;
+  // Between Stops a turn never slows the Ride to a Stop's crawl. Near a Stop it may, and right at
+  // one it may go slower still, down to the pace of the run itself: New York turns back on itself
+  // round Columbus Circle, which is a Stop, and at a Stop's 12 m/s the view would whip round there.
+  const slowest = THE_PACE_OF_THE_RUN_KM_PER_S + (lapse.slowestThroughATurnKmPerS - THE_PACE_OF_THE_RUN_KM_PER_S) * intoItsCruise;
+  return Math.min(paced, Math.max(lapse.mostSwingDegPerS / swing, slowest));
 }
 
 export type HowItMoved = "riding" | "jump";
@@ -114,7 +140,7 @@ export interface Ride {
   /** Go back to the Stop just passed (from a Stop, to the one before it) and pause there. */
   back(): void;
   /** The runner was moved by hand, by scrubbing: the Ride carries on from there. */
-  seek(km: number): void;
+  scrubbedTo(km: number): void;
   /** The runner has taken hold of the strip, or let it go: while they hold it, the Ride waits where they put it. */
   hold(held: boolean): void;
   /** Switch cameras, in the middle of the Ride or not. The time-lapse follows: gentler On the road. */
@@ -243,7 +269,7 @@ export function createRide(options: RideOptions): Ride {
       const back = stopsAround(course.stops, km).back;
       if (back !== null) moveTo(course.stops[back].km, "jump");
     },
-    seek(next) {
+    scrubbedTo(next) {
       km = clamp(next, 0, course.lengthKm);
       stoodSeconds = 0;
       // A Ride to the next stop rides to the next Stop from wherever the runner is put: past the one

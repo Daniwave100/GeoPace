@@ -29,26 +29,16 @@ function fakeFrames() {
       waiting = null;
     },
   };
-  return {
-    frames,
-    /** Let `seconds` go by with only `perSecond` frames in each. */
-    runAtFramesPerSecond(seconds: number, perSecond: number) {
-      for (let frame = 0; frame < Math.round(seconds * perSecond); frame += 1) {
-        nowMs += 1000 / perSecond;
-        const callback = waiting;
-        waiting = null;
-        callback?.(nowMs);
-      }
-    },
-    run(seconds: number) {
-      for (let frame = 0; frame < Math.round(seconds * 60); frame += 1) {
-        nowMs += 1000 / 60;
-        const callback = waiting;
-        waiting = null;
-        callback?.(nowMs);
-      }
-    },
+  /** Let `seconds` go by with only `perSecond` frames in each. */
+  const runAtFramesPerSecond = (seconds: number, perSecond: number) => {
+    for (let frame = 0; frame < Math.round(seconds * perSecond); frame += 1) {
+      nowMs += 1000 / perSecond;
+      const callback = waiting;
+      waiting = null;
+      callback?.(nowMs);
+    }
   };
+  return { frames, runAtFramesPerSecond, run: (seconds: number) => runAtFramesPerSecond(seconds, 60) };
 }
 
 function rideOn(course: RideCourse, options: { reducedMotion?: boolean } = {}) {
@@ -72,14 +62,33 @@ function rideOn(course: RideCourse, options: { reducedMotion?: boolean } = {}) {
 }
 
 describe("the Ride's time-lapse", () => {
-  it("is slower near a Stop than between Stops, on both courses and from both cameras", () => {
+  it("is slower at a Stop than anywhere between Stops, on both courses and from both cameras, every corner included", () => {
     for (const camera of ["from-above", "on-the-road"] as const) {
-      // Open road with no Stop within 3 km: Brooklyn's Fourth Avenue, and Berlin between the Victory Column and Strausberger Platz.
-      const betweenStops = [rideSpeedKmPerS(nyc, 6, camera), rideSpeedKmPerS(berlin, 6, camera)];
       for (const course of [nyc, berlin]) {
-        for (const stop of course.stops) {
-          expect(rideSpeedKmPerS(course, stop.km, camera), `${camera} at km ${stop.km}`).toBeLessThan(Math.min(...betweenStops) / 3);
+        const atAStop = Math.max(...course.stops.map((stop) => rideSpeedKmPerS(course, stop.km, camera)));
+        let placesBetweenStops = 0;
+        for (let km = 0; km <= course.lengthKm; km += 0.01) {
+          if (course.stops.some((stop) => km > stop.km - 0.5 && km < (stop.toKm ?? stop.km) + 0.5)) continue; // near a Stop
+          placesBetweenStops += 1;
+          // The Ride eases off through a sharp turn, but never to a Stop's crawl: a street corner is not a Stop.
+          expect(rideSpeedKmPerS(course, km, camera), `${camera}, km ${km.toFixed(2)}`).toBeGreaterThan(atAStop);
         }
+        expect(placesBetweenStops).toBeGreaterThan(1500); // most of the course is between Stops
+        // And on the open road it is several times as quick: Brooklyn's Fourth Avenue; Berlin between the Victory Column and Strausberger Platz.
+        expect(rideSpeedKmPerS(course, 6, camera)).toBeGreaterThan(atAStop * 3);
+      }
+    }
+  });
+
+  it("stays slow through the whole of a stretch that is a Stop: up the Queensboro Bridge's climb, not only at its foot", () => {
+    const climb = nyc.stops.find((stop) => Math.abs(stop.km - 23.53) < 0.01);
+    expect(climb?.toKm).toBeCloseTo(24.81, 2);
+    for (const camera of ["from-above", "on-the-road"] as const) {
+      const openRoad = rideSpeedKmPerS({ lengthKm: nyc.lengthKm, stops: nyc.stops }, 6, camera);
+      for (const km of [23.9, 24.2, 24.6]) {
+        const upTheClimb = rideSpeedKmPerS({ lengthKm: nyc.lengthKm, stops: nyc.stops }, km, camera);
+        expect(upTheClimb, `${camera}, km ${km}`).toBeLessThan(openRoad / 2);
+        expect(upTheClimb, `${camera}, km ${km}`).toBeGreaterThan(rideSpeedKmPerS(nyc, 23.53, camera)); // slow, not the crawl of arriving
       }
     }
   });
@@ -88,17 +97,20 @@ describe("the Ride's time-lapse", () => {
 describe("the Ride through a sharp turn", () => {
   it("eases off so the view never whips round, and however sharp the turn keeps moving", () => {
     const openRoad = { lengthKm: 40, stops: [{ km: 0 }, { km: 40 }] };
-    // Two right-angled corners 100 m apart swing the On the road view 900 degrees for every km of road.
-    const throughTheCorners = { ...openRoad, swingDegPerKm: () => 900 };
+    // A right-angled corner swings the On the road view a quarter turn in 50 m of road: 1800 degrees for every km.
+    const throughTheCorners = { ...openRoad, swingDegPerKm: () => 1800 };
     const round = { ...openRoad, swingDegPerKm: () => 1_000_000 };
 
     const cruise = rideSpeedKmPerS(openRoad, 20, "on-the-road");
     const eased = rideSpeedKmPerS(throughTheCorners, 20, "on-the-road");
 
     expect(eased).toBeLessThan(cruise / 2);
-    expect(eased * 900).toBeLessThanOrEqual(45.001); // degrees a second
-    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeGreaterThanOrEqual(0.003); // the pace of the run itself, not a standstill
+    expect(eased * 1800).toBeLessThanOrEqual(60.001); // degrees a second: a quarter turn in a second and a half
+    // However sharp, between Stops it keeps moving quicker than it does at a Stop: a street corner is not a Stop.
+    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeGreaterThan(rideSpeedKmPerS(openRoad, 0, "on-the-road"));
     expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeLessThan(eased);
+    // Right at a Stop it may slow as far as the pace of the run itself, and no further.
+    expect(rideSpeedKmPerS(round, 0, "on-the-road")).toBeCloseTo(0.003, 6);
   });
 });
 
@@ -155,7 +167,7 @@ describe("Ride the course", () => {
 
   it("moves the runner no further in a late frame than a tenth of a second would: a tab left in the background doesn't leap", () => {
     const { ride, run, runAtFramesPerSecond } = rideOn(nyc);
-    ride.seek(5); // open road: the cruise
+    ride.scrubbedTo(5); // open road: the cruise
     ride.playPause();
     run(0.5);
     const before = ride.km;
@@ -168,7 +180,7 @@ describe("Ride the course", () => {
 
   it("starts again from the start when played on the Finish, which in Berlin is listed 5 m short of the end of the line", () => {
     const { ride, run } = rideOn(berlin);
-    ride.seek(42.28);
+    ride.scrubbedTo(42.28);
 
     ride.playPause();
     run(1);
@@ -209,7 +221,7 @@ describe("Back and Ride to the next stop", () => {
 
   it("goes back to the Stop just passed, from a Stop to the one before it, and pauses there", () => {
     const { ride, run } = rideOn(berlin);
-    ride.seek(13);
+    ride.scrubbedTo(13);
     ride.playPause();
     run(0.5);
 
@@ -226,7 +238,7 @@ describe("Back and Ride to the next stop", () => {
 
   it("reaches the finish and pauses, though New York's Finish is listed 2 m past the end of its course line", () => {
     const { ride, secondsUntilItStops } = rideOn(nyc);
-    ride.seek(42.3); // past Columbus Circle, the last Stop before the Finish
+    ride.scrubbedTo(42.3); // past Columbus Circle, the last Stop before the Finish
 
     ride.rideToNextStop();
     const seconds = secondsUntilItStops();
@@ -249,7 +261,7 @@ describe("Back and Ride to the next stop", () => {
 
   it("has nowhere to ride to from the finish", () => {
     const { ride } = rideOn(berlin);
-    ride.seek(berlin.lengthKm);
+    ride.scrubbedTo(berlin.lengthKm);
 
     ride.rideToNextStop();
 
@@ -275,7 +287,7 @@ describe("scrubbing during the Ride", () => {
     ride.playPause();
     run(2);
 
-    ride.seek(30);
+    ride.scrubbedTo(30);
     run(1);
 
     expect(ride.playing).toBe(true);
@@ -287,7 +299,7 @@ describe("scrubbing during the Ride", () => {
     const { ride, secondsUntilItStops } = rideOn(nyc);
     ride.rideToNextStop(); // to the Verrazzano-Narrows Bridge, km 0.9
 
-    ride.seek(5);
+    ride.scrubbedTo(5);
     secondsUntilItStops();
 
     expect(ride.km).toBe(12.1); // the Barclays Center
@@ -295,11 +307,11 @@ describe("scrubbing during the Ride", () => {
 
   it("back behind an earlier Stop, rides to that one: never through a Stop it was asked to pause at", () => {
     const { ride, run, secondsUntilItStops } = rideOn(nyc);
-    ride.seek(5);
+    ride.scrubbedTo(5);
     ride.rideToNextStop(); // to the Barclays Center, km 12.1
     run(1);
 
-    ride.seek(0.3);
+    ride.scrubbedTo(0.3);
     secondsUntilItStops();
 
     expect(ride.km).toBe(0.9); // the Verrazzano-Narrows Bridge, the next Stop from where the runner was put
@@ -307,12 +319,12 @@ describe("scrubbing during the Ride", () => {
 
   it("wiggled round the Stop it was riding to, in one drag, still pauses at the next Stop from where it is let go", () => {
     const { ride, secondsUntilItStops } = rideOn(nyc);
-    ride.seek(11.5);
+    ride.scrubbedTo(11.5);
     ride.rideToNextStop();
 
     ride.hold(true);
-    ride.seek(12.2);
-    ride.seek(11.9);
+    ride.scrubbedTo(12.2);
+    ride.scrubbedTo(11.9);
     ride.hold(false);
     secondsUntilItStops();
 
@@ -326,10 +338,10 @@ describe("scrubbing during the Ride", () => {
       run(2);
 
       ride.hold(true);
-      ride.seek(nyc.lengthKm);
+      ride.scrubbedTo(nyc.lengthKm);
       run(0.5);
       expect(ride.playing, `reduced motion: ${reducedMotion}`).toBe(true);
-      ride.seek(30);
+      ride.scrubbedTo(30);
       ride.hold(false);
       run(0.5);
 
@@ -344,7 +356,7 @@ describe("scrubbing during the Ride", () => {
     run(1); // the Ride is under way when the runner takes the strip
 
     ride.hold(true);
-    ride.seek(20);
+    ride.scrubbedTo(20);
     run(5);
     expect(ride.km).toBe(20);
     expect(ride.playing).toBe(true);
@@ -382,7 +394,7 @@ describe("with reduced motion asked for", () => {
 
   it("gives the start its few seconds too, when played again from the finish", () => {
     const { ride, moves, run } = rideOn(berlin, { reducedMotion: true });
-    ride.seek(berlin.lengthKm);
+    ride.scrubbedTo(berlin.lengthKm);
 
     ride.playPause();
     run(2);
@@ -403,7 +415,7 @@ describe("with reduced motion asked for", () => {
 
   it("switched on in the middle of a Ride to the next stop, still pauses at that Stop", () => {
     const { ride, motion, run, secondsUntilItStops } = rideOn(nyc);
-    ride.seek(5);
+    ride.scrubbedTo(5);
     ride.rideToNextStop(); // to the Barclays Center, km 12.1
     run(2);
 
@@ -450,7 +462,7 @@ describe("the Ride's two cameras", () => {
   it("can be switched in the middle of the Ride without stopping it", () => {
     const { ride, run } = rideOn(nyc);
     expect(ride.camera).toBe("from-above");
-    ride.seek(5);
+    ride.scrubbedTo(5);
     ride.playPause();
     run(1);
     const fromAbove = ride.km - 5;
@@ -508,7 +520,7 @@ describe("the Ride as a mode of the screen", () => {
 
   it("stops where it is when left: the runner isn't sent back to the start", () => {
     const { ride, run } = rideOn(nyc);
-    ride.seek(20);
+    ride.scrubbedTo(20);
     ride.playPause();
     run(1);
 
@@ -523,7 +535,7 @@ describe("the Ride as a mode of the screen", () => {
     const motion = { reduced: false };
     const ride = createRide({ course: berlin, frames: clock.frames, reducedMotion: () => motion.reduced, onMove: (_km, how) => hows.push(how), onChange: () => undefined });
 
-    ride.seek(13);
+    ride.scrubbedTo(13);
     ride.playPause();
     clock.run(0.1);
     expect(new Set(hows)).toEqual(new Set(["riding"])); // frame after frame
@@ -539,7 +551,7 @@ describe("the Ride as a mode of the screen", () => {
 
     hows.length = 0;
     motion.reduced = false;
-    ride.seek(berlin.lengthKm);
+    ride.scrubbedTo(berlin.lengthKm);
     ride.playPause(); // played at the finish: back to the start
     expect(hows).toEqual(["jump"]);
   });
@@ -547,7 +559,7 @@ describe("the Ride as a mode of the screen", () => {
   it("is not started by scrubbing: Explore stays Explore", () => {
     const { ride } = rideOn(nyc);
 
-    ride.seek(10);
+    ride.scrubbedTo(10);
 
     expect(ride.on).toBe(false);
   });

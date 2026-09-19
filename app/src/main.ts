@@ -352,7 +352,7 @@ function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
  */
 function scrubTo(km: number): void {
   if (!showing) return;
-  showing.ride.seek(km);
+  showing.ride.scrubbedTo(km);
   showWhere(km);
   if (showing.ride.on) followTheRide("jump");
 }
