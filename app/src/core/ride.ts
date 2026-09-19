@@ -9,11 +9,16 @@ import { ON_THE_STOP_KM, stopsAround } from "./stops";
 /** The Ride's two cameras (PLAN.md D33). */
 export type RideCamera = "from-above" | "on-the-road";
 
-/** As much of a course as the Ride needs: how long it is, and where its Stops are. */
+/** As much of a course as the Ride needs: how long it is, where its Stops are, and where it turns. */
 export interface RideCourse {
   lengthKm: number;
   /** In course order (core/stops.ts). */
   stops: { km: number }[];
+  /**
+   * How far a camera's view swings round for the course that goes by at `km`, in degrees per km
+   * (core/ride-view.ts). Left out, the Ride takes every turn at full speed.
+   */
+  swingDegPerKm?(km: number, camera: RideCamera): number;
 }
 
 interface Pace {
@@ -24,6 +29,8 @@ interface Pace {
   slowWithinKm: number;
   /** The distance over which the Ride picks its speed back up, and sheds it again before the next Stop. */
   easeOverKm: number;
+  /** The fastest the view may swing round, degrees a second: through a sharp turn the Ride eases off to keep to it. */
+  mostSwingDegPerS: number;
 }
 
 /**
@@ -32,17 +39,34 @@ interface Pace {
  * so the time-lapse is gentler (PLAN.md D33, §6 "The ride"), and slows to a fast run at a Stop.
  */
 const PACE: Record<RideCamera, Pace> = {
-  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5 },
-  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.015, slowWithinKm: 0.04, easeOverKm: 0.3 },
+  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20 },
+  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.015, slowWithinKm: 0.04, easeOverKm: 0.3, mostSwingDegPerS: 45 },
 };
 
-/** How much course goes by in a second of the Ride at `km`: slow at a Stop, easing up to the cruise away from one. */
-export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
+/**
+ * How far into its cruise the Ride is at `km`: 0 at a Stop and close to one, 1 on the open road
+ * between Stops, easing between the two with no sudden change at either end, which a moving
+ * camera would show as a jolt. The camera uses it too: From above comes down for a closer look
+ * exactly as the Ride slows (core/ride-view.ts).
+ */
+export function cruising(course: RideCourse, km: number, camera: RideCamera): number {
   const pace = PACE[camera];
   const toNearestStop = Math.min(...course.stops.map((stop) => Math.abs(stop.km - km)));
   const away = clamp((toNearestStop - pace.slowWithinKm) / pace.easeOverKm, 0, 1);
-  // Smoothstep: no sudden change of speed at either end of the ease, which a moving camera would show as a jolt.
-  return pace.slowKmPerS + (pace.cruiseKmPerS - pace.slowKmPerS) * away * away * (3 - 2 * away);
+  return away * away * (3 - 2 * away); // smoothstep
+}
+
+/**
+ * How much course goes by in a second of the Ride at `km`: slow at a Stop, easing up to the cruise
+ * away from one, and easing off through a turn sharp enough to whip the view round (at a
+ * time-lapse's speed a city block's corner is one; New York's Bronx mile is five in a row).
+ * Never slower for a turn than it is at a Stop.
+ */
+export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
+  const pace = PACE[camera];
+  const paced = pace.slowKmPerS + (pace.cruiseKmPerS - pace.slowKmPerS) * cruising(course, km, camera);
+  const swing = course.swingDegPerKm?.(km, camera) ?? 0;
+  return swing > 0 ? Math.max(Math.min(paced, pace.mostSwingDegPerS / swing), pace.slowKmPerS) : paced;
 }
 
 /** The browser's animation frames, or a test's stand-in for them. */

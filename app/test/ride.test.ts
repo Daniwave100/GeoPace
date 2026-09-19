@@ -5,11 +5,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { createRide, type Frames, type Ride, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
+import { rideCourseFor } from "../src/core/ride-view";
 import { stopsFor } from "../src/core/stops";
 
+/** The course exactly as the app hands it to the Ride: its Stops, and its turns. */
 const courseFor = (id: string): RideCourse => {
   const bundle = parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${id}/course-bundle.json`, import.meta.url), "utf8")), id);
-  return { lengthKm: bundle.measured.course_line.length_m / 1000, stops: stopsFor(bundle) };
+  return rideCourseFor({ line: bundle.measured.course_line, stops: stopsFor(bundle) });
 };
 const nyc = courseFor("nyc");
 const berlin = courseFor("berlin");
@@ -68,6 +70,22 @@ describe("the Ride's time-lapse", () => {
         }
       }
     }
+  });
+});
+
+describe("the Ride through a sharp turn", () => {
+  it("eases off so the view never whips round, and is never slower for it than at a Stop", () => {
+    const openRoad = { lengthKm: 40, stops: [{ km: 0 }, { km: 40 }] };
+    // Two right-angled corners 100 m apart swing the On the road view 900 degrees for every km of road.
+    const throughTheCorners = { ...openRoad, swingDegPerKm: () => 900 };
+    const round = { ...openRoad, swingDegPerKm: () => 1_000_000 };
+
+    const cruise = rideSpeedKmPerS(openRoad, 20, "on-the-road");
+    const eased = rideSpeedKmPerS(throughTheCorners, 20, "on-the-road");
+
+    expect(eased).toBeLessThan(cruise / 2);
+    expect(eased * 900).toBeLessThanOrEqual(45.001); // degrees a second
+    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBe(rideSpeedKmPerS(openRoad, 0, "on-the-road"));
   });
 });
 
@@ -276,11 +294,20 @@ describe("with reduced motion asked for", () => {
 });
 
 describe("the Ride's two cameras", () => {
-  it("make On the road a gentler time-lapse than From above, everywhere on both courses", () => {
+  it("make On the road a gentler time-lapse than From above: slower at every Stop and on every open road, and several times as long over the whole course", () => {
     for (const course of [nyc, berlin]) {
+      // The pace itself, turns aside: through a sharp turn each camera eases off by its own amount.
+      const turnsAside = { lengthKm: course.lengthKm, stops: course.stops };
       for (let km = 0; km <= course.lengthKm; km += 0.05) {
-        expect(rideSpeedKmPerS(course, km, "on-the-road"), `km ${km.toFixed(2)}`).toBeLessThan(rideSpeedKmPerS(course, km, "from-above"));
+        expect(rideSpeedKmPerS(turnsAside, km, "on-the-road"), `km ${km.toFixed(2)}`).toBeLessThan(rideSpeedKmPerS(turnsAside, km, "from-above"));
       }
+
+      const onTheRoad = rideOn(course);
+      onTheRoad.ride.useCamera("on-the-road");
+      onTheRoad.ride.playPause();
+      const fromAbove = rideOn(course);
+      fromAbove.ride.playPause();
+      expect(onTheRoad.secondsUntilItStops()).toBeGreaterThan(3 * fromAbove.secondsUntilItStops());
     }
   });
 
