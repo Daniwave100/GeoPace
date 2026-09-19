@@ -1,6 +1,6 @@
-// The Ride (PLAN.md D34, issue #8): the runner carried along the course as a time-lapse, quick
-// between Stops and slow through them, so the whole course takes a couple of minutes and there is
-// time to read at the places that matter. Pure logic, no drawing and no 3D: where the runner is
+// The Ride (PLAN.md D34, issue #8): the runner carried along the course as a time-lapse, so the
+// whole course takes a minute or two from above, at one pace, and some ten minutes on the road,
+// where it is quick between Stops and slow through them (D53). Pure logic, no drawing and no 3D: where the runner is
 // and whether the Ride is playing. The strip, the readout, the sentence and the camera are moved
 // by whoever listens, through the same scrubbing that a hand on the strip does.
 import { clamp } from "./series";
@@ -22,10 +22,23 @@ export interface RideCourse {
   swingDegPerKm?(km: number, camera: RideCamera): number;
 }
 
-/** One camera's time-lapse. Speeds are km of course a second, since positions along a course are km: 0.55 is 550 m of road a second. */
+/** One camera's time-lapse. Speeds are km of course a second, since positions along a course are km: 0.45 is 450 m of road a second. */
 interface TimeLapse {
-  /** The cruise: between Stops, how much course goes by in a second. */
+  /** The cruise: how much course goes by in a second on the open road. */
   cruiseKmPerS: number;
+  /** What the Ride eases off for, and how far. Left out, it keeps its cruise from the start to the finish: one pace. */
+  easesOff?: EasesOff;
+  /**
+   * How hard the Ride brakes, km/s per second: for what is coming, picking up again the same way,
+   * and to come to rest where it stops. The speed a place allows can drop to a fifth within a few
+   * metres at a street corner; the Ride sees it coming and sheds speed at this rate, as a vehicle
+   * would, instead of all at once.
+   */
+  brakingKmPerS2: number;
+}
+
+/** A time-lapse that slows for Stops, and through turns sharp enough to whip the view round. */
+interface EasesOff {
   /** At a Stop, and this close to one: the slowest the Ride ever goes. */
   slowKmPerS: number;
   slowWithinKm: number;
@@ -38,12 +51,6 @@ interface TimeLapse {
    * Ride is slower at a Stop than anywhere between Stops (issue #8), and a street corner is not a Stop.
    */
   slowestThroughATurnKmPerS: number;
-  /**
-   * How hard the Ride brakes for what is coming and picks up after it, km/s per second. The speed a
-   * place allows can drop to a fifth within a few metres at a street corner; the Ride sees it
-   * coming and sheds speed at this rate, as a vehicle would, instead of all at once.
-   */
-  brakingKmPerS2: number;
 }
 
 /** About 5:30 a kilometre: the time-lapse is never slower than the race it is a time-lapse of. */
@@ -52,37 +59,50 @@ const THE_PACE_OF_THE_RUN_KM_PER_S = 0.003;
 /**
  * Through a stretch that is a Stop (a climb), past the slow of arriving at its foot, the Ride gets
  * no nearer its cruise than this: slow all the way up, so the hill is seen, without crawling for a
- * kilometre. From above the camera stays down for the look with it (core/ride-view.ts).
+ * kilometre.
  */
 const MOST_CRUISE_THROUGH_A_STRETCH = 0.3;
 
 /**
- * How fast each camera's time-lapse goes. From above the whole course is a couple of minutes:
- * half a kilometre of road a second reads well from the air. On the road the same speed would be a blur,
- * so the time-lapse is gentler (PLAN.md D33, §6 "The ride"), and slows to a fast run at a Stop.
+ * How fast each camera's time-lapse goes.
+ *
+ * From above it is one pace from the start to the finish, 450 m of road a second, and the whole
+ * course is about a minute and a half. First built at 550, slowing to 80 at every Stop, staying
+ * slow up each big climb and easing off through sharp turns; the owner, after riding both courses
+ * (issue #24), asked for it "a little bit" slower, and then: "I don't like how it slows down on the
+ * turns slash stops… Just keep one smooth pace throughout." So from above a Stop is a place the
+ * Ride names, and can ride to or go back to, and no longer one it slows for; and what keeps the
+ * view from whipping round where the course doubles back is no longer the Ride easing off but the
+ * camera's own facing, which turns no faster than it may (core/ride-view.ts; D53 has the numbers).
+ *
+ * On the road the same speed would be a blur, so the time-lapse is gentler (PLAN.md D33, §6 "The
+ * ride"), and slows to a fast run at a Stop. There the camera looks at the runner from 25 m behind,
+ * so a street corner swings the view a quarter turn in those 25 m: the Ride takes it as a vehicle
+ * would, in a second and a half, at some 13 m/s. A Stop is slower still: 12 m/s for the 60 m
+ * around it, five seconds to read it by.
  */
 const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
-  "from-above": { cruiseKmPerS: 0.55, slowKmPerS: 0.08, slowWithinKm: 0.12, easeOverKm: 0.5, mostSwingDegPerS: 20, slowestThroughATurnKmPerS: 0.1, brakingKmPerS2: 0.4 },
-  // On the road the camera looks at the runner from 25 m behind, so a street corner swings the view
-  // a quarter turn in those 25 m: the Ride takes it as a vehicle would, in a second and a half, at
-  // some 13 m/s. A Stop is slower still: 12 m/s for the 60 m around it, five seconds to read it by.
-  "on-the-road": { cruiseKmPerS: 0.12, slowKmPerS: 0.012, slowWithinKm: 0.03, easeOverKm: 0.25, mostSwingDegPerS: 60, slowestThroughATurnKmPerS: 0.0125, brakingKmPerS2: 0.06 },
+  "from-above": { cruiseKmPerS: 0.45, brakingKmPerS2: 0.4 },
+  "on-the-road": {
+    cruiseKmPerS: 0.12,
+    easesOff: { slowKmPerS: 0.012, slowWithinKm: 0.03, easeOverKm: 0.25, mostSwingDegPerS: 60, slowestThroughATurnKmPerS: 0.0125 },
+    brakingKmPerS2: 0.06,
+  },
 };
 
 /**
  * How far into its cruise the Ride is at `km`: 0 at a Stop and close to one, 1 on the open road
  * between Stops, easing between the two with no sudden change at either end, which a moving
- * camera would show as a jolt. The camera uses it too: From above comes down for a closer look
- * exactly as the Ride slows (core/ride-view.ts).
+ * camera would show as a jolt.
  */
 export function cruising(course: RideCourse, km: number, camera: RideCamera): number {
-  const lapse = TIME_LAPSE[camera];
+  const lapse = TIME_LAPSE[camera].easesOff;
+  if (!lapse) return 1; // one pace: at its cruise everywhere
   let most = 1;
   let toNearestStop = Number.POSITIVE_INFINITY;
   for (const stop of course.stops) {
     // Through a stretch the Ride is held back all the way up, and past its top it is let go of
-    // gradually, over the same distance it eases away from a Stop: never all at once, which From
-    // above, taking its height from this number, showed as a 900 m jump of the camera.
+    // gradually, over the same distance it eases away from a Stop: never all at once.
     if (stop.toKm !== undefined && km > stop.km) {
       const past = clamp((km - stop.toKm) / lapse.easeOverKm, 0, 1);
       most = Math.min(most, MOST_CRUISE_THROUGH_A_STRETCH + (1 - MOST_CRUISE_THROUGH_A_STRETCH) * past * past * (3 - 2 * past));
@@ -101,6 +121,9 @@ export function cruising(course: RideCourse, km: number, camera: RideCamera): nu
  * same km always gives the same speed, however the Ride got there.
  */
 export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
+  // One pace: the answer is the same everywhere, and there is no 42,000-entry table of it to build.
+  const { cruiseKmPerS, easesOff } = TIME_LAPSE[camera];
+  if (!easesOff) return cruiseKmPerS;
   const speeds = speedsAlong(course, camera);
   const at = clamp(km / SPEEDS_EVERY_KM, 0, speeds.length - 1);
   const before = Math.floor(at);
@@ -108,7 +131,7 @@ export function rideSpeedKmPerS(course: RideCourse, km: number, camera: RideCame
   return speeds[before] + (speeds[after] - speeds[before]) * (at - before);
 }
 
-/** The Ride's speed is worked out every metre of the course, once for each course and camera: the Ride asks on every frame. */
+/** The Ride's speed is worked out every metre of the course, once for each course and camera that eases off for anything: the Ride asks on every frame. */
 const SPEEDS_EVERY_KM = 0.001;
 const SPEEDS = new WeakMap<RideCourse, Partial<Record<RideCamera, Float64Array>>>();
 
@@ -132,9 +155,10 @@ function speedsAlong(course: RideCourse, camera: RideCamera): Float64Array {
 
 /** The most the Ride may do at `km` for what is there: how near a Stop it is, and how sharply the view is swinging. */
 function speedThePlaceAllowsKmPerS(course: RideCourse, km: number, camera: RideCamera): number {
-  const lapse = TIME_LAPSE[camera];
+  const { cruiseKmPerS, easesOff: lapse } = TIME_LAPSE[camera];
+  if (!lapse) return cruiseKmPerS; // one pace, whatever is here
   const intoItsCruise = cruising(course, km, camera);
-  const paced = lapse.slowKmPerS + (lapse.cruiseKmPerS - lapse.slowKmPerS) * intoItsCruise;
+  const paced = lapse.slowKmPerS + (cruiseKmPerS - lapse.slowKmPerS) * intoItsCruise;
   const swing = course.swingDegPerKm?.(km, camera) ?? 0;
   if (swing === 0) return paced;
   // Between Stops a turn never slows the Ride to a Stop's crawl. Near a Stop it may, and right at
@@ -142,6 +166,17 @@ function speedThePlaceAllowsKmPerS(course: RideCourse, km: number, camera: RideC
   // round Columbus Circle, which is a Stop, and at a Stop's 12 m/s the view would whip round there.
   const slowest = THE_PACE_OF_THE_RUN_KM_PER_S + (lapse.slowestThroughATurnKmPerS - THE_PACE_OF_THE_RUN_KM_PER_S) * intoItsCruise;
   return Math.min(paced, Math.max(lapse.mostSwingDegPerS / swing, slowest));
+}
+
+/**
+ * Coming to rest: the most the Ride may do with `toGoKm` left before where it stops (the finish, or
+ * the Stop it was asked to ride to), shedding its speed at its braking rate (v² = 2as) rather than
+ * stopping dead from its cruise, which from above is 450 m a second. Never so slow that it doesn't
+ * arrive. It is the one thing about the Ride's speed that is not a plain function of the place:
+ * it depends on where the runner asked it to stop.
+ */
+function speedToComeToRestKmPerS(toGoKm: number, camera: RideCamera): number {
+  return Math.max(Math.sqrt(2 * TIME_LAPSE[camera].brakingKmPerS2 * Math.max(toGoKm, 0)), THE_PACE_OF_THE_RUN_KM_PER_S);
 }
 
 export type HowItMoved = "riding" | "jump";
@@ -239,7 +274,8 @@ export function createRide(options: RideOptions): Ride {
     }
     // A finish listed a hair past the end of the course line is still reached.
     const endKm = Math.min(untilKm ?? course.lengthKm, course.lengthKm);
-    if (seconds > 0) moveTo(Math.min(km + rideSpeedKmPerS(course, km, camera) * seconds, endKm), "riding");
+    const speed = Math.min(rideSpeedKmPerS(course, km, camera), speedToComeToRestKmPerS(endKm - km, camera));
+    if (seconds > 0) moveTo(Math.min(km + speed * seconds, endKm), "riding");
     if (km >= endKm) setPlaying(false);
     else waitingFor = frames.request(onFrame);
   };

@@ -38,7 +38,7 @@ A named, sourced place on the course.
 _Avoid_: point of interest, marker
 
 **Stop**:
-A place the Ride slows down for: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). For a stretch, the Ride arrives where it begins, and stays slow to where it ends.
+A place the Ride names as it goes by, and can ride to or go back to: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). On the road the Ride slows down for it, and for a stretch arrives where it begins and stays slow to where it ends; From above it keeps its one pace.
 _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 
 ### The runner's plan
@@ -78,7 +78,7 @@ The home mode: the city seen from above with the course on it, moved freely, wit
 _Avoid_: dashboard, map mode, overview
 
 **Ride**:
-The mode that carries the runner along the course as a time-lapse, slowing at Stops.
+The mode that carries the runner along the course as a time-lapse, past its Stops.
 _Avoid_: flyover, tour, playback, video, walkthrough
 
 **From above** / **On the road**:
@@ -86,11 +86,11 @@ The Ride's two cameras. From above looks down on the runner from the air; On the
 _Avoid_: bird's-eye mode, drive cam, runner's-eye, first-person
 
 **Time-lapse**:
-How the Ride passes the course: far quicker than any runner, quick between Stops and slow at them, and gentler On the road than From above.
+How the Ride passes the course: far quicker than any runner, and gentler On the road than From above. From above it is one pace from start to finish; On the road it is quick between Stops, slow at them, and slows into corners.
 _Avoid_: fast-forward, speed-up, animation
 
 **Cruise**:
-The time-lapse's speed on the open road between Stops.
+The time-lapse's speed on the open road between Stops. From above it is the Ride's speed everywhere.
 
 **Player**:
 The Ride's controls, on the top of the map: Back, play or pause, Ride to the next stop, the two cameras, and Back to the map. In Explore the same place holds the one button, "Ride the course".

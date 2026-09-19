@@ -69,6 +69,12 @@ function metersFrom(from: { lat: number; lon: number }, to: { lat: number; lon: 
   return { north: (to.lat - from.lat) * M_PER_DEG_LAT, east: (to.lon - from.lon) * M_PER_DEG_LAT * Math.cos((from.lat * Math.PI) / 180) };
 }
 
+/** How far a camera is from the runner on the road, in a straight line through the air. */
+function distanceM(runner: { lat: number; lon: number; ellipsoidHeightM: number }, eye: { lat: number; lon: number; heightM: number }): number {
+  const back = metersFrom(runner, eye);
+  return Math.hypot(back.north, back.east, eye.heightM - runner.ellipsoidHeightM);
+}
+
 interface Swing {
   /** The fastest the view swings, degrees a second, where the Ride could still have gone slower; and where. */
   degPerS: number;
@@ -88,6 +94,8 @@ interface Swing {
 function swingAlong(scene: RideScene, camera: RideCamera): Swing {
   const course = rideCourseFor(scene);
   const asSlowAsItGoes = { ...course, swingDegPerKm: () => Number.MAX_VALUE };
+  // Both worked out once: a fresh course object every metre would rebuild its whole table of speeds.
+  const withNoTurns = { ...course, swingDegPerKm: undefined };
   const swing: Swing = { degPerS: 0, km: 0, atItsSlowestM: 0, fastestAtItsSlowestDegPerS: 0 };
   let last = rideView(scene, 0, camera).headingDeg;
   for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
@@ -97,7 +105,10 @@ function swingAlong(scene: RideScene, camera: RideCamera): Swing {
     // Degrees in a metre of road, times how many metres go by in a second.
     const degPerS = Math.abs(relativeBearing(last, heading)) * speed * 1000;
     last = heading;
-    if (speed <= rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) {
+    // A camera whose Ride never eases off for a turn (From above keeps one pace, issue #24) is never
+    // "as slow as it may go": every metre of it is measured, or the bound below would mean nothing.
+    const slowedForThisTurn = speed < rideSpeedKmPerS(withNoTurns, km, camera) * 0.999;
+    if (slowedForThisTurn && speed <= rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) {
       // Only a turn counts: near a Stop the Ride is this slow on a dead straight road too.
       if (degPerS > 1) swing.atItsSlowestM += 1;
       swing.fastestAtItsSlowestDegPerS = Math.max(swing.fastestAtItsSlowestDegPerS, degPerS);
@@ -291,8 +302,7 @@ describe("From above", () => {
     const scene = cornerCourse();
     const runner = positionAtKm(scene.line, 1);
     const centred = rideView(scene, 1, "from-above");
-    const fromTheRunner = metersFrom(runner, centred.eye);
-    const range = Math.hypot(fromTheRunner.north, fromTheRunner.east, centred.eye.heightM - 100);
+    const range = distanceM(runner, centred.eye);
 
     const shifted = rideView(scene, 1, "from-above", { leftOfRunner: 0.1 });
 
@@ -307,19 +317,31 @@ describe("From above", () => {
     expect(shifted.eye.heightM).toBeCloseTo(centred.eye.heightM, 9);
   });
 
-  it("comes down for a closer look at a Stop, and goes up again between Stops", () => {
-    const atTheBarclaysCenter = rideView(nyc, 12.1, "from-above");
-    const onFourthAvenue = rideView(nyc, 6, "from-above");
-
-    expect(atTheBarclaysCenter.eye.heightM).toBeLessThan(onFourthAvenue.eye.heightM / 1.5);
+  it("keeps one distance from the runner all the way, at a Stop, up a climb and on the open road alike: it never dollies in and out", () => {
+    // The owner's pick (issue #24). First built coming down to 900 m at every Stop and going back up
+    // to 2,200 m after it: eighteen times in New York, a camera that "is moving a little bit too much".
+    for (const scene of [nyc, berlin]) {
+      const distancesM: number[] = [];
+      for (let km = 0; km <= scene.line.length_m / 1000; km += 0.05) {
+        const view = rideView(scene, km, "from-above");
+        distancesM.push(distanceM(positionAtKm(scene.line, km), view.eye));
+      }
+      // Within a few metres: over a bridge whose height is filled in, the camera rides over an estimate of the crest.
+      expect(Math.max(...distancesM) - Math.min(...distancesM)).toBeLessThan(5);
+      // Far enough off for the course to read like a map, near enough for the city to read as a city.
+      expect(Math.min(...distancesM)).toBeGreaterThan(1000);
+      expect(Math.max(...distancesM)).toBeLessThan(2200);
+    }
   });
 
   it("turns with the course slowly: a change of direction is a sweep of several seconds, not a spin", () => {
     for (const scene of [cornerCourse(), nyc, berlin]) {
       const swing = swingAlong(scene, "from-above");
       expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(21);
-      // From above the Ride never has to go as slow as it may to keep to that: nothing is excused.
-      expect(swing.fastestAtItsSlowestDegPerS).toBeLessThan(21);
+      // From above the Ride eases off for nothing (issue #24), so every metre is measured above and
+      // none is excused: what keeps the view from whipping round is the camera's own facing.
+      expect(swing.atItsSlowestM).toBe(0);
+      expect(swing.fastestAtItsSlowestDegPerS).toBe(0);
     }
   });
 });

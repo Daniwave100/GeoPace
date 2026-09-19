@@ -35,12 +35,12 @@ Drag the strip's **top edge** to make its rows taller or to give the map the roo
 like a paper map.
 
 Press **Ride the course**, on the map, and the runner is carried from the start to the finish as a
-time-lapse: quick along the open road and slow at each **Stop** (the start, every landmark, the big
-climbs, the finish), just under three minutes for the whole course seen from above. The button becomes a player: **Back** and
+time-lapse past each **Stop** (the start, every landmark, the big climbs, the finish): seen from above at one
+smooth pace, about a minute and a half for the whole course. The button becomes a player: **Back** and
 **Ride to the next stop** move between Stops and pause on arrival, the **space bar** plays and pauses,
 and scrubbing the strip moves the Ride. Two cameras, switched whenever you like: **From above**, and **On the
 road**, which follows a few metres up and behind like the lead vehicle's camera, at a gentler
-time-lapse that slows into corners: ten to twelve minutes for the whole course. The readout, the sentence, the layer that is on and the sun keep up. Paused, the map is
+time-lapse that slows at each Stop and into corners: ten to twelve minutes for the whole course. The readout, the sentence, the layer that is on and the sun keep up. Paused, the map is
 yours to look around; touching the map pauses. If your system asks for reduced motion, nothing glides:
 the Ride steps from Stop to Stop. **Back to the map** returns to Explore.
 
