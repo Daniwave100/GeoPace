@@ -3,6 +3,7 @@ import "./style.css";
 import { browserStorage } from "./browser-storage";
 import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
+import { loadWhiteModel, type WhiteModel, WhiteModelError } from "./bundle/white-model";
 import { type Encoding, ENCODINGS } from "./core/encoding";
 import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
@@ -17,7 +18,8 @@ import { sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
 import { loadStripSize, saveStripSize } from "./core/strip-size";
 import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
-import { distanceNumber, type Units, unitName } from "./core/units";
+import { distanceNumber, formatNearby, type Units, unitName } from "./core/units";
+import { loadWhiteModelChoice, saveWhiteModelChoice, type WhiteModelChoice } from "./core/white-model";
 import { COURSES, courseFromUrl, urlForCourse } from "./courses";
 import { html, link } from "./dom";
 import { createLayerBar } from "./explore/layer-bar";
@@ -28,6 +30,7 @@ import { createSentence, sentenceInWords } from "./explore/sentence-view";
 import { renderSources } from "./explore/sources";
 import { createStripEdge } from "./explore/strip-edge";
 import { createSwitches } from "./explore/switches";
+import { createWhiteModelSwitches, type WhiteModelSwitches } from "./explore/white-model-switches";
 import { createPhotoreal, type Photoreal } from "./photoreal/photoreal";
 import { createPhotorealPanel, type PhotorealPanel } from "./photoreal/photoreal-panel";
 import { createPlanPanel } from "./plan/plan-panel";
@@ -42,6 +45,7 @@ import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labe
 import { loadPhotorealTiles } from "./scene/photoreal-tileset";
 import type { Placement } from "./scene/placement";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
+import { createWhiteModel, type WhiteModelInScene } from "./scene/white-model";
 import { type CameraInTheScene, createRideCamera, roadHeightOnTheMap } from "./scene/ride-camera";
 import { createStrip, type KeyEntry, rowsHeightAtSizeOne } from "./strip/strip";
 import type { Viewer } from "cesium";
@@ -66,7 +70,12 @@ interface Showing {
   vicinity: Vicinity;
   /** The Ride through this course: off until the runner rides, and then a mode of this same screen (PLAN.md D34). */
   ride: Ride;
+  /** The city's buildings along this course, as they are getting on: they arrive after everything else (#7). */
+  city: City;
 }
+
+/** How the city's own buildings are getting on for the course that is showing (app/src/bundle/white-model.ts). */
+type City = { state: "none" } | { state: "loading" } | { state: "drawn"; model: WhiteModel } | { state: "failed"; why: string };
 
 /** The layers a course has. Each later ticket adds its own here, and gets its switch, its rows, its marks and its clause. */
 function layersFor(bundle: CourseBundle): Layer[] {
@@ -81,6 +90,7 @@ let units: Units = loadUnits(storage);
 let themeChoice: ThemeChoice = loadThemeChoice(storage);
 let layerState: LayerState = NO_LAYERS;
 let stripSize = loadStripSize(storage);
+let whiteModelChoice: WhiteModelChoice = loadWhiteModelChoice(storage);
 let fullMap = false;
 /** How the course is drawn on the map now: draped over the keyless map, at road height over photoreal imagery (issue #22). */
 let placement: Placement = "draped";
@@ -99,6 +109,7 @@ let mapLabels: MapLabels | undefined;
 let mapDots: MapDots | undefined;
 let photoreal: Photoreal | undefined;
 let photorealPanel: PhotorealPanel | undefined;
+let whiteModel: WhiteModelInScene | undefined;
 let showing: Showing | undefined;
 let loading = "";
 
@@ -113,6 +124,7 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
   scrubTo(km);
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
+const whiteModelSwitches: WhiteModelSwitches = createWhiteModelSwitches(byId("white-model"), useWhiteModel);
 const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
 const strip = createStrip(byId("strip"), scrubTo, (held) => showing?.ride.hold(held));
 const rideControls = createRideControls(byId("ride"), {
@@ -199,6 +211,7 @@ async function show(courseId: string): Promise<void> {
       straightDown: () => toggleStraightDown(map, flightSeconds()),
       fullMap: () => useFullMap(!fullMap),
     });
+    whiteModel = createWhiteModel(map);
     // While photoreal hides the plain ground, the map's own moves count heights from the road where the runner is.
     useRoadAsGroundWhenHidden(map, () => (showing ? positionAtKm(showing.bundle.measured.course_line, showing.km).ellipsoidHeightM : undefined));
     rideCamera = createRideCamera(map, { reducedMotion: () => reducedMotion.matches, now: () => performance.now() });
@@ -221,9 +234,11 @@ async function show(courseId: string): Promise<void> {
   const layers = layersFor(bundle);
   const stops = stopsFor(bundle);
   const rideScene: RideScene = { line: bundle.measured.course_line, stops, notMeasured: bundle.measured.elevation_not_measured };
-  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, vicinity: vicinityOf(bundle.measured.course_line), ride: startRide(rideScene) };
+  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, vicinity: vicinityOf(bundle.measured.course_line), ride: startRide(rideScene), city: { state: bundle.measured.white_model ? "loading" : "none" } };
   wasRiding = false;
   wasPlaying = false;
+  whiteModel?.show(null); // the last course's buildings go with it
+  void loadTheCity(bundle);
   showPlan();
   // Framed last: the strip has just taken its height, and the map is whatever is left.
   frameWholeCourse(0);
@@ -254,6 +269,69 @@ function showTheme(): void {
   const theme = resolveTheme(themeChoice, { systemPrefersDark: systemDark.matches });
   document.documentElement.dataset.theme = theme;
   if (viewer) showMapTheme(viewer, theme);
+  whiteModel?.look(whiteModelChoice, theme);
+}
+
+/**
+ * The city's real buildings for this course: fetched after everything else and never waited for
+ * (#7). The course, the strip, the plan and the Ride are already on screen, and if the buildings
+ * never arrive the map is what is left, with the block on the map saying so.
+ */
+async function loadTheCity(bundle: CourseBundle): Promise<void> {
+  const white = bundle.measured.white_model;
+  if (!white) return showCity({ state: "none" }, bundle);
+  try {
+    const model = await loadWhiteModel(bundle.course_id, white.file);
+    showCity({ state: "drawn", model }, bundle);
+  } catch (err) {
+    showCity({ state: "failed", why: err instanceof WhiteModelError ? err.message : String(err) }, bundle);
+  }
+}
+
+/** The buildings have arrived, or haven't. Ignored if the runner has moved on to another course. */
+function showCity(city: City, bundle: CourseBundle): void {
+  if (!showing || showing.bundle !== bundle) return;
+  showing.city = city;
+  whiteModel?.show(city.state === "drawn" ? city.model : null);
+  showWhiteModel();
+}
+
+/** The runner asked for more or fewer buildings, or for the shadows to stop. */
+function useWhiteModel(next: WhiteModelChoice): void {
+  whiteModelChoice = next;
+  saveWhiteModelChoice(storage, next);
+  showWhiteModel();
+}
+
+/**
+ * The White model as it should be now: what the scene draws, and what its switches say. The block
+ * steps aside while photoreal has the ground's place, because the city standing there is Google's.
+ */
+function showWhiteModel(): void {
+  whiteModel?.look(whiteModelChoice, resolveTheme(themeChoice, { systemPrefersDark: systemDark.matches }));
+  whiteModelSwitches.show(whiteModelChoice, cityInWords(), placement === "road-height" || showing === undefined);
+}
+
+/**
+ * What the block says under its switches: how the buildings are getting on, and — once they are
+ * drawn — the two things a runner can't tell by looking. Only the corridor is there, so the rest
+ * of the city staying flat is the data, not a fault; and the shadows are worked out for race day,
+ * which is the whole reason the keyless look exists (PLAN.md D4).
+ */
+function cityInWords(): string {
+  const city = showing?.city;
+  if (!city) return "";
+  switch (city.state) {
+    case "loading":
+      return "Getting the city's buildings…";
+    case "none":
+      return "No buildings for this course yet: the pipeline hasn't built any.";
+    case "failed":
+      return "The city's buildings couldn't be loaded, so this is the plain map. Everything else is untouched.";
+    case "drawn":
+      if (whiteModelChoice.buildings === "off") return "";
+      return `Real buildings within ${formatNearby(city.model.corridor_m / 1000, units)} of the course; shadows worked out for race day, not photographed.`;
+  }
 }
 
 function useLayers(next: LayerState): void {
@@ -299,6 +377,7 @@ function showPlan(): void {
   planSummary.show(showing.planner, units);
   planPanel.show(showing.course, showing.planner, units);
   splitsTable.show(showing.planner, units);
+  showWhiteModel();
   showLayers();
 }
 
@@ -326,6 +405,9 @@ function showLayers(): void {
 function usePlacement(next: Placement): void {
   if (placement === next) return;
   placement = next;
+  // Google's photographed city stands where ours would: ours steps aside, switches and all (#7).
+  whiteModel?.standAside(next === "road-height");
+  showWhiteModel();
   showLayers(); // the course line with its marks, the labels, and through showWhere the runner and the end dots
   // A camera the Ride is holding needs no telling: it asks where it should be before every frame,
   // and the road it rides over has just changed height with the course.

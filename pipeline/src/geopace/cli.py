@@ -7,8 +7,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from geopace import berlin_dgm1, berlin_dom1, geoid_egm2008, nyc_dem, nyc_lidar
-from geopace.bundle import build_course_bundle, write_bundle
+from geopace import berlin_buildings, berlin_dgm1, berlin_dom1, geoid_egm2008, nyc_buildings, nyc_dem, nyc_lidar, white_model
+from geopace.buildings import BuildingsModel
+from geopace.bundle import build_course_bundle, validate_bundle, write_bundle
 from geopace.cache import cache_dir, download
 from geopace.course_facts import CourseFacts, load_course_facts
 from geopace.edition_facts import load_editions
@@ -27,11 +28,15 @@ class CourseData:
 
     elevation: Callable[..., ElevationModel]  # bare-earth ground model
     decks: Callable[..., BridgeDeckModel] | None = None  # surface data for bridge decks, if any
+    # The city's buildings, for the White model (#7). None for a course with no building data.
+    # Each city asks for what it needs: Berlin's blocks stand on the ground model the course line
+    # uses, because no ground comes with its heights; New York's come with their own.
+    buildings: Callable[[], BuildingsModel] | None = None
 
 
 COURSE_DATA = {
-    "berlin": CourseData(elevation=berlin_dgm1.elevation_model, decks=berlin_dom1.deck_model),
-    "nyc": CourseData(elevation=nyc_dem.elevation_model, decks=nyc_lidar.deck_model),
+    "berlin": CourseData(elevation=berlin_dgm1.elevation_model, decks=berlin_dom1.deck_model, buildings=lambda: berlin_buildings.buildings_model(berlin_dgm1.elevation_model())),
+    "nyc": CourseData(elevation=nyc_dem.elevation_model, decks=nyc_lidar.deck_model, buildings=nyc_buildings.buildings_model),
 }
 
 
@@ -58,17 +63,29 @@ def build(course_id: str) -> Path:
     print(f"  editions: {', '.join(str(edition.edition) for edition in editions)}")
     route = load_route(facts)
     data = COURSE_DATA[course_id]
+    elevation = data.elevation()
+    # One worldwide geoid model for every course (PLAN.md D51).
+    geoid = geoid_egm2008.geoid_model()
     bundle = build_course_bundle(
         facts,
         route,
-        data.elevation(),
+        elevation,
         decks=data.decks() if data.decks else None,
         editions=editions,
-        # One worldwide geoid model for every course (PLAN.md D51).
-        geoid=geoid_egm2008.geoid_model(),
+        geoid=geoid,
     )
 
     out = DERIVED / course_id / "course-bundle.json"
+    if data.buildings:
+        # The White model is found along the bundle's own course line, so the blocks stand beside
+        # exactly the road the app draws, and is written beside the bundle, which names it (#7).
+        buildings = data.buildings()
+        model = white_model.build_white_model(bundle, buildings, geoid=geoid)
+        white_model.note_in_bundle(bundle, model, buildings)
+        validate_bundle(bundle)
+        white_out = out.parent / white_model.FILE_NAME
+        white_model.write_white_model(model, white_out)
+        print(f"  wrote {white_out.relative_to(REPO)} ({white_out.stat().st_size / 1024 / 1024:.1f} MB)")
     write_bundle(bundle, out)
     line = bundle["measured"]["course_line"]
     summary = bundle["measured"]["elevation_summary"]

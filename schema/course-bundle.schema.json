@@ -83,6 +83,17 @@
             }
           }
         },
+        "white_model": {
+          "description": "The city's real buildings along this course, written beside this bundle as its own file (schema/white-model.schema.json). Absent for a course nobody has building data for; the app then draws the course on the plain map. The geometry is far larger than everything else about a course put together, so the bundle only names it and counts it — and carries its credits, which must be on screen whenever the buildings are.",
+          "type": "object",
+          "required": ["file", "buildings", "corridor_m"],
+          "additionalProperties": false,
+          "properties": {
+            "file": { "description": "The file's name, beside this bundle.", "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*\\.json$" },
+            "buildings": { "description": "How many blocks it holds.", "type": "integer", "minimum": 0 },
+            "corridor_m": { "description": "How far either side of the course a building had to be to be kept.", "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
         "difficulty_model": {
           "description": "The published model behind course_line.difficulty.",
           "type": "object",

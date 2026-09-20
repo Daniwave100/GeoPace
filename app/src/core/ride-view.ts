@@ -43,6 +43,9 @@ const ON_THE_ROAD = {
  */
 const GRADE_READ_KM = { from: 0.05, to: 0.15 };
 
+/** How far From above holds the camera from the runner (PLAN.md D53). Read by the White model's tests: a shadow drawn no further than the camera's own distance is a shadow nobody sees. */
+export const FROM_ABOVE_RANGE_M = 1500;
+
 const FROM_ABOVE = {
   /** Degrees below the horizon: enough tilt for the city to read as 3D, enough height to read the course like a map. */
   tiltDeg: 50,
@@ -52,7 +55,7 @@ const FROM_ABOVE = {
    * New York is eighteen times: the owner, after riding both, keeps it at one level (issue #24).
    * A Stop is still marked: the strip and the player name it as it goes by.
    */
-  rangeM: 1500,
+  rangeM: FROM_ABOVE_RANGE_M,
   /**
    * The way the course is going, over 3 km of it: it faces along the straight line from 1 km behind
    * the runner to 2 km ahead. Zigzags of city blocks even out, the loop onto the Queensboro Bridge

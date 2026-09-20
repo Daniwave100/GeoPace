@@ -94,7 +94,7 @@ def test_committed_nyc_bundle_matches_the_schema_and_the_real_course():
     check_nyc_ellipsoid_heights(bundle["measured"]["course_line"])
     check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])
     # The data it was built from is named, with a licence and the date it was fetched.
-    assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "geoid-egm2008", "openstreetmap"} == {s["id"] for s in bundle["sources"]}
+    assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "geoid-egm2008", "openstreetmap", "nyc-building-footprints"} == {s["id"] for s in bundle["sources"]}
 
 
 @pytest.mark.skipif(not (CACHE / "dem").exists() or not (CACHE / "lidar").exists(), reason="real NYC inputs not cached")

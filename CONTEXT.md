@@ -249,6 +249,16 @@ _Avoid_: mock, dummy, demo data
 The city's real buildings shown as plain white blocks with real shadows. What the app shows with no set-up.
 _Avoid_: analysis mode, architectural model, maquette (the maquette was the mockups' drawn stand-in)
 
+**Block**:
+One building in the White model: its outline as the city publishes it, pulled up to one flat roof. A
+building with parts of different heights is several blocks.
+_Avoid_: massing, extrusion, footprint (a footprint is the outline, not the block)
+
+**Corridor**:
+The strip of city either side of the course that the pipeline reads and the White model covers. Set
+once per course and written in the data, so the flat city beyond it is the corridor, not a fault.
+_Avoid_: buffer, catchment, radius
+
 **Photoreal**:
 Google's photographed 3D city, shown with the runner's own key. For looking at only: never stored, never used to work anything out.
 _Avoid_: satellite view, Google Maps mode
