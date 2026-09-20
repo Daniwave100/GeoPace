@@ -24,6 +24,12 @@ export interface CourseBundle {
     elevation_summary: { gain_m: number; loss_m: number; min_m: number; max_m: number };
     /** Where the height is a straight line between measured heights, in course order. Often empty. */
     elevation_not_measured: NotMeasuredSpan[];
+    /**
+     * The city's real buildings along this course, written beside the bundle as its own file
+     * (app/src/bundle/white-model.ts). Absent for a course nobody has building data for. The
+     * bundle carries the credits for it, so they can be shown before the geometry arrives.
+     */
+    white_model?: { file: string; buildings: number; corridor_m: number };
     difficulty_model: {
       name: string;
       description: string;

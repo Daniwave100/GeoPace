@@ -16,7 +16,11 @@ cd app && npm install && npm run dev
 Then open http://localhost:5173 and pick a course: **Berlin** or **New York City**.
 
 The app opens on **Explore**: the city from above with the course on it as a blue line, moved like any
-maps app (drag, scroll, Ctrl + drag to tilt; or focus the map and use the arrow keys and + / −). Laid
+maps app (drag, scroll, Ctrl + drag to tilt; or focus the map and use the arrow keys and + / −). Nothing
+is drawn on the ground — it is plain paper — and either side of the course stands the **white model**: the
+city's real buildings, from each city's own open data, as plain white blocks. Their shadows are the shadows
+that will be there on race day, because the geometry is ours and the sun is worked out for the minute you
+reach each kilometre. Zoom in and watch them swing as you drag the strip. Laid
 over the map: the distance as one giant numeral, the time of day, the elapsed time, and **one
 sentence** about where you are ("Climbing 4%. Ed Koch Queensboro Bridge in 600 m. Sun on your left.").
 Along the bottom is the **strip**, the whole course as one line: drag it, click it, or use the arrow
@@ -56,9 +60,13 @@ the reason; a race date the organizer hasn't stated yet is marked **not confirme
 start time nobody has published is never filled with a guess: pick it and type in **your own start
 time**, from your start card. You can do the same on any wave, and your own time always wins.
 
-The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
-app needs an internet connection to show them. If they can't be reached, the course, the strip, the
-layers and the Ride all still work, over a plain grey ground.
+**Buildings** and **Shadows** are two switches on the map, under "Make it photoreal". Shadows are the
+expensive part of a 3D scene: they are as good as the engine will give, and either of the two can be
+turned off on a computer that can't spare the work.
+
+The ground's shape comes from a free, keyless terrain service (Re:Earth Terrain), so the app needs an
+internet connection for it. If it can't be reached, the course, the strip, the layers and the Ride all
+still work, over flat ground. The buildings come from GeoPace's own committed files and need nothing.
 
 ### Make it photoreal (optional)
 
@@ -75,7 +83,8 @@ Your key stays in your browser. It is never written to GeoPace's files, and it i
 provider it belongs to; **Forget my key** removes it. Everything else works without a key, and if
 the imagery can't be had (a refused key, a used-up allowance, no connection) you are back on the
 plain map with a message saying why. Photoreal is for looking at: its shadows were there when the
-city was photographed, so GeoPace's numbers never come from it.
+city was photographed, so GeoPace's numbers never come from it — which is exactly why the white model
+exists, and why it steps aside while the photographed city is on screen.
 
 Over the imagery the course is drawn at the road's own height, from GeoPace's own survey data, so
 it stays on the road as you move the camera: under the trees in Central Park, and on the deck the
@@ -113,9 +122,10 @@ cd pipeline && uv run geopace build nyc
 
 The first run downloads the raw inputs into `pipeline/.cache/` (never committed): for Berlin the
 official course file and about 300 MB of terrain tiles; for NYC the streets along the course, the
-1-ft elevation model block by block, and the LiDAR points around each bridge. Only the corridor
-along the course is ever fetched, never the whole city. Both also need the worldwide geoid grid
-(80 MB, fetched once). Later runs reuse the cache.
+1-ft elevation model block by block, and the LiDAR points around each bridge. Both also fetch their
+city's buildings, a kilometre of course at a time, and the worldwide geoid grid (80 MB, fetched
+once). Only the corridor along the course is ever fetched, never the whole city. Later runs reuse
+the cache.
 
 ## Tests
 
@@ -136,8 +146,11 @@ pipeline/ (Python)                  route → evenly spaced samples → official
         │                            → height above the ellipsoid, for the 3D scene
         ▼
 data/derived/<course>/course-bundle.json   committed; must match schema/course-bundle.schema.json
-        │
+data/derived/<course>/white-model.json     committed; the buildings along the course, as blocks
+        │                                  (schema/white-model.schema.json; the bundle names it)
+        ▼
 app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and the profile,
+                                    stands the city's buildings beside it with real shadows,
                                     and times your race along it
 ```
 
@@ -148,6 +161,13 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
   course's USATF certification, which records how far apart the start and finish are.
 - **Elevation** comes from each city's official ground model, never GPS. It is smoothed before
   grade is computed.
+- **The buildings** are each city's own: Berlin's published building heights, worked out by the city
+  from its LoD2 3D models and laid on the cadastre's outlines; New York's Building Footprints, whose
+  roof heights are kept current and so know about a decade of towers the 2017 LiDAR doesn't. Each is
+  read only within 150 m of the course and written as one file beside the bundle — about 3 MB a city,
+  committed, so the app needs nothing at run time. A block is flat-topped: where a city publishes the
+  ridge of a pitched roof, the block stands as tall as the ridge. Nothing is drawn on the ground they
+  stand on: no map, photographed or otherwise, only the design's own paper and the shadows.
 - **Bridges** are missing from those models: they are bare-earth, so a bridge reads as the water
   underneath (New York's start on the Verrazzano would sit at sea level). Berlin's are read from the
   city's surface model, which still has them. New York's are measured from the 2017 city LiDAR, using the

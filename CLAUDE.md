@@ -28,7 +28,8 @@ ask before anything that changes scope or look.
   Never naive datetimes.
 - Wind direction: **meteorological — degrees the wind blows FROM.**
 - Hand-maintained course facts live in `data/courses/<id>/` (YAML). Pipeline outputs live in
-  `data/derived/<id>/` and are committed. Raw downloads go to a local cache and are **never
+  `data/derived/<id>/` and are committed, up to **8 MB per course** (D56); above that, geometry ships as a
+  release download fetched by a documented set-up step. Raw downloads go to a local cache and are **never
   committed**.
 - The app must run without Python; Python only regenerates `data/derived/`.
 
@@ -43,6 +44,11 @@ ask before anything that changes scope or look.
   39.5 m *above* it in Berlin. A missing, swapped or sign-flipped geoid offset must not pass (D51). The height comes from
   the Course Bundle, never from Google's surface (D5).
 - Timezone/DST: **US DST ends Sun 2026-11-01**, likely NYC race day.
+- The White model's shadows: a shadow map drawn no further than the camera's own height shows **nothing**, silently
+  (D56). Every quality's distance is tested against the Ride's camera. A block stands on its city's own ground —
+  Berlin's from our bare-earth model, New York's from the building record — and goes through the same geoid step
+  as the road, so the two can never drift apart.
+- Metres per degree change with latitude; one rounded constant made a "150 m" corridor 151 m (D56).
 - Course length stays within tolerance of the certified 42.195 km (a route traced along street
   centre lines gets a wider tolerance than an organizer's course file — see D21/D22).
 
@@ -58,7 +64,9 @@ through `core/units.ts`.
 ## Commands
 - Run the app: `cd app && npm install && npm run dev` → http://localhost:5173
 - App tests / types: `cd app && npm test` · `cd app && npm run typecheck`
-- Rebuild a Course Bundle: `cd pipeline && uv run geopace build berlin` (or `nyc`; downloads into `pipeline/.cache/`)
+- Rebuild a Course Bundle: `cd pipeline && uv run geopace build berlin` (or `nyc`; downloads into `pipeline/.cache/`).
+  It writes two committed files: `course-bundle.json` and, beside it, `white-model.json` — the corridor's buildings
+  as blocks, which the bundle names, counts and credits (`schema/white-model.schema.json`, D56).
 - Pipeline tests: `cd pipeline && uv run pytest` (real-data checks skip until the cache exists)
 - The Course Bundle contract is `schema/course-bundle.schema.json`; both halves validate against it.
   Bump `schema_version` on breaking changes.

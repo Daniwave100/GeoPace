@@ -19,11 +19,17 @@ from geopace.cache import cache_dir, download
 TILE_SIZE_M = 2000
 
 _to_utm33 = Transformer.from_crs("EPSG:4326", "EPSG:25833", always_xy=True)
+_from_utm33 = Transformer.from_crs("EPSG:25833", "EPSG:4326", always_xy=True)
 
 
 def to_utm33(lon, lat):
     """(easting, northing) in meters, EPSG:25833."""
     return _to_utm33.transform(lon, lat)
+
+
+def from_utm33(easting, northing):
+    """(lon, lat) in degrees, back from EPSG:25833: what the city's own services answer in."""
+    return _from_utm33.transform(easting, northing)
 
 
 @dataclass(frozen=True)
