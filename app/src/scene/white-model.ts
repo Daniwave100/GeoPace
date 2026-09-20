@@ -13,8 +13,9 @@
 // entirely, because the city standing there is then Google's.
 import { Cartesian3, Color, Material, MaterialAppearance, PolygonGeometry, PolygonHierarchy, Primitive, GeometryInstance, ShadowMode, type Viewer } from "cesium";
 import type { WhiteModel } from "../bundle/white-model";
+import { heightAboveGround } from "./globe";
 import type { Theme } from "../core/theme";
-import { DEFAULT_WHITE_MODEL, SHADOW_QUALITY, type WhiteModelChoice } from "../core/white-model";
+import { DEFAULT_WHITE_MODEL, SHADOWS, shadowDistanceM, type WhiteModelChoice } from "../core/white-model";
 
 /**
  * How far below its measured ground each block is started.
@@ -36,8 +37,10 @@ const SKIRT_M = 25;
  * the same model, and the shadows lighten so they are not black on black.
  */
 const BLOCK_LOOK: Record<Theme, { face: string; shadowDarkness: number }> = {
-  light: { face: "#f7f7f4", shadowDarkness: 0.28 },
-  dark: { face: "#8e8e88", shadowDarkness: 0.5 },
+  // A roof turned to the sun is the brightest thing on screen after the course, a shade over the
+  // paper it stands on, so the blocks read against the ground without an outline round them.
+  light: { face: "#ffffff", shadowDarkness: 0.26 },
+  dark: { face: "#9c9c95", shadowDarkness: 0.45 },
 };
 
 export interface WhiteModelInScene {
@@ -58,6 +61,12 @@ export function createWhiteModel(viewer: Viewer): WhiteModelInScene {
   let theme: Theme = "light";
   let aside = false;
   let shadowMapSize = 0; // what the shadow map was last resized to; resizing throws its textures away
+  let shadowReachM = 0; // how far the shadows were last told to reach, so it is set only when it changes
+  // The camera moves every frame of a Ride, so the reach is checked every frame; it is one
+  // lookup of the ground under the camera, and the answer is stepped, so it rarely changes anything.
+  viewer.scene.preRender.addEventListener(() => {
+    if (viewer.scene.shadowMap.enabled) followTheCamera();
+  });
 
   function showBlocks(): void {
     const on = wanted !== null && choice.buildings === "on" && !aside;
@@ -81,20 +90,31 @@ export function createWhiteModel(viewer: Viewer): WhiteModelInScene {
 
   function showShadows(): void {
     const scene = viewer.scene;
-    const quality = choice.shadows === "off" ? null : SHADOW_QUALITY[choice.shadows];
-    const on = blocks !== undefined && quality !== null;
+    const on = blocks !== undefined && choice.shadows === "on";
     scene.shadowMap.enabled = on;
     // The ground catches the buildings' shadows; it casts none of its own, which would be the
     // whole globe drawn a second time for a hill neither city has.
     viewer.terrainShadows = on ? ShadowMode.RECEIVE_ONLY : ShadowMode.DISABLED;
-    if (!on || !quality) return;
-    if (shadowMapSize !== quality.size) {
-      scene.shadowMap.size = quality.size;
-      shadowMapSize = quality.size;
+    if (!on) return;
+    if (shadowMapSize !== SHADOWS.size) {
+      scene.shadowMap.size = SHADOWS.size;
+      shadowMapSize = SHADOWS.size;
     }
-    scene.shadowMap.softShadows = quality.soft;
-    scene.shadowMap.maximumDistance = quality.withinM;
+    scene.shadowMap.softShadows = SHADOWS.soft;
     scene.shadowMap.darkness = BLOCK_LOOK[theme].shadowDarkness;
+    followTheCamera();
+  }
+
+  /**
+   * How far the shadows reach, kept in step with how high the camera is (issue #39): the one
+   * shadow map is spread over everything between the camera and this distance, so a distance that
+   * stood still while the camera moved would be coarse on the road and short from the air.
+   */
+  function followTheCamera(): void {
+    const wanted = shadowDistanceM(heightAboveGround(viewer));
+    if (wanted === shadowReachM) return;
+    shadowReachM = wanted;
+    viewer.scene.shadowMap.maximumDistance = wanted;
   }
 
   return {

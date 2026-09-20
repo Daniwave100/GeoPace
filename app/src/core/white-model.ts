@@ -1,55 +1,75 @@
-// How much of the White model the runner's computer is asked to draw. Two plain choices, both
+// How much of the White model the runner's computer is asked to draw. Two plain switches, both
 // remembered in the browser.
 //
-// Heavy 3D kills weak GPUs (PLAN.md §8), so there has to be a way down from day one. The cost is
-// almost all in the shadows, not in the blocks: the blocks are one lump of geometry the card
-// draws once, while a shadow means drawing the whole city a second time, from the sun, into a
-// square of memory whose size is the setting. So the quality setting is the shadows, and the
-// conservative default is the smaller square with hard edges — which is also the look the poster
-// asked for (PLAN.md §6: solid black shadows).
+// Heavy 3D kills weak GPUs (PLAN.md §8), so there has to be a way down from day one — but the way
+// down is off, not a lesser shadow. The owner, 09-20: "I want to immediately go to detailed. I
+// don't want to care about like mid detail." So there is one quality, the best the engine will
+// give, and a switch that turns it off (issue #39, D57).
 import { type BrowserStorage, isRecord, readStored, writeStored } from "../browser-storage";
 
-/** Whether the city's buildings are drawn at all. Off leaves the plain map the app had before. */
+/** Whether the city's buildings are drawn at all. Off leaves the white ground and the course on it. */
 export type Buildings = "on" | "off";
-/** The shadows the sun casts through those buildings, and how much they cost to draw. */
-export type Shadows = "off" | "simple" | "detailed";
+/** Whether the sun casts them, at the moment the runner reaches that kilometre. */
+export type Shadows = "on" | "off";
 
 export interface WhiteModelChoice {
   buildings: Buildings;
   shadows: Shadows;
 }
 
-export const BUILDINGS_CHOICES: { choice: Buildings; label: string; explained: string }[] = [
+const ON_OR_OFF = [
   { choice: "on", label: "On", explained: "" },
-  { choice: "off", label: "Off", explained: "no buildings, just the map" },
-];
-
-export const SHADOW_CHOICES: { choice: Shadows; label: string; explained: string }[] = [
   { choice: "off", label: "Off", explained: "" },
-  { choice: "simple", label: "Simple", explained: "hard-edged, and easier on an older computer" },
-  { choice: "detailed", label: "Detailed", explained: "softer edges, and further from you" },
-];
+] as const;
+
+export const BUILDINGS_CHOICES: { choice: Buildings; label: string; explained: string }[] = ON_OR_OFF.map((c) => ({ ...c, explained: c.choice === "off" ? "no buildings, just the ground and the course" : "" }));
+export const SHADOWS_CHOICES: { choice: Shadows; label: string; explained: string }[] = ON_OR_OFF.map((c) => ({ ...c, explained: c.choice === "off" ? "easier on an older computer" : "" }));
 
 /**
- * What CesiumJS's shadow map is set to for each quality.
+ * What CesiumJS's shadow map is set to. One quality, the good one.
  *
- * `size` is the square of memory the city is drawn into from the sun, and is the whole of the
- * cost: four times the pixels is four times the work, every frame. `soft` spreads each shadow's
- * edge over several reads of that square, which costs again.
- *
- * `withinM` is how far from the camera a shadow is still drawn, and is **not** a taste: set below
- * the height the camera is flying at, nothing is shadowed at all, because the ground is further
- * away than the limit. Both are set well above every camera this app uses — the Ride holds 1,500 m
- * From above, and a runner looking at a street is a few hundred metres up — so the only view
- * without shadows is the whole course from twenty kilometres up, where a building is a speck.
+ * `size` is the square of memory the city is drawn into from the sun, shared between four
+ * cascades, and is the whole of the cost: four times the pixels is four times the work, every
+ * frame. `soft` spreads each shadow's edge over several reads of that square, which is what hides
+ * the stair-steps a hard edge shows when the camera is far from what it is looking at.
  */
-export const SHADOW_QUALITY: Record<Exclude<Shadows, "off">, { size: number; soft: boolean; withinM: number }> = {
-  simple: { size: 1024, soft: false, withinM: 6000 },
-  detailed: { size: 2048, soft: true, withinM: 12000 },
+export const SHADOWS = { size: 4096, soft: true };
+
+/**
+ * How far from the camera a shadow is still drawn, from how high the camera is above the ground.
+ *
+ * CesiumJS spreads that one square over everything between the camera and this distance, so a
+ * distance that stands still while the camera moves is wrong at both ends: far too coarse when the
+ * runner is on the road, and too short to reach the ground when they pull back. It follows the
+ * camera instead, and is never less than three times the camera's height, because a tilted camera
+ * is further from the ground it is looking at than it is above it — set below that, *nothing* is
+ * shadowed at all, silently (PLAN.md §8).
+ */
+export const SHADOW_DISTANCE = {
+  /** Enough to reach well past what a tilted camera has on screen. */
+  timesTheHeight: 3,
+  /** On the road the camera is three metres up; the street still wants shadows down its length. */
+  atLeastM: 2000,
+  /**
+   * Past this there is nothing a shadow map can do for a 20 m building: the whole course is seen
+   * from 25 to 43 km up, where a building is a speck. The shadows come back on the way in.
+   */
+  atMostM: 20000,
 };
 
-/** Buildings on, shadows on but cheap: the city and its moving shadows on a computer that can't spare much. */
-export const DEFAULT_WHITE_MODEL: WhiteModelChoice = { buildings: "on", shadows: "simple" };
+/** Rounded to steps, so a camera drifting up and down doesn't rebuild the cascades every frame. */
+const STEP = 1.25;
+
+export function shadowDistanceM(cameraHeightAboveGroundM: number): number {
+  const wanted = Math.max(cameraHeightAboveGroundM, 0) * SHADOW_DISTANCE.timesTheHeight;
+  const held = Math.min(Math.max(wanted, SHADOW_DISTANCE.atLeastM), SHADOW_DISTANCE.atMostM);
+  if (held <= SHADOW_DISTANCE.atLeastM) return SHADOW_DISTANCE.atLeastM;
+  if (held >= SHADOW_DISTANCE.atMostM) return SHADOW_DISTANCE.atMostM;
+  return Math.min(SHADOW_DISTANCE.atLeastM * STEP ** Math.ceil(Math.log(held / SHADOW_DISTANCE.atLeastM) / Math.log(STEP)), SHADOW_DISTANCE.atMostM);
+}
+
+/** The city and its shadows, both on: what the app opens with (PLAN.md D30). */
+export const DEFAULT_WHITE_MODEL: WhiteModelChoice = { buildings: "on", shadows: "on" };
 
 export type WhiteModelStorage = Pick<BrowserStorage, "getItem" | "setItem">;
 
@@ -60,7 +80,8 @@ export function loadWhiteModelChoice(storage: WhiteModelStorage): WhiteModelChoi
   if (!isRecord(stored)) return DEFAULT_WHITE_MODEL;
   return {
     buildings: BUILDINGS_CHOICES.some((c) => c.choice === stored.buildings) ? (stored.buildings as Buildings) : DEFAULT_WHITE_MODEL.buildings,
-    shadows: SHADOW_CHOICES.some((c) => c.choice === stored.shadows) ? (stored.shadows as Shadows) : DEFAULT_WHITE_MODEL.shadows,
+    // "simple" and "detailed" are what an older version of the app wrote here: both meant on.
+    shadows: stored.shadows === "off" ? "off" : DEFAULT_WHITE_MODEL.shadows,
   };
 }
 

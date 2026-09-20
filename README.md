@@ -16,11 +16,11 @@ cd app && npm install && npm run dev
 Then open http://localhost:5173 and pick a course: **Berlin** or **New York City**.
 
 The app opens on **Explore**: the city from above with the course on it as a blue line, moved like any
-maps app (drag, scroll, Ctrl + drag to tilt; or focus the map and use the arrow keys and + / −). Either
-side of the course stands the **white model**: the city's real buildings, from each city's own open
-data, as plain white blocks — and their shadows are the shadows that will be there on race day, because
-the geometry is ours and the sun is worked out for the minute you reach each kilometre. Zoom in and
-watch them swing as you drag the strip. Laid
+maps app (drag, scroll, Ctrl + drag to tilt; or focus the map and use the arrow keys and + / −). Nothing
+is drawn on the ground — it is plain paper — and either side of the course stands the **white model**: the
+city's real buildings, from each city's own open data, as plain white blocks. Their shadows are the shadows
+that will be there on race day, because the geometry is ours and the sun is worked out for the minute you
+reach each kilometre. Zoom in and watch them swing as you drag the strip. Laid
 over the map: the distance as one giant numeral, the time of day, the elapsed time, and **one
 sentence** about where you are ("Climbing 4%. Ed Koch Queensboro Bridge in 600 m. Sun on your left.").
 Along the bottom is the **strip**, the whole course as one line: drag it, click it, or use the arrow
@@ -61,13 +61,12 @@ start time nobody has published is never filled with a guess: pick it and type i
 time**, from your start card. You can do the same on any wave, and your own time always wins.
 
 **Buildings** and **Shadows** are two switches on the map, under "Make it photoreal". Shadows are the
-expensive part of a 3D scene, so they start on the cheaper of two settings and can be turned off
-altogether, along with the buildings themselves, on a computer that can't spare the work.
+expensive part of a 3D scene: they are as good as the engine will give, and either of the two can be
+turned off on a computer that can't spare the work.
 
-The map and terrain are free, keyless services (OpenStreetMap tiles, Re:Earth Terrain), so the
-app needs an internet connection to show them. If they can't be reached, the course, the strip, the
-layers and the Ride all still work, over a plain grey ground. The buildings come from GeoPace's own
-committed files and need nothing.
+The ground's shape comes from a free, keyless terrain service (Re:Earth Terrain), so the app needs an
+internet connection for it. If it can't be reached, the course, the strip, the layers and the Ride all
+still work, over flat ground. The buildings come from GeoPace's own committed files and need nothing.
 
 ### Make it photoreal (optional)
 
@@ -167,7 +166,8 @@ app/ (TypeScript + CesiumJS)        validates the bundle, draws the route and th
   roof heights are kept current and so know about a decade of towers the 2017 LiDAR doesn't. Each is
   read only within 150 m of the course and written as one file beside the bundle — about 3 MB a city,
   committed, so the app needs nothing at run time. A block is flat-topped: where a city publishes the
-  ridge of a pitched roof, the block stands as tall as the ridge.
+  ridge of a pitched roof, the block stands as tall as the ridge. Nothing is drawn on the ground they
+  stand on: no map, photographed or otherwise, only the design's own paper and the shadows.
 - **Bridges** are missing from those models: they are bare-earth, so a bridge reads as the water
   underneath (New York's start on the Verrazzano would sit at sea level). Berlin's are read from the
   city's surface model, which still has them. New York's are measured from the 2017 city LiDAR, using the

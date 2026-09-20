@@ -114,7 +114,13 @@ _Avoid_: flight (a flight is the map's own move to the whole course or to the ru
 
 **Map**:
 The city seen from above with the course drawn on it. It is the same scene the Ride moves through, not a separate thing.
-_Avoid_: globe, 2D view
+Nothing is drawn on its ground: with no key the ground is the paper and the White model's blocks stand on it; with a key
+Google's photographed city does (D57).
+_Avoid_: globe, 2D view, basemap (there is none)
+
+**The paper ground**:
+The one flat colour the map's ground is, the design's own paper. The sun still lights it, so it dims after sunset.
+_Avoid_: basemap, backdrop, canvas
 
 **Strip**:
 The whole course laid out as one line of kilometres, with a row per layer, that is also the control for where the runner is.
@@ -268,7 +274,7 @@ The runner's own Google Maps key or Cesium ion token: what lets Photoreal be sho
 _Avoid_: API key (alone), credentials, BYOK
 
 **Keyless**:
-Said of whatever the app shows with no set-up: the map today, the White model once it exists. What Photoreal falls back to.
+Said of what the app shows with no set-up: the White model on the paper ground. What Photoreal falls back to.
 _Avoid_: free mode, default mode, fallback view
 
 **Load** (of Photoreal):

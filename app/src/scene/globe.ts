@@ -11,14 +11,11 @@ import {
   Cartographic,
   CesiumTerrainProvider,
   Color,
-  Credit,
   HeadingPitchRange,
-  ImageryLayer,
   Ion,
   JulianDate,
   Math as CesiumMath,
   Matrix4,
-  OpenStreetMapImageryProvider,
   PerspectiveFrustum,
   sampleTerrainMostDetailed,
   Terrain,
@@ -34,9 +31,12 @@ import { registerCourseRibbon } from "./course-ribbon";
 import { groundUnderM } from "./ground-under";
 import { middleOfTheMap } from "./map-middle";
 import { plainGroundIfTerrainFails } from "./plain-ground";
-import { BASEMAP, TERRAIN } from "./providers";
+import { TERRAIN } from "./providers";
 
 const EARTH_RADIUS_M = 6_371_000;
+
+/** The design's own paper (PLAN.md §6), which the ground now is: the blocks stand a shade above it. */
+const PAPER = "#f4f4f0";
 
 /** Where the camera was left by the last framing of the whole course, to tell whether the runner has moved the map since. */
 const framedFrom = new WeakMap<Viewer, Cartesian3>();
@@ -72,13 +72,12 @@ export function createGlobe(container: HTMLElement): Viewer {
 
   const terrain = new Terrain(CesiumTerrainProvider.fromUrl(TERRAIN.url));
   const viewer = new Viewer(container, {
-    baseLayer: new ImageryLayer(
-      new OpenStreetMapImageryProvider({
-        url: BASEMAP.url,
-        maximumLevel: BASEMAP.maximumLevel,
-        credit: new Credit(BASEMAP.creditHtml, true),
-      }),
-    ),
+    // No map is drawn on the ground. With no key the app shows the White model — the city's own
+    // buildings on the design's own paper, with the shadows of race day — and a photographed or
+    // drawn map under it only muddies that (issue #38, PLAN.md D15, D57). With a key, Google's
+    // photographed city stands there instead. Neither wants a raster map underneath, so none is
+    // asked for: no tiles are fetched, and the ground is one flat colour the theme sets.
+    baseLayer: false,
     terrain,
     // Everything below would otherwise reach for Cesium ion (which needs a key) or add clutter.
     baseLayerPicker: false,
@@ -104,6 +103,10 @@ export function createGlobe(container: HTMLElement): Viewer {
   globe.enableLighting = true;
   globe.lightingFadeOutDistance = 0;
   globe.lightingFadeInDistance = 1;
+  // CesiumJS hazes the whole globe with a ground atmosphere, which is right over a photographed
+  // Earth and wrong over a sheet of paper: it holds white down to 221 of 255, so the design's own
+  // paper came out grey and the White model's blocks had nothing to stand against (issue #38).
+  globe.showGroundAtmosphere = false;
   viewer.clock.shouldAnimate = false; // time moves only when the runner does
 
   return viewer;
@@ -206,20 +209,19 @@ export function toggleStraightDown(viewer: Viewer, seconds = 0): void {
 }
 
 /**
- * In the dark theme the keyless map goes quiet: dimmer and almost without colour, so a bright map
- * doesn't glare out of a dark screen and the blue line is the brightest thing on it. Only our own
- * basemap layer is touched. Photoreal imagery is Google's and is shown as it comes.
+ * The ground the White model stands on: the design's paper, and nothing else (issue #38).
+ *
+ * It is one flat colour, not a map, so the city's own blocks and the shadows they cast are the
+ * only things on it besides the course. The sun still lights it, so it dims as the sun gets low
+ * and goes to the globe's night floor after sunset, which is what says the runner is finishing in
+ * the dark (D39).
+ *
+ * Dark is not the design's black: a shadow on black is no shadow at all. It is the darkest ground
+ * the shadows still read on, and the blocks go grey to match so a white city doesn't glare out of
+ * a dark screen.
  */
 export function showMapTheme(viewer: Viewer, theme: "light" | "dark"): void {
-  // The ground under the basemap: what is on screen where a map tile hasn't arrived, or can't
-  // (PLAN.md D16: the map service is best-effort). A quiet grey the course's blue reads on, in
-  // place of CesiumJS's deep blue, which is the course's own colour.
-  viewer.scene.globe.baseColor = Color.fromCssColorString(theme === "dark" ? "#33332f" : "#deded8");
-  const basemap = viewer.imageryLayers.get(0);
-  if (!basemap) return;
-  basemap.brightness = theme === "dark" ? 0.55 : 1;
-  basemap.contrast = theme === "dark" ? 1.15 : 1;
-  basemap.saturation = theme === "dark" ? 0.15 : 1;
+  viewer.scene.globe.baseColor = Color.fromCssColorString(theme === "dark" ? "#2a2a27" : PAPER);
 }
 
 /** For each map, how high the road is where the runner is, from the Course Bundle: the ground while photoreal has hidden the globe (ground-under.ts). */
@@ -230,8 +232,12 @@ export function useRoadAsGroundWhenHidden(viewer: Viewer, roadM: () => number | 
   roadWhenHidden.set(viewer, roadM);
 }
 
-/** How far the camera is above the ground under it (never less than a metre, so the ground is always under the camera). */
-function heightAboveGround(viewer: Viewer): number {
+/**
+ * How far the camera is above the ground under it (never less than a metre, so the ground is
+ * always under the camera). The ground is our own — the open terrain, or the road's own height
+ * while photoreal hides it — and never anything read from the imagery (PLAN.md D5).
+ */
+export function heightAboveGround(viewer: Viewer): number {
   const eye = viewer.camera.positionCartographic;
   return Math.max(eye.height - groundUnderM(viewer.scene.globe, eye, roadWhenHidden.get(viewer)), 1);
 }

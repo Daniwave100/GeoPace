@@ -6,7 +6,7 @@
 // standing there is then Google's, and a switch that does nothing is worse than no switch.
 import { html } from "../dom";
 import { segmented } from "../segmented";
-import { BUILDINGS_CHOICES, type Buildings, DEFAULT_WHITE_MODEL, SHADOW_CHOICES, type Shadows, type WhiteModelChoice } from "../core/white-model";
+import { BUILDINGS_CHOICES, type Buildings, DEFAULT_WHITE_MODEL, SHADOWS_CHOICES, type Shadows, type WhiteModelChoice } from "../core/white-model";
 
 export interface WhiteModelSwitches {
   /**
@@ -29,7 +29,7 @@ export function createWhiteModelSwitches(container: HTMLElement, onChoice: (choi
   const shadows = segmented(
     "Shadows",
     "white-model-shadows",
-    SHADOW_CHOICES.map(({ choice: value, label, explained }) => ({ value, label, explained })),
+    SHADOWS_CHOICES.map(({ choice: value, label, explained }) => ({ value, label, explained })),
     (value) => onChoice({ ...choice, shadows: value as Shadows }),
     "white-model-switch",
   );
