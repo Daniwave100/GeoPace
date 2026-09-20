@@ -678,8 +678,8 @@ arrival times are approximate — state that in the UI.
 - 🟡 **The owner's first look at the White model (#7, D56)**, owed, and the only judgement that matters on it. What
   is put to them, each measured but none of it chosen by eye: the **blocks' colour** (near-white on the light map,
   a mid grey on the dark one, so a white city doesn't undo the dark theme's quiet map) and **how dark their shadows
-  are**; the **150 m corridor** — beyond it the city is flat map, which the block on screen says in words so it
-  doesn't read as a fault; **Simple as the default shadow quality**, and whether Detailed is worth having at all;
+  are**; the **150 m corridor** — beyond it the ground is bare paper (D57), which the block on screen says in words so it
+  doesn't read as a fault; **shadows on by default at the one quality** the engine gives, and whether the off switch is where it should be (D57, #39);
   where the **two switches** sit (under "Make it photoreal", gone while photoreal is showing); and the look
   **after sunset**, where the ground goes dark and the blocks stay pale, so the city is brighter than the street it
   stands on; whether the blocks want **outlines** round them, which §6 and the ticket both ask for "where the engine
