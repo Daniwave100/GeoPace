@@ -675,7 +675,12 @@ arrival times are approximate — state that in the UI.
   buildings switched off so only the page is in it: **clear at 1600 × 1000, 1440 × 900, 1366 × 768, 1280 × 800,
   900 × 900 and 420 × 850; four pixels of overlap at 1100 × 700 and 1024 × 768**, where the buttons paint over the
   block's bottom corner rather than under it. A ticket of its own: where the map's buttons go on a short map.
-- 🟡 **The owner's first look at the White model (#7, D56)**, owed, and the only judgement that matters on it. What
+- ✅ **The owner's first look at the White model (#7, D56)**, done 09-20; **#7, #38 and #39 are closed.** The blocks,
+  their colour, their shadows, the corridor, the switches, the look after sunset and the missing outlines drew **no
+  remark** and are taken as accepted (D53's convention). The one verdict was about the **ground**: *"the ground is
+  still too white. it's hard on the eye when photoreal is off."* Asked whether that is glare or bareness, the owner
+  said **both**, and asked for designs to pick between — **#40**, re-cut and no longer "not pressing", since the
+  keyless view is the one everybody sees first. What was put to them, for the record:
   is put to them, each measured but none of it chosen by eye: the **blocks' colour** (near-white on the light map,
   a mid grey on the dark one, so a white city doesn't undo the dark theme's quiet map) and **how dark their shadows
   are**; the **150 m corridor** — beyond it the ground is bare paper (D57), which the block on screen says in words so it
