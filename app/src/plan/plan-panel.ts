@@ -8,16 +8,21 @@
 //   - every time of day that rests on a carried-over start time is greyed, with the edition it
 //     came from and the reason; the runner's own start time is theirs, and is never greyed;
 //   - it says that every time assumes an even pace.
+// The fueling plan is part of the same plan and sits at the bottom of the same form (#12,
+// plan/fueling-panel.ts): what the runner means to take, where, and what the organizer's
+// refreshment points make of it.
 // A pace is typed and shown per kilometre or per mile, whichever the runner thinks in (D42); the
 // plan itself keeps it per km, so switching units never changes the goal.
 // The form is built once and then only refreshed, so typing and pressing Tab never loses the
 // runner's place.
 import type { Edition, Wave } from "../bundle/types";
+import type { FuelItem } from "../core/fueling";
 import { type Goal, goalWrittenAs, hasStartTime, ownStartTimeFor, parseGoal, parseStartTime, type Planner, type PlannerCourse, type RacePlan, sanitizePlan } from "../core/planner";
 import { formatElapsed, formatPace } from "../core/race-clock";
 import { paceInUnits, type Units, unitName } from "../core/units";
 import { raceDate } from "../core/words";
 import { html, sourceLink } from "../dom";
+import { createFuelingPanel } from "./fueling-panel";
 
 export interface PlanPanel {
   show(course: PlannerCourse, planner: Planner, units: Units): void;
@@ -65,6 +70,7 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   const goalHint = html("small", { id: "goal-help" });
   const goalProblem = html("p", { class: "plan-error", id: "goal-error", role: "alert" });
   const summary = html("p", { class: "plan-summary" });
+  const fuelingBox = html("div");
 
   const form = html(
     "form",
@@ -80,12 +86,16 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
     html("fieldset", {}, html("legend", { text: "Goal" }), html("label", {}, finishKind, " Finish time"), html("label", {}, paceKind, " ", paceLabel), goal, goalHint, goalProblem),
     summary,
     html("p", { class: "plan-note", text: EVEN_PACE }),
+    fuelingBox,
   );
   container.replaceChildren(form);
 
   const change = (changes: Partial<RacePlan>) => {
     if (course && planner) onChange(sanitizePlan(course, { ...planner.plan, ...changes }));
   };
+  // The fueling plan is one more part of the same plan: it comes back as a whole list and goes
+  // through the same `change`, so it is sanitized and saved exactly like a wave or a goal.
+  const fueling = createFuelingPanel(fuelingBox, (items: FuelItem[]) => change({ fueling: items }));
   // An own start time belongs to the wave it was typed for, so a new edition or wave starts without one.
   edition.addEventListener("change", () => change({ edition: Number(edition.value), ownStartLocal: null }));
   wave.addEventListener("change", () => {
@@ -165,6 +175,7 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       planner = nextPlanner;
       units = nextUnits;
       awaitingStartTime = undefined;
+      fueling.show(nextPlanner, nextUnits);
       const chosen = planner.edition;
       const whose = planner.carriedOver ? ` (carried over from ${planner.carriedOver.fromEdition})` : planner.ownStartTime ? " (your own start time)" : "";
 

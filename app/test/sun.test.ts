@@ -22,7 +22,7 @@ const berlin = bundleFor("berlin");
 const nyc = bundleFor("nyc");
 
 const plannerFor = (bundle: CourseBundle, plan: RacePlan) => createPlanner(plannerCourse(bundle), plan);
-const firstWavePlan = (bundle: CourseBundle): RacePlan => ({ courseId: bundle.course_id, edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 } });
+const firstWavePlan = (bundle: CourseBundle): RacePlan => ({ courseId: bundle.course_id, edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 }, fueling: [] });
 
 /** Where a km falls in the course line's samples. */
 function sampleAt(bundle: CourseBundle, km: number): number {
@@ -111,7 +111,7 @@ describe("what the table says about the real courses", () => {
 describe("the moment the runner gets there", () => {
   it("changes with the wave, and with the pace, on the same stretch of road", () => {
     const course = madeUpCourse();
-    const at600m = (waveId: string, goal: Goal) => sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId, ownStartLocal: null, goal }))!.at(0.6).state;
+    const at600m = (waveId: string, goal: Goal) => sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId, ownStartLocal: null, goal, fueling: [] }))!.at(0.6).state;
     const twoHours: Goal = { kind: "finish", seconds: 2 * 3600 };
 
     // The made-up course falls into shade at 10:00 from halfway on. 600 m in, at a two-hour pace
@@ -123,7 +123,7 @@ describe("the moment the runner gets there", () => {
 
   it("says nothing was worked out where the runner arrives outside the hours in the table", () => {
     const course = madeUpCourse();
-    const plan = (ownStartLocal: string): RacePlan => ({ courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal, goal: { kind: "finish", seconds: 2 * 3600 } });
+    const plan = (ownStartLocal: string): RacePlan => ({ courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] });
 
     // The table stops at 11:00. A runner who sets out at 09:30 is still going at 11:30.
     const afterTheTable = sunAlong(course, plannerFor(course, plan("09:30")))!.at(1.0);
@@ -137,7 +137,7 @@ describe("the moment the runner gets there", () => {
     const course = madeUpCourse();
     course.editions[0].date.day = "2026-09-28";
 
-    expect(sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 } }))).toBeNull();
+    expect(sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))).toBeNull();
   });
 
   it("reads the bits back exactly as the pipeline packed them", () => {
@@ -218,7 +218,7 @@ describe("the Shade layer", () => {
     expect(layer.clause(27, "mi")?.text).toMatch(/(ft|mi)\./);
     // At the very end of a stretch there is no distance worth printing, and none is printed.
     const course = madeUpCourse();
-    const atTheEdge = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const atTheEdge = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
     expect(atTheEdge.clause(0.49, "km")?.text).toBe("No shade, at any hour.");
     // And nowhere along either real course does it come out as a distance of nothing.
     for (const bundle of [berlin, nyc]) {
@@ -256,7 +256,7 @@ describe("the Shade layer", () => {
     // A runner still out after sunset is not in a building's shade: the layer has no value for
     // them, the map marks nothing, and the sentence's own sun clause says the sun is down.
     const course = madeUpCourse();
-    const atNight = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "20:00", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const atNight = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "20:00", goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
 
     expect(atNight.rows()[0].valueAt(0.5, "km")).toEqual({ text: "The sun is down", notMeasured: null });
     expect(atNight.rows()[0].bins(100).every((bin) => bin.value === null)).toBe(true);
@@ -266,7 +266,7 @@ describe("the Shade layer", () => {
 
   it("greys what it didn't work out, on the strip, on the map and in words", () => {
     const course = madeUpCourse();
-    const layer = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "09:30", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const layer = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "09:30", goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
     const clause = layer.clause(1.0, "km");
 
     expect(clause?.encoding).toBe("not-measured");

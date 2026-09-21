@@ -1529,3 +1529,75 @@ button.map-label {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── The fueling plan, inside the Race Plan (#12) ────────────────────────────────────────── */
+
+/* One line per item: what, where, and the way to take it off again. The warnings under it are
+   the point of the whole panel, so they are the thing that is set apart, not the list. */
+.fueling {
+  margin-top: 16px;
+  padding: 12px;
+  border: var(--rule) solid var(--ink);
+}
+
+.fuel-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fuel-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.fuel-item .fuel-km {
+  width: 6ch;
+}
+
+.fuel-unit {
+  font-size: 0.85em;
+  color: var(--grey-text);
+}
+
+.fuel-remove {
+  margin-left: auto;
+}
+
+/* The way in: one button, under the list, in the plain button style the panel already uses. */
+.fuel-add {
+  margin-top: 4px;
+}
+
+.fuel-warnings {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A warning is a fact about the organizer's list, not a scolding: plain ink on the paper, with
+   the one button that answers it. Nothing red — a runner carrying their own bottle has already
+   answered every one of these. */
+.fuel-warning {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--ink);
+}
+
+/* The button that answers a warning. It is the whole feature: a warning a runner has to act on by
+   retyping a number is a warning they read once and stop reading. */
+.fuel-move {
+  white-space: nowrap;
+}
+
+.fuel-clear {
+  margin-top: 8px;
+  font-size: 0.9em;
+  color: var(--grey-text);
+}

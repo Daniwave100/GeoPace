@@ -39,6 +39,7 @@ const plan = (overrides: Partial<RacePlan> = {}): RacePlan => ({
   waveId: "wave-1",
   ownStartLocal: null,
   goal: { kind: "finish", seconds: 4 * 3600 },
+  fueling: [],
   ...overrides,
 });
 
@@ -55,7 +56,7 @@ describe("Planner", () => {
 
   it("takes the goal as a pace per kilometre instead, the way a training plan states it", () => {
     // 5:00/km over the certified 42.195 km is 3:30:58.5.
-    const planner = createPlanner(NYC, plan({ goal: { kind: "pace", secondsPerKm: 300 } }));
+    const planner = createPlanner(NYC, plan({ goal: { kind: "pace", secondsPerKm: 300 }, fueling: [] }));
 
     expect(formatElapsed(planner.goalFinishSeconds)).toBe("3:30:59");
     expect(formatElapsed(planner.at(10).elapsedSeconds)).toBe("50:00");
@@ -67,7 +68,7 @@ describe("Planner", () => {
     // goal is a promise about the finish line. So a 5:00/km runner, who finishes in 3:30:58.5,
     // reaches line km 10 after 3:30:58.5 x 10 / 42.69 = 49:25, not 50:00: line km 10 is only
     // 9.88 km of the certified course. Pinned here so it is a known property, not a surprise.
-    const longerLine = createPlanner({ ...NYC, lineLengthM: 42690 }, plan({ goal: { kind: "pace", secondsPerKm: 300 } }));
+    const longerLine = createPlanner({ ...NYC, lineLengthM: 42690 }, plan({ goal: { kind: "pace", secondsPerKm: 300 }, fueling: [] }));
 
     expect(formatElapsed(longerLine.at(10).elapsedSeconds)).toBe("49:25");
     expect(formatElapsed(longerLine.at(42.69).elapsedSeconds)).toBe("3:30:59");
@@ -210,11 +211,11 @@ describe("Race Plan", () => {
   };
 
   it("starts a new runner on the latest edition, in its first wave with a published time, aiming for four hours", () => {
-    expect(defaultPlan(course)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 14400 } });
+    expect(defaultPlan(course)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 14400 }, fueling: [] });
   });
 
   it("keeps a remembered plan that still makes sense", () => {
-    const remembered: RacePlan = { courseId: "nyc", edition: 2025, waveId: "wave-2", ownStartLocal: "09:50", goal: { kind: "pace", secondsPerKm: 320 } };
+    const remembered: RacePlan = { courseId: "nyc", edition: 2025, waveId: "wave-2", ownStartLocal: "09:50", goal: { kind: "pace", secondsPerKm: 320 }, fueling: [] };
 
     expect(sanitizePlan(course, remembered)).toEqual(remembered);
   });
@@ -223,10 +224,10 @@ describe("Race Plan", () => {
     const goal = { kind: "finish", seconds: 3 * 3600 + 45 * 60 };
 
     // A wave that has since been removed, or has no start time: first wave that has one.
-    expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-9", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal });
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-9", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal, fueling: [] });
     expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-3", goal }).waveId).toBe("wave-1");
     // An edition we have no facts for: the latest one.
-    expect(sanitizePlan(course, { courseId: "nyc", edition: 2019, waveId: "wave-2", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal });
+    expect(sanitizePlan(course, { courseId: "nyc", edition: 2019, waveId: "wave-2", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal, fueling: [] });
     // A goal nobody could mean.
     for (const nonsense of [{ kind: "finish", seconds: -5 }, { kind: "finish", seconds: "fast" }, { kind: "pace", secondsPerKm: 1 }, { kind: "stroll" }, null]) {
       expect(sanitizePlan(course, { courseId: "nyc", edition: 2026, waveId: "wave-2", goal: nonsense }).goal).toEqual({ kind: "finish", seconds: 14400 });
@@ -240,12 +241,12 @@ describe("Race Plan", () => {
   it("keeps a remembered own start time, and with it a wave that has no published one", () => {
     const goal = { kind: "finish", seconds: 14400 };
 
-    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal });
+    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal, fueling: [] });
     // A plan remembered before own start times existed has none.
     expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", goal }).ownStartLocal).toBeNull();
     // An own start time that isn't a time of day is dropped, and the wave with it if it has no time of its own.
     for (const junk of ["25:00", "9:5", "soon", 620, {}, ""]) {
-      expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", ownStartLocal: junk, goal }), String(junk)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal });
+      expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", ownStartLocal: junk, goal }), String(junk)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal, fueling: [] });
       expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: junk, goal }).waveId, String(junk)).toBe("wave-1");
     }
   });
