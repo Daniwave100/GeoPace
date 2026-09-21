@@ -262,7 +262,35 @@
           "minItems": 1,
           "contains": { "type": "object", "properties": { "start_local": { "type": "string" } }, "required": ["start_local"] },
           "items": { "$ref": "#/$defs/wave" }
+        },
+        "aid_stations": {
+          "description": "The organizer's refreshment points for this edition, in course order. Absent where nobody has published this edition's yet \u2014 the app then has no Aid layer for that course at all, rather than an invented one. Every station carries its own source, and one copied from an earlier edition is flagged like a wave.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/aid_station" }
         }
+      }
+    },
+    "aid_station": {
+      "description": "One refreshment point, as the organizer lists it.",
+      "type": "object",
+      "required": ["km", "km_marked", "label", "serves", "carried_over", "source", "accessed"],
+      "additionalProperties": false,
+      "properties": {
+        "km": { "description": "Where it stands on the course line, the app's one distance scale (D20): the organizer's own kilometre scaled onto a line a little longer than the certified course.", "type": "number", "minimum": 0 },
+        "km_marked": { "description": "What the organizer published, in km on the certified course: what the road sign says.", "type": "number", "minimum": 0 },
+        "label": { "description": "What the organizer calls it, in their own units: \"9 km\", \"Mile 12\".", "type": "string", "minLength": 1 },
+        "serves": {
+          "description": "What it hands out. A fixed vocabulary, because the fueling check reasons about it: \"the next water\" is only a sentence the app can say if water is a thing it knows and not a phrase.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["water", "sports-drink", "gel", "fruit", "tea", "refill", "own-bottle"] }
+        },
+        "carried_over": { "description": "Copied from the edition named in the edition's carried_over; the app flags it to the runner.", "type": "boolean" },
+        "detail": { "description": "Anything the vocabulary can't hold \u2014 a brand, a sponsor's bottle. Shown, never reasoned about.", "type": "string", "minLength": 1 },
+        "note": { "description": "For the runner.", "type": "string", "minLength": 1 },
+        "source": { "$ref": "#/$defs/url" },
+        "accessed": { "$ref": "#/$defs/date" }
       }
     },
     "wave": {

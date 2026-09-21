@@ -15,7 +15,7 @@ import jsonschema
 from geopace import __version__, difficulty
 from geopace.course_facts import CourseFacts
 from geopace.course_line import CourseLine, build_course_line
-from geopace.edition_facts import EditionFacts
+from geopace.edition_facts import AidStation, EditionFacts
 from geopace.elevation import BridgeDeckModel, ElevationModel, GeoidModel
 from geopace.provenance import Attribution, Source
 
@@ -83,7 +83,7 @@ def build_course_bundle(
             "landmarks": [{"name": mark.name, "km": mark.km, "source": mark.source} for mark in facts.landmarks],
             **({"leaves": {"state": facts.leaves.state, "note": facts.leaves.note, "source": facts.leaves.source}} if facts.leaves else {}),
         },
-        "editions": [_edition_json(edition) for edition in editions],
+        "editions": [_edition_json(edition, line.length_m / facts.certified_distance_m) for edition in editions],
         "measured": {
             "course_line": _course_line_json(line),
             "elevation_summary": _elevation_summary(line),
@@ -159,8 +159,14 @@ def check_length(length_m: float, certified_m: float, traced: bool = False) -> N
         )
 
 
-def _edition_json(edition: EditionFacts) -> dict:
-    """An edition's facts as the app reads them. Optional parts are left out rather than null."""
+def _edition_json(edition: EditionFacts, onto_the_line: float) -> dict:
+    """An edition's facts as the app reads them. Optional parts are left out rather than null.
+
+    `onto_the_line` puts the organizer's own kilometres on the course line the app measures
+    everything else along, which is a little longer than the certified course they are marked on
+    (D20, and the same scaling the landmarks in course.yaml already carry). The organizer's own
+    number goes with it, because that is what the sign the runner passes says.
+    """
     date = {
         "day": edition.date.day,
         "confirmed": edition.date.confirmed,
@@ -186,6 +192,24 @@ def _edition_json(edition: EditionFacts) -> dict:
         if wave.note:
             wave_json["note"] = wave.note
         out["waves"].append(wave_json)
+    if edition.aid_stations:
+        out["aid_stations"] = [_aid_station_json(station, onto_the_line) for station in edition.aid_stations]
+    return out
+
+
+def _aid_station_json(station: AidStation, onto_the_line: float) -> dict:
+    out = {
+        "km": round(station.km_marked * onto_the_line, 3),
+        "km_marked": station.km_marked,
+        "label": station.label,
+        "serves": list(station.serves),
+        "carried_over": station.carried_over,
+        "source": station.source,
+        "accessed": station.accessed,
+    }
+    for name, value in (("detail", station.detail), ("note", station.note)):
+        if value:
+            out[name] = value
     return out
 
 

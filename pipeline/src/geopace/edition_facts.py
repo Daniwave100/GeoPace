@@ -1,6 +1,6 @@
 """Hand-maintained edition facts from data/courses/<id>/editions/<year>.yaml.
 
-An edition is one year's running of a course: its date and its waves. Like course facts, every
+An edition is one year's running of a course: its date, its waves and its aid stations. Like course facts, every
 fact says where it came from, and loading refuses a file that doesn't.
 
 Wave times are written the way the organizer prints them: a wall-clock time ("09:10") in the
@@ -15,6 +15,19 @@ Three kinds of honesty are built in:
     `note` that tells the runner why.
   - A race date the organizer hasn't stated for this edition is marked `confirmed: false`, with a
     `note` saying how we know it.
+
+**Aid stations are the organizer's own list, in the organizer's own numbers.** A station is at
+the kilometre the road sign says — 9 km on a course certified at 42.195 — and the course line the
+app measures everything else along is a little longer than that (42.285 in Berlin, 42.688 in New
+York, §5). So the file holds `km_marked`, exactly what the organizer published, and the pipeline
+puts it on the course line by the same scaling the landmarks use (D20): the extra length is taken
+as spread evenly, which is all anyone can say without a second survey. Both numbers reach the
+app, because the sign the runner passes says the first one.
+
+What a station serves is a short list from a fixed vocabulary, so that the fueling check can
+reason about it — "a gel here, and the next water is at 17.5 km" is only a sentence the app can
+say if "water" is a thing it knows and not a phrase. Anything the vocabulary can't hold (a brand,
+a bottle handed out by a sponsor) goes in `detail`, which is shown and never reasoned about.
 
 These files are edited by hand, so every mistake in one ends in a message that names it, never in
 a Python traceback.
@@ -32,6 +45,18 @@ from geopace.provenance import check_sourced
 
 WALL_CLOCK = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 WAVE_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+# What a station can serve. A fixed vocabulary, because the fueling check reasons about it: a gel
+# needs `water` near it, and "relying on a sports drink where there is none" is only a warning the
+# app can give if it knows which stations have one.
+#   water         drinking water, in cups
+#   sports-drink  a carbohydrate or electrolyte drink
+#   gel           an energy gel handed out on the course
+#   fruit         fruit, usually bananas or oranges
+#   tea           tea, hot or cold
+#   refill        a runner's own bottle or hydration pack can be topped up here
+#   own-bottle    a runner's own container, handed in beforehand, is waiting here
+SERVES = ("water", "sports-drink", "gel", "fruit", "tea", "refill", "own-bottle")
 
 
 class EditionFactsInvalid(ValueError):
@@ -72,11 +97,34 @@ class Wave:
 
 
 @dataclass(frozen=True)
+class AidStation:
+    """One refreshment point on the course, as the organizer lists it."""
+
+    # Where the organizer says it is, in km on the certified course: what the road sign says.
+    # bundle.py also puts it on the course line, which is a little longer (see the module note).
+    km_marked: float
+    # What the organizer calls it, in their own units: "9 km", "Mile 12".
+    label: str
+    # From SERVES, in the order they are listed. Never empty.
+    serves: tuple[str, ...]
+    source: str
+    accessed: str
+    # Anything the vocabulary can't hold, shown and never reasoned about: a brand, a sponsor's
+    # bottle, "at the last table of the water supply".
+    detail: str | None = None
+    carried_over: bool = False  # copied from the edition named in EditionFacts.carried_over
+    note: str | None = None  # for the runner
+
+
+@dataclass(frozen=True)
 class EditionFacts:
     edition: int  # which edition: the calendar year it is run in
     date: RaceDate
     waves: list[Wave]
     carried_over: CarriedOver | None = None
+    # The organizer's refreshment points, in course order. Empty where nobody has published this
+    # edition's yet: the app then has no Aid layer at all, rather than an invented one.
+    aid_stations: tuple[AidStation, ...] = ()
 
 
 def load_editions(course_folder: Path, timezone: str) -> list[EditionFacts]:
@@ -108,6 +156,8 @@ def parse_edition_facts(raw: dict | None, timezone: str) -> EditionFacts:
     _check_date(raw.get("date"), edition, problems)
     _check_carried_over(raw.get("carried_over"), edition, problems)
     _check_waves(raw.get("waves"), raw.get("carried_over"), problems)
+    _check_aid_stations(raw.get("aid_stations"), raw.get("carried_over"), problems)
+    _check_something_is_carried_over(raw, problems)
     if problems:
         raise EditionFactsInvalid("Edition facts are invalid:\n  - " + "\n  - ".join(problems))
 
@@ -137,6 +187,24 @@ def parse_edition_facts(raw: dict | None, timezone: str) -> EditionFacts:
             for wave in raw["waves"]
         ],
         carried_over=CarriedOver(from_edition=carried_over["from_edition"], reason=carried_over["reason"].strip()) if carried_over else None,
+        aid_stations=tuple(
+            sorted(
+                (
+                    AidStation(
+                        km_marked=float(station["km_marked"]),
+                        label=str(station["label"]).strip(),
+                        serves=tuple(station["serves"]),
+                        source=station["source"],
+                        accessed=str(station["accessed"]),
+                        detail=_text_or_none(station.get("detail")),
+                        carried_over=station.get("carried_over", False),
+                        note=_text_or_none(station.get("note")),
+                    )
+                    for station in raw.get("aid_stations", []) or []
+                ),
+                key=lambda station: station.km_marked,
+            )
+        ),
     )
 
 
@@ -216,8 +284,60 @@ def _check_waves(waves, carried_over, problems: list[str]) -> None:
     blocks = [wave for wave in waves if isinstance(wave, dict)]
     if blocks and all(wave.get("start_local") is None for wave in blocks):
         problems.append("at least one wave needs a start time, or the app has no race clock to run")
-    if isinstance(carried_over, dict) and not any(wave.get("carried_over") is True for wave in blocks):
-        problems.append("the edition has `carried_over`, but no wave is marked `carried_over: true`")
+
+
+
+def _check_something_is_carried_over(raw: dict, problems: list[str]) -> None:
+    """An edition that explains a carry-over has to have something carried over: the reason is
+    shown beside every such detail, and one with nothing to sit beside is a note nobody sees."""
+    if raw.get("carried_over") is None:
+        return
+    lists = [raw.get("waves"), raw.get("aid_stations")]
+    facts = [fact for group in lists if isinstance(group, list) for fact in group if isinstance(fact, dict)]
+    if not any(fact.get("carried_over") is True for fact in facts):
+        problems.append("the edition has `carried_over`, but nothing is marked `carried_over: true`")
+
+
+def _check_aid_stations(stations, carried_over, problems: list[str]) -> None:
+    """The organizer's refreshment points. An edition may have none; what it has must be whole."""
+    if stations is None:
+        return
+    if not isinstance(stations, list):
+        problems.append("aid_stations must be a list of stations, each starting with a dash")
+        return
+    seen: set[float] = set()
+    for i, station in enumerate(stations):
+        if not isinstance(station, dict):
+            problems.append(f"aid_stations[{i}] must be a block with `km_marked`, `label` and `serves`")
+            continue
+        label = f"aid_stations[{i}] ({station.get('label', '?')})"
+        check_sourced(label, station, problems)
+        if not _text_or_none(station.get("label")):
+            problems.append(f"{label} has no `label`: what the organizer calls it, like \"9 km\" or \"Mile 12\"")
+
+        km = station.get("km_marked")
+        if not isinstance(km, int | float) or isinstance(km, bool) or km < 0:
+            problems.append(f"{label} km_marked {km!r} is not a distance in kilometres from the start")
+        elif float(km) in seen:
+            problems.append(f"{label} is at km {km}, where another station already is")
+        else:
+            seen.add(float(km))
+
+        serves = station.get("serves")
+        if not isinstance(serves, list) or not serves:
+            problems.append(f"{label} needs `serves`: what it hands out, from {', '.join(SERVES)}")
+        else:
+            unknown = [item for item in serves if item not in SERVES]
+            if unknown:
+                problems.append(f"{label} serves {', '.join(map(str, unknown))}, which is not one of {', '.join(SERVES)}")
+            if len(set(serves)) != len(serves):
+                problems.append(f"{label} lists something twice in `serves`")
+
+        is_carried_over = station.get("carried_over", False)
+        if not isinstance(is_carried_over, bool):
+            problems.append(f"{label} carried_over must be true or false, not {is_carried_over!r}")
+        elif is_carried_over and carried_over is None:
+            problems.append(f"{label} is carried over, but the edition has no `carried_over` saying from which edition and why")
 
 
 def _check_wall_clock(label: str, value, problems: list[str]) -> None:

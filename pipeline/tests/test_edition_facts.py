@@ -223,3 +223,93 @@ def test_an_unconfirmed_date_with_no_explanation_is_rejected(synthetic_edition):
 
     with pytest.raises(EditionFactsInvalid, match=r"date is not confirmed, so it needs a `note`"):
         parse_edition_facts(synthetic_edition, timezone="America/New_York")
+
+
+# ── The organizer's aid stations ────────────────────────────────────────────────────────────
+
+
+def with_stations(edition: dict, *stations: dict) -> dict:
+    source = {"source": "https://example.org/course", "accessed": "2026-09-21"}
+    edition["aid_stations"] = [{**source, **station} for station in stations]
+    return edition
+
+
+def test_stations_come_back_in_course_order_whatever_order_they_are_written_in(synthetic_edition):
+    raw = with_stations(
+        synthetic_edition,
+        {"km_marked": 15, "label": "15 km", "serves": ["water", "sports-drink"], "detail": "Maurten DRINK MIX 160"},
+        {"km_marked": 5, "label": "5 km", "serves": ["water"]},
+    )
+
+    stations = parse_edition_facts(raw, timezone="America/New_York").aid_stations
+
+    assert [(s.km_marked, s.label, s.serves) for s in stations] == [
+        (5.0, "5 km", ("water",)),
+        (15.0, "15 km", ("water", "sports-drink")),
+    ]
+    assert stations[1].detail == "Maurten DRINK MIX 160"
+
+
+def test_an_edition_with_no_stations_published_yet_simply_has_none(synthetic_edition):
+    """Never an invented list: the app then has no Aid layer for that course at all."""
+    assert parse_edition_facts(synthetic_edition, timezone="America/New_York").aid_stations == ()
+
+
+def test_a_station_serving_something_the_app_has_never_heard_of_is_rejected(synthetic_edition):
+    # The vocabulary is fixed because the fueling check reasons about it: "the next water" is only
+    # a sentence the app can say if "water" is a thing it knows and not a phrase.
+    raw = with_stations(synthetic_edition, {"km_marked": 5, "label": "5 km", "serves": ["water", "espresso"]})
+
+    with pytest.raises(EditionFactsInvalid, match=r"aid_stations\[0\] \(5 km\) serves espresso, which is not one of water"):
+        parse_edition_facts(raw, timezone="America/New_York")
+
+
+def test_a_station_that_serves_nothing_is_rejected(synthetic_edition):
+    raw = with_stations(synthetic_edition, {"km_marked": 5, "label": "5 km", "serves": []})
+
+    with pytest.raises(EditionFactsInvalid, match=r"aid_stations\[0\] \(5 km\) needs `serves`"):
+        parse_edition_facts(raw, timezone="America/New_York")
+
+
+def test_a_station_without_a_source_is_rejected(synthetic_edition):
+    synthetic_edition["aid_stations"] = [{"km_marked": 5, "label": "5 km", "serves": ["water"]}]
+
+    with pytest.raises(EditionFactsInvalid, match=r"aid_stations\[0\] \(5 km\) has no source"):
+        parse_edition_facts(synthetic_edition, timezone="America/New_York")
+
+
+def test_two_stations_cannot_stand_at_the_same_kilometre(synthetic_edition):
+    raw = with_stations(
+        synthetic_edition,
+        {"km_marked": 5, "label": "5 km", "serves": ["water"]},
+        {"km_marked": 5, "label": "5 km again", "serves": ["gel"]},
+    )
+
+    with pytest.raises(EditionFactsInvalid, match=r"aid_stations\[1\] \(5 km again\) is at km 5, where another station already is"):
+        parse_edition_facts(raw, timezone="America/New_York")
+
+
+def test_a_carried_over_station_needs_the_edition_to_say_from_where_and_why(synthetic_edition):
+    raw = with_stations(synthetic_edition, {"km_marked": 5, "label": "5 km", "serves": ["water"], "carried_over": True})
+
+    with pytest.raises(EditionFactsInvalid, match=r"aid_stations\[0\] \(5 km\) is carried over, but the edition has no `carried_over`"):
+        parse_edition_facts(raw, timezone="America/New_York")
+
+
+def test_stations_alone_can_be_what_a_carry_over_explains(synthetic_edition):
+    """The waves may be this year's while the refreshment list is last year's, which is exactly
+    New York: the organizer publishes the stations late."""
+    raw = with_stations(synthetic_edition, {"km_marked": 5, "label": "5 km", "serves": ["water"], "carried_over": True})
+    raw["carried_over"] = {"from_edition": 2025, "reason": "The 2026 refreshment list is not published yet."}
+
+    edition = parse_edition_facts(raw, timezone="America/New_York")
+
+    assert edition.aid_stations[0].carried_over is True
+    assert [w.carried_over for w in edition.waves] == [False, False]
+
+
+def test_an_edition_that_explains_a_carry_over_with_nothing_carried_over_is_rejected(synthetic_edition):
+    synthetic_edition["carried_over"] = {"from_edition": 2025, "reason": "Not published yet."}
+
+    with pytest.raises(EditionFactsInvalid, match="nothing is marked `carried_over: true`"):
+        parse_edition_facts(synthetic_edition, timezone="America/New_York")
