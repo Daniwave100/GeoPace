@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { AidStationFact, CourseBundle } from "../src/bundle/types";
-import { aidLayer, furthestWithoutWater, toNextWaterKm } from "../src/core/aid-layer";
+import { aidLayer, furthestWithoutWater } from "../src/core/aid-layer";
 import { type AidStation, aidStations, nextServing, servesInWords } from "../src/core/aid";
 import { checkFueling, type FuelItem, type FuelKind, sanitizeFueling, WATER_WITHIN_KM } from "../src/core/fueling";
 import { somewhereFree } from "../src/plan/fueling-panel";
@@ -54,11 +54,57 @@ describe("the organizer's stations, as the bundle carries them", () => {
     expect(last.km).toBeGreaterThan(last.kmMarked);
   });
 
-  it("are absent for New York, so the course has no Aid layer at all", () => {
-    // NYRR publishes them behind a waiting room our tools don't pass, and we don't work around it
-    // (PLAN.md §10). Only layers that exist get a switch (D47) — never an invented list.
-    expect(aidStations(nyc.editions[0])).toEqual([]);
-    expect(layerFor(nyc)).toBeNull();
+  it("are New York's twenty, every mile from 3 to 25 but for three of them", () => {
+    // NYRR's own page: water and Gatorade every mile from 3 to 25 except 5, 7 and 9; Maurten gels
+    // at 12 and 18; bananas at 21. It sits behind a waiting room our tools don't pass, so the
+    // owner opened it and read it out (PLAN.md §10, D61).
+    const stations = aidStations(nyc.editions[0]);
+
+    expect(stations.map((s) => s.label)).toEqual([3, 4, 6, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].map((mile) => `Mile ${mile}`));
+    expect(stations.every((s) => s.serves.includes("water") && s.serves.includes("sports-drink"))).toBe(true);
+    expect(stations.filter((s) => s.serves.includes("gel")).map((s) => s.label)).toEqual(["Mile 12", "Mile 18"]);
+    expect(stations.filter((s) => s.serves.includes("fruit")).map((s) => s.label)).toEqual(["Mile 21"]);
+    // NYRR takes no personal refreshments and this page names no refill points, so neither is here.
+    expect(stations.some((s) => s.serves.includes("own-bottle") || s.serves.includes("refill"))).toBe(false);
+    // The page says medical volunteers and supplies are at *all* aid stations, so every one has it.
+    expect(stations.every((s) => s.serves.includes("medical"))).toBe(true);
+    // And every one of them is last year's list, which the app flags to the runner.
+    expect(stations.every((s) => s.carriedOver)).toBe(true);
+  });
+
+  it("flags every New York station as last year's, in the sentence and in the words a reader hears", () => {
+    // The owner read NYRR's page on 2026-09-21 and it was still the 2025 edition's list (D61).
+    const clause = layerFor(nyc)!.clause(19.5, "km")!;
+
+    expect(clause.carriedOver).toBe(true);
+    expect(clause.note).toContain("This is 2025's list.");
+    expect(clause.carriedOverSaid).toBe(" (from an earlier edition's list of refreshment points)");
+  });
+
+  it("put a mile marker where that mile lands on our own longer line", () => {
+    // Mile 12 is 19.312 km of certified course; our New York line is 42.688 against 42.195.
+    const mile12 = aidStations(nyc.editions[0]).find((s) => s.label === "Mile 12")!;
+
+    expect(mile12.kmMarked).toBeCloseTo(19.312, 3);
+    expect(mile12.km).toBeCloseTo(19.537, 2);
+  });
+
+  it("gives a course with no published list no Aid layer at all", () => {
+    // Only layers that exist get a switch (PLAN.md D47) — never an invented list.
+    const unlisted = JSON.parse(JSON.stringify(nyc)) as CourseBundle;
+    delete unlisted.editions[0].aid_stations;
+
+    expect(aidStations(unlisted.editions[0])).toEqual([]);
+    expect(aidLayer(unlisted, createPlanner(plannerCourse(unlisted), planFor(unlisted)))).toBeNull();
+  });
+
+  it("warns a New York runner counting on a bottle of their own, and never a Berlin one at the right station", () => {
+    // The two lists really do differ, and the check is reading them rather than a rule of thumb.
+    const inNewYork = checkFueling([item(19.54, "own-drink", "mine")], aidStations(nyc.editions[0]), 42.688);
+
+    expect(inNewYork).toHaveLength(1);
+    expect(inNewYork[0].text("km")).toMatch(/has no bottle of yours waiting/);
+    expect(checkFueling([item(20.04, "own-drink")], aidStations(berlin.editions[0]), 42.285)).toEqual([]);
   });
 
   it("read as a sentence, drinks first", () => {
@@ -74,38 +120,40 @@ describe("the Aid layer", () => {
 
     expect(layer.lineMarks()).toHaveLength(15);
     expect(layer.lineMarks().every((mark) => mark.encoding === "measured" && mark.toKm > mark.fromKm)).toBe(true);
-    expect(layer.lineLabels().map((label) => label.text("km"))).toContain("27.5 km: water and a gel");
+    // The label is the station's own name and the marks for what it has; the words are in its note
+    // and in the sentence, so the map stays legible with fifteen of them on it (owner, 09-21).
+    const gel = layer.lineLabels().find((label) => label.text("km") === "27.5 km")!;
+    expect(gel.glyphs?.map((glyph) => glyph.name)).toEqual(["Water", "Gel"]);
   });
 
-  it("charts how far there still is to run for water, which is what a runner wants off a chart", () => {
-    const layer = layerFor(berlin)!;
-    const [row] = layer.rows();
-    const bins = row.bins(400);
+  it("is a row of the stations themselves, not a chart of the gaps between them", () => {
+    // The owner, 09-21, having looked at the sawtooth this used to be: "the chart for water
+    // shouldn't be a bar or a line chart… just have like an indicator with the same images."
+    const [row] = layerFor(berlin)!.rows();
 
-    // A sawtooth: it climbs through every dry stretch and drops to nothing at each station.
-    expect(Math.min(...bins.map((bin) => bin.value as number))).toBeLessThan(0.2);
-    expect(Math.max(...bins.map((bin) => bin.value as number))).toBeLessThanOrEqual(row.domain[1]);
-    expect(Math.max(...bins.map((bin) => bin.value as number))).toBeGreaterThan(row.domain[1] - 0.2);
-    expect(bins.every((bin) => (bin.value as number) >= 0 && bin.encoding === "measured")).toBe(true);
+    expect(row.bins(400)).toEqual([]);
+    expect(row.marks!()).toHaveLength(15);
+    expect(row.marks!()[1].glyphs.map((glyph) => glyph.name)).toEqual(["Water", "Sports drink", "Tea", "Fruit"]);
+    expect(row.marks!()[1].km).toBeCloseTo(9.019, 2);
+    expect(row.marks!()[1].label).toBe("9 km: water, a sports drink, tea and fruit");
+    // How far the next water is hasn't gone: it is the readout, where a number belongs.
     expect(row.valueAt(9.02, "km").text).toBe("water here");
+    expect(row.valueAt(10, "km").text).toMatch(/km|m$/);
   });
 
-  it("measures its own reach by the water, not by the stations", () => {
-    // The row counts the run to the next *water*, so a list with a gel depot in it — which is
-    // exactly what New York's will be — must not have its scale set by the depot. Otherwise the
-    // trace climbs past the top of the row and the header states a maximum it exceeds.
+  it("says in its header the longest the runner will go without water, counting only water", () => {
+    // A gel depot between two water stations — which New York has, at miles 12 and 18 — is not a
+    // drink, so it must not shorten the number the header states.
     const withADepot = [station(5, ["water"]), station(12, ["gel"]), station(20, ["water"])];
 
-    expect(furthestWithoutWater(withADepot, 42)).toBe(22); // finish to the last water, not 8 to the depot
+    expect(furthestWithoutWater(withADepot, 42)).toBe(22); // the finish to the last water, not 8 to the depot
     expect(furthestWithoutWater([station(5, ["water"]), station(20, ["water"])], 42)).toBe(22);
-    expect(Math.max(...[10, 16, 30].map((km) => toNextWaterKm(km, withADepot, 42)))).toBeLessThanOrEqual(furthestWithoutWater(withADepot, 42));
+    expect(layerFor(berlin)!.rows()[0].scale("km")).toMatch(/longest run without water is 5\.0 km/);
   });
 
-  it("counts the run to the finish as thirst once the last station is behind you", () => {
+  it("says there is no more water once the last station is behind you", () => {
     const stations = [station(5, ["water"])];
 
-    expect(toNextWaterKm(1, stations, 10)).toBe(4);
-    expect(toNextWaterKm(6, stations, 10)).toBe(4); // nothing more is coming: the count runs to the end
     expect(nextServing(stations, 6, "water")).toBeNull();
   });
 

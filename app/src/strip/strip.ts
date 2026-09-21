@@ -12,7 +12,7 @@
 // arithmetic lives in core/ (scrub.ts, trace.ts, layout.ts, units.ts), where it is tested; this
 // file only listens and draws.
 import { ENCODINGS } from "../core/encoding";
-import type { StripRow } from "../core/layers";
+import type { RowMark, StripRow } from "../core/layers";
 import { assignFreeLanes, linearScale, type Scale } from "../core/layout";
 import { kmAfterKey, kmAtFraction } from "../core/scrub";
 import { plainName } from "../core/sentence";
@@ -279,6 +279,7 @@ function stopLane(content: StripContent, x: Scale): SVGGElement {
 
 /** One row's trace: solid with a light fill where measured, dashed grey where the value is filled in, a grey block where there is none. */
 function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, height: number): SVGGElement {
+  if (row.marks) return markGroup(row.marks(), x, top, height);
   const group = svg("g", {});
   const bins = row.bins(binCount);
   const paths = tracePaths(row, bins, { x, top, height }, row.howMuch?.(binCount));
@@ -299,6 +300,40 @@ function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, heig
   }
   for (const piece of paths.measured) group.append(svg("path", { d: piece.line, class: solid }));
   for (const line of paths.notMeasured) group.append(svg("path", { d: line, class: gap }));
+  return group;
+}
+
+/** How wide one glyph is drawn on a row of marks, and the room one needs beside its neighbour. */
+const GLYPH_PX = 13;
+const GLYPH_GAP_PX = 2;
+
+/**
+ * A row of things at places: one rule down the middle, a tick at each thing, and its marks above.
+ *
+ * Not a trace. A chart through fifteen aid stations draws the gaps between them, which is a line
+ * about what isn't there; what a runner wants to see is the stations, which are points. Where two
+ * crowd each other the marks are thinned to what will fit — the first one is what a station is
+ * most likely to be wanted for — and the rest stay in the tooltip and in the hidden text.
+ */
+function markGroup(marks: RowMark[], x: Scale, top: number, height: number): SVGGElement {
+  const group = svg("g", {});
+  const rule = top + height - 9;
+  if (marks.length === 0) return group;
+  group.append(svg("line", { x1: x(marks[0].km), x2: x(marks[marks.length - 1].km), y1: rule, y2: rule, class: `${ENCODINGS.measured.cssClass} strip-mark-rule` }));
+  marks.forEach((mark, i) => {
+    const at = x(mark.km);
+    const room = Math.min(i === 0 ? Infinity : at - x(marks[i - 1].km), i === marks.length - 1 ? Infinity : x(marks[i + 1].km) - at);
+    const fits = Math.max(1, Math.floor(room / (GLYPH_PX + GLYPH_GAP_PX)));
+    const shown = mark.glyphs.slice(0, fits);
+    const wide = shown.length * GLYPH_PX + (shown.length - 1) * GLYPH_GAP_PX;
+    const cell = svg("g", { class: ENCODINGS[mark.encoding].cssClass }, svg("title", { text: mark.label }));
+    cell.append(svg("line", { x1: at, x2: at, y1: rule - 4, y2: rule + 4, class: "strip-mark-tick" }));
+    shown.forEach((glyph, g) => {
+      const left = at - wide / 2 + g * (GLYPH_PX + GLYPH_GAP_PX);
+      cell.append(svg("path", { d: glyph.path, class: "strip-mark-glyph", transform: `translate(${left.toFixed(1)} ${(rule - 8 - GLYPH_PX).toFixed(1)}) scale(${(GLYPH_PX / 16).toFixed(3)})` }));
+    });
+    group.append(cell);
+  });
   return group;
 }
 

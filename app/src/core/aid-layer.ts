@@ -1,11 +1,14 @@
 // Aid, as a layer: where the organizer's refreshment points are, what each one hands out, and how
 // far it is to the next drink (issue #12, PLAN.md D47).
 //
-// The row is **how far to the next water**, not "is there a station here". A station is a point
-// and a slice of the strip is ninety metres of road, so a row of points would be a row of gaps;
-// what a runner actually wants off a chart is the shape of the thirst — a sawtooth that climbs
-// through every dry stretch and drops to nothing at each station. The stations themselves are on
-// the course line, where a point belongs, with their own labels.
+// **The row is the stations themselves, not a chart of them.** It was a sawtooth of "how far to
+// the next water" for a day; the owner looked and said it plainly (09-21): *"the chart for water
+// shouldn't be a bar or a line chart. It just doesn't look right. Just have like an indicator with
+// the same images."* They are right, and the reason is the same one that made a station a point in
+// the first place — a trace through fifteen stations draws the gaps between them, which is a line
+// about what isn't there. So the row is one rule with a tick at each station and its own marks
+// above it, and the marks are the ones on the map (core/serve-glyphs.ts): a drop, a bolt, a cross.
+// How far the next water is has not gone: it is the row's own readout, where a number belongs.
 //
 // **A station is a sourced fact, not a measurement** (PLAN.md D19): it is what the organizer says
 // will be there, which is the strongest claim anyone can make about a race that hasn't happened.
@@ -13,7 +16,8 @@
 // and says so, the way a carried-over wave time is (D38).
 import type { CourseBundle } from "../bundle/types";
 import { type AidStation, aidStations, nextServing, servesInWords } from "./aid";
-import type { Clause, Layer, LineMark, MarkLabel, RowBin, RowValue, StripRow } from "./layers";
+import type { Clause, Layer, LineMark, MarkLabel, RowValue, StripRow } from "./layers";
+import { glyphsFor, SERVE_GLYPH, SHOWN_AS_GLYPHS } from "./serve-glyphs";
 import type { Planner } from "./planner";
 import { formatDistance, formatNearby, type Units } from "./units";
 
@@ -43,15 +47,24 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
 
   const row: StripRow = {
     id: "aid",
-    name: "To the next water",
+    name: "Stations",
     encoding: "measured",
-    scale: (units) => `${formatDistance(0, units, 0)} to ${formatDistance(furthestDryKm, units, 1)}`,
-    summary: () => `${stations.length} stations, the organizer's own list`,
-    bins: (count) => cutInto(lengthKm, count).map((bin) => rowBin(bin, stations, lengthKm)),
-    domain: [0, furthestDryKm],
+    // The header says the thing the marks can't: how far it still is to the next drink.
+    scale: (units) => `the longest run without water is ${formatDistance(furthestDryKm, units, 1)}`,
+    summary: () => `${stations.length} of them, the organizer's own list`,
+    // A row of marks is asked for its marks, never for bins (strip/strip.ts).
+    bins: () => [],
+    domain: [0, 1],
     baseline: "bottom",
     stepped: false,
     valueAt: (km, units) => valueAt(km, stations, units),
+    marks: () =>
+      stations.map((station) => ({
+        km: station.km,
+        label: `${station.label}: ${servesInWords(station)}`,
+        glyphs: glyphsFor(station.serves),
+        encoding: "measured" as const,
+      })),
   };
 
   const marks: LineMark[] = stations.map((station) => ({
@@ -67,7 +80,8 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     note: noteFor(station, carriedOver),
     atKm: station.km,
     startKm: station.km,
-    text: () => `${station.label}: ${servesInWords(station)}`,
+    glyphs: glyphsFor(station.serves),
+    text: () => station.label,
     // The full stations first, so that where two crowd each other it is the one with more on it
     // that survives: a runner scanning the map is looking for a drink, not for a water table.
     priority: station.serves.length,
@@ -76,7 +90,7 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
   return {
     id: "aid",
     name: "Aid",
-    key: "Ink on the line is a refreshment point, from the organizer's own list; the label says what it hands out. The chart is how far you still have to run for water.",
+    key: `Ink on the line is a refreshment point, from the organizer's own list. The marks are what it hands out: ${markNames(stations)}.`,
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => labels,
@@ -88,26 +102,6 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
 export function furthestWithoutWater(stations: AidStation[], lengthKm: number): number {
   const water = stations.filter((station) => station.serves.includes("water")).map((station) => station.km);
   return Math.max(...[...water, lengthKm].map((km, i) => km - (i === 0 ? 0 : [...water, lengthKm][i - 1])));
-}
-
-/** One slice of the course, for the row. */
-interface AidBin {
-  startKm: number;
-  midKm: number;
-  endKm: number;
-}
-
-function rowBin(bin: AidBin, stations: AidStation[], lengthKm: number): RowBin {
-  return { startKm: bin.startKm, midKm: bin.midKm, endKm: bin.endKm, value: toNextWaterKm(bin.midKm, stations, lengthKm), encoding: "measured" };
-}
-
-/**
- * How far from here to the next water, in km. Past the last water station it is the distance to
- * the finish: the thirst keeps climbing, because there is nothing else coming.
- */
-export function toNextWaterKm(km: number, stations: AidStation[], lengthKm: number): number {
-  const next = nextServing(stations, km, "water");
-  return Math.max(0, (next ? next.km : lengthKm) - km);
 }
 
 function valueAt(km: number, stations: AidStation[], units: Units): RowValue {
@@ -152,15 +146,13 @@ function noteFor(station: AidStation, carriedOver: { from_edition: number; reaso
   return note === "" ? undefined : note;
 }
 
-function capital(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+/** The marks this course actually uses, named, because a shape nobody has learned is a guess. */
+function markNames(stations: AidStation[]): string {
+  const here = SHOWN_AS_GLYPHS.filter((what) => stations.some((station) => station.serves.includes(what)));
+  const names = here.map((what) => SERVE_GLYPH[what].name.toLowerCase());
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-function cutInto(lengthKm: number, count: number): AidBin[] {
-  const width = lengthKm / count;
-  return Array.from({ length: count }, (_, b) => {
-    const startKm = b * width;
-    const endKm = b === count - 1 ? lengthKm : startKm + width;
-    return { startKm, midKm: (startKm + endKm) / 2, endKm };
-  });
+function capital(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

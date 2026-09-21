@@ -9,6 +9,7 @@
 // looks. So a later ticket adds a layer by writing one of these, and cannot restyle its way
 // around the measured / runner-report split.
 import type { Encoding } from "./encoding";
+import type { Glyph } from "./serve-glyphs";
 import type { Units } from "./units";
 
 /** Every layer GeoPace will have (PLAN.md D35). The ones that exist are listed once, in `main.ts`. */
@@ -88,6 +89,22 @@ export interface StripRow {
   valueAt(km: number, units: Units): RowValue;
   /** For a row whose fill says how much as well as where: a `HowMuch` for each of `binCount` slices. */
   howMuch?(binCount: number): HowMuch[];
+  /**
+   * A row that is *things at places* rather than a value all the way along: aid stations, later
+   * cheer zones. Where this is given the row draws these on one rule instead of a trace, and
+   * `bins` is not asked for. A chart is the wrong shape for a point — a trace through fifteen
+   * stations is a line about the gaps between them, not about the stations.
+   */
+  marks?(): RowMark[];
+}
+
+/** One thing at one place on a row: what it is, and the marks that say so. */
+export interface RowMark {
+  km: number;
+  /** What it is, for the tooltip and for a reader who can't see the shapes. */
+  label: string;
+  glyphs: Glyph[];
+  encoding: Encoding;
 }
 
 /**
@@ -123,6 +140,12 @@ export interface MarkLabel {
   /** Where the thing it names begins: picking the label takes the runner there. */
   startKm: number;
   text(units: Units): string;
+  /**
+   * Marks drawn beside the words, where the layer has a shape for what it is naming: an aid
+   * station's water, bolt and cross (core/serve-glyphs.ts). Every one carries its own word, so a
+   * label still says what it means to somebody who hasn't learned the shapes, or can't see them.
+   */
+  glyphs?: Glyph[];
   /** When labels would overprint each other, the higher priority stays. */
   priority: number;
 }

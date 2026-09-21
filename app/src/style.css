@@ -1601,3 +1601,39 @@ button.map-label {
   font-size: 0.9em;
   color: var(--grey-text);
 }
+
+/* ── What an aid station hands out, as marks (#12) ───────────────────────────────────────── */
+
+/* One shape per thing, flat ink with no colour of its own, drawn the same on a map label and on
+   the strip (core/serve-glyphs.ts). Every one carries its word as well: a shape on its own is a
+   guess for anybody who hasn't learned it, and a screen reader has nothing to say about a path. */
+.glyph {
+  display: inline-flex;
+  align-items: center;
+}
+
+.map-label-glyph {
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 3px;
+  fill: currentColor;
+  vertical-align: -0.12em;
+}
+
+/* The Stations row: one rule with a tick at each station and its marks above it. Not a trace — a
+   line through fifteen stations draws the gaps between them (owner, 09-21). */
+svg .strip-mark-rule {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+svg .strip-mark-tick {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+svg .strip-mark-glyph {
+  fill: var(--ink);
+  stroke: none;
+}

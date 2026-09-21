@@ -16,7 +16,7 @@
 import type { AidStationFact, Edition } from "../bundle/types";
 
 /** What a station hands out. The fixed vocabulary the pipeline writes (edition_facts.py). */
-export type Serves = "water" | "sports-drink" | "gel" | "fruit" | "tea" | "refill" | "own-bottle";
+export type Serves = "water" | "sports-drink" | "gel" | "fruit" | "tea" | "refill" | "own-bottle" | "medical";
 
 export interface AidStation {
   /** Where it stands on the course line, in km: the app's own scale. */
@@ -43,10 +43,13 @@ export const SERVES_NAME: Record<Serves, string> = {
   tea: "tea",
   refill: "refill",
   "own-bottle": "your own bottle",
+  medical: "medical help",
 };
 
 /** The things a runner drinks, in the order a list of them reads best. */
 const DRINKS: Serves[] = ["water", "sports-drink", "tea"];
+/** Conditions on the station rather than things handed out: they get their own sentence. */
+const ABOUT_THE_STATION: Serves[] = ["refill", "own-bottle"];
 
 /**
  * This edition's stations, in course order. Empty for an edition nobody has published a list for,
@@ -93,7 +96,7 @@ export function nearestStation(stations: AidStation[], km: number): AidStation |
  */
 export function servesInWords(station: AidStation): string {
   const drinks = DRINKS.filter((what) => station.serves.includes(what));
-  const rest = station.serves.filter((what) => !DRINKS.includes(what) && what !== "refill" && what !== "own-bottle");
+  const rest = station.serves.filter((what) => !DRINKS.includes(what) && !ABOUT_THE_STATION.includes(what));
   const names = [...drinks, ...rest].map((what) => (what === "sports-drink" ? "a sports drink" : what === "gel" ? "a gel" : SERVES_NAME[what]));
   if (names.length === 0) return "a refill point";
   if (names.length === 1) return names[0];

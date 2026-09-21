@@ -457,7 +457,7 @@ function endLabels(bundle: CourseBundle): MapLabel[] {
 
 function markLabel(bundle: CourseBundle, label: MarkLabel): MapLabel {
   const at = positionAtKm(bundle.measured.course_line, label.atKm);
-  return { ...at, text: label.text(units), look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
+  return { ...at, text: label.text(units), glyphs: label.glyphs, look: label.encoding, note: label.note, priority: label.priority, onPick: () => scrubTo(label.startKm) };
 }
 
 /**

@@ -15,6 +15,8 @@ import { keepLabels } from "../core/declutter";
 import { type Encoding, ENCODINGS } from "../core/encoding";
 import { isOverTheHorizon } from "../core/horizon";
 import { html } from "../dom";
+import type { Glyph } from "../core/serve-glyphs";
+import { glyphNode } from "./glyph-node";
 import { type Placement, scenePosition } from "./placement";
 
 export interface MapLabel {
@@ -23,6 +25,8 @@ export interface MapLabel {
   /** The road's height above the ellipsoid there, from the Course Bundle: where the label stands when the course is drawn at road height. */
   ellipsoidHeightM: number;
   text: string;
+  /** Marks drawn before the words: what an aid station hands out (core/serve-glyphs.ts). */
+  glyphs?: Glyph[];
   /** The kind of claim it makes, drawn as everywhere else; or "place" for the start and the finish, which are the course's own. */
   look: Encoding | "place";
   priority: number;
@@ -130,6 +134,8 @@ function labelNode(label: MapLabel): HTMLElement {
   const look = label.look === "place" ? undefined : ENCODINGS[label.look];
   const node = html(label.onPick ? "button" : "span", { class: `map-label ${look ? look.cssClass : "map-label-place"}`, title: label.note });
   if (node instanceof HTMLButtonElement) node.type = "button";
+  // The marks come first and the words after them, so a label still reads without the shapes.
+  for (const glyph of label.glyphs ?? []) node.append(glyphNode(glyph, "map-label-glyph"));
   // Not measured: struck through, with the words that say so left standing, as in the sentence.
   node.append(label.look === "not-measured" ? html("s", { text: label.text }) : label.text);
   if (look?.saidAfter) node.append(` ${look.saidAfter}`);
