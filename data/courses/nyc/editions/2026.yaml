@@ -64,3 +64,23 @@ waves:
     carried_over: true
     source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
     accessed: 2026-09-18
+
+# Aid stations: none listed, on purpose (#12).
+#
+# NYRR publishes what the course serves on its own "The Course" page, and that page sits behind a
+# waiting room that a person's browser passes and our tools don't — the same wall the wave times
+# ran into (PLAN.md §10, D38). We don't work around it. The runner guide and the official course
+# map, both of which we can fetch from webassets.nyrr.org, carry no station list: the guide is
+# bibs, bags and the finish, and the map marks miles and neighbourhoods.
+#
+# Third-party pages print the list. None of them is the organizer, so none of them goes in here.
+#
+# What it takes to fill this in: open https://www.nyrr.org/tcsnycmarathon/race-day/the-course in a
+# browser, and copy what it says about fluid stations, gel depots, refill stations and anything
+# else handed out, with the miles. Then write them here the way Berlin's are written, in km
+# (a mile is 1.609344 km), with that URL as the source and the day you looked as `accessed`. If
+# they turn out to be last year's, mark each `carried_over: true` and add the edition's
+# `carried_over` block saying so — the app flags every carried-over fact to the runner.
+#
+# Until then the app has no Aid layer for New York, which is the honest state: only layers that
+# exist get a switch (PLAN.md D47).
