@@ -95,7 +95,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     id: "shade",
     name: "Shade",
     key: along.table.hasTrees
-      ? `Warm is the sun on you when you get there; solid teal is a building's shade, and dotted teal a tree's — that one you get while the leaves are on. ${leaves.onRaceDay} A clear sky is assumed.`
+      ? ["Warm is the sun on you when you get there; solid teal is a building's shade, and dotted teal a tree's — that one you get while the leaves are on.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
       : "Warm is the sun on you when you get there; teal is a building's shade. A clear sky is assumed, and trees are not in yet.",
     rows: () => [row],
     lineMarks: () => marks,
@@ -104,18 +104,22 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
   };
 }
 
-/** What a tree's shade rests on: the leaves on race day, and the survey the crowns came from. */
+/**
+ * What a tree's shade rests on: the leaves on race day, and the survey the crowns came from.
+ * Both empty for a course nobody has written a leaf state for — the halftone still means what it
+ * means, there is simply nothing more to say about it.
+ */
 interface LeafNote {
   /** One sentence for the key under the strip: what the trees are wearing on race day. */
   onRaceDay: string;
   /** The longer reason, printed under the sentence where a clause depends on the leaves. */
-  why: string;
+  why?: string;
 }
 
 function leafNote(bundle: CourseBundle, hasTrees: boolean): LeafNote {
   const leaves = bundle.course.leaves;
   const surveyed = bundle.measured.sun?.trees?.leaves_when_surveyed;
-  if (!hasTrees || !leaves) return { onRaceDay: "", why: "" };
+  if (!hasTrees || !leaves) return { onRaceDay: "" };
   return {
     onRaceDay: `On race day the trees here are ${leaves.state}.`,
     why: [`On race day the trees here are ${leaves.state}. ${leaves.note}`, surveyed ? `The crowns this is worked out from were ${surveyed}.` : ""].filter(Boolean).join(" "),

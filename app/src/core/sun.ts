@@ -40,7 +40,7 @@ export interface SunTable {
   inLeafShade(sample: number, step: number): boolean;
   /** Whether the road here is unshaded at every step: neither wall nor leaf, at any hour we model. */
   alwaysInSun(sample: number): boolean;
-  /** Whether this course has tree data at all. */
+  /** Whether this course has tree data at all — not whether any of it ended up shading anything. */
   hasTrees: boolean;
 }
 
@@ -86,7 +86,9 @@ export function readSunTable(bundle: CourseBundle): SunTable | null {
   const inLeafShade = (sample: number, step: number) => leafBits !== null && bitAt(leafBits, sample, step);
   return {
     block,
-    hasTrees: leafBits !== null,
+    // What the table was worked out from, not what it found: a course whose trees happen never to
+    // reach the road still has trees, and the layer should say so rather than "no trees".
+    hasTrees: block.trees !== undefined,
     day: block.first_step.slice(0, 10),
     firstStepMs,
     stepMs,
