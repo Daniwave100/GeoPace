@@ -47,7 +47,8 @@ export function sunLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     summary: () => "clear sky, buildings only",
     bins: (count) => binned(count).map((bin) => rowBin(bin, dominant(along.states, bin))),
     domain: [-1, 1],
-    baseline: 0,
+    // The middle of this row is not a value: there is no zero between sun and shade.
+    baseline: "middle",
     stepped: true,
     valueAt: (km) => sunValue(along.at(km), floorDeg),
     howMuch: (count) => binned(count).map((bin) => howMuch(dominant(along.states, bin))),

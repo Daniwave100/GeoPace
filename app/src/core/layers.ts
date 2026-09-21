@@ -64,8 +64,14 @@ export interface StripRow {
   bins(binCount: number): RowBin[];
   /** The values at the bottom and the top of the row. */
   domain: [number, number];
-  /** Where the fill hangs from: the bottom of the row, or a value (0% grade, flat-ground effort). */
-  baseline: "bottom" | number;
+  /**
+   * Where the fill hangs from: the bottom of the row, a value the row's scale has a place for
+   * (0% grade, flat-ground effort), or `"middle"` — the axis a two-way row is drawn about when
+   * there is no value there at all. A number is a value, so it is drawn as a line the runner can
+   * read against; the middle of a binary row is not, and drawing it there put a dotted rule
+   * through the Sun row that looked exactly like the app's own "not measured here".
+   */
+  baseline: "bottom" | "middle" | number;
   /** A stepped trace holds each bin's value flat; a smooth one joins bin to bin. */
   stepped: boolean;
   /** The value where the runner is, as it is printed in the row's header. */

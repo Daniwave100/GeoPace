@@ -169,6 +169,21 @@ describe("the Sun layer", () => {
     expect(allDay.valueAt(27, "km").text).toBe("Some shade");
   });
 
+  it("draws nothing dashed on a course where everything is measured", () => {
+    // Berlin has no filled-in heights and no hours outside the table for this plan, so nothing on
+    // its strip may be dashed or grey. The Sun row hangs from the middle of itself rather than
+    // from a value, because a dotted rule across a row reads as "not measured here" (the owner
+    // asked what it was, 09-21).
+    const [now, allDay] = layerFor(berlin).rows();
+
+    expect(now.baseline).toBe("middle");
+    expect(allDay.baseline).toBe("bottom");
+    for (const row of [now, allDay]) {
+      expect(row.bins(400).every((bin) => bin.measured && bin.value !== null)).toBe(true);
+    }
+    expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding === "measured")).toBe(true);
+  });
+
   it("says what the numbers rest on, where the numbers are", () => {
     const [now] = layerFor(berlin).rows();
 

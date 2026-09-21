@@ -32,7 +32,7 @@ const PAD = 3;
 export function tracePaths(row: Pick<StripRow, "domain" | "baseline" | "stepped">, bins: RowBin[], box: TraceBox, howMuch: HowMuch[] = []): TracePaths {
   const bottom = box.top + box.height;
   const y = linearScale(row.domain, [bottom - PAD, box.top + PAD]);
-  const baselineY = row.baseline === "bottom" ? bottom : y(row.baseline);
+  const baselineY = row.baseline === "bottom" ? bottom : row.baseline === "middle" ? (box.top + bottom) / 2 : y(row.baseline);
   const paths: TracePaths = { measured: [], notMeasured: [], noValue: [], baselineY, howMuchBlocks: [] };
 
   bins.forEach((bin, i) => {
