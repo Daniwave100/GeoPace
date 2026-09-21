@@ -24,6 +24,11 @@ lower than atan(h / d). Everything else here is bookkeeping around it.
     out. It is also what bounds the reach above: without a floor, a building at sunrise reaches
     the horizon.
 
+  - **The road under a roof, and the road under a tree.** A roof over the road shades it at every
+    hour, which is right: Berlin's course runs through the Brandenburg Gate. A crown does not —
+    at a low sun the light comes in sideways, under the leaves — so the runner standing under a
+    street tree is traced like anybody else, from a ray that starts inside the outline.
+
   - **The road can be above a roof.** In New York three samples on the Queensboro's lower deck
     sit over a building beside the bridge, whose outline holds the road's plan position without
     standing over the road at all (PLAN.md §10). A roof that clears the road by less than a
@@ -259,12 +264,24 @@ def _blocked(lat, lon, elevation_m, blockers, altitude_deg, azimuth_deg, *, clea
         # A sample inside the outline is under the top, or the outline is only overlapping a road
         # it doesn't stand over (the Queensboro's lower deck).
         indoors = inside_ring(ring, lat[candidates], lon[candidates])
-        underneath = candidates[indoors & (over_the_road[candidates] >= clearance_m)]
-        blocked[underneath] = True
-        candidates = candidates[~indoors]
+        enough_headroom = over_the_road[candidates] >= clearance_m
+        if underside_m == -np.inf:
+            # A roof over the road shades it at every moment: Berlin's course runs through the
+            # Brandenburg Gate, and there is no hour at which the sun gets under 21 m of stone.
+            blocked[candidates[indoors & enough_headroom]] = True
+            candidates = candidates[~indoors]
+            inside = np.zeros(len(candidates), dtype=bool)
+        else:
+            # A crown over the road does not. Standing under a street tree at a low sun the light
+            # comes in sideways, under the leaves — which is the whole reason a crown has an
+            # underside — so the runner beneath one is traced like anybody else, from a ray that
+            # is inside the outline from its very first metre.
+            keep = ~indoors | enough_headroom
+            inside = indoors[keep]
+            candidates = candidates[keep]
         if len(candidates) == 0:
             continue
-        away = _distance_to_ring(x[candidates], y[candidates], ring_x, ring_y)
+        away = np.where(inside, 0.0, _distance_to_ring(x[candidates], y[candidates], ring_x, ring_y))
         reach = over_the_road[candidates, None] / rise[candidates]
         # Where the ray would still be under the shape's underside as it leaves the outline, it
         # has passed beneath it. A wall has no underside, and this is skipped.
@@ -272,8 +289,10 @@ def _blocked(lat, lon, elevation_m, blockers, altitude_deg, azimuth_deg, *, clea
         maybe = np.flatnonzero(open_still[candidates] & (away[:, None] < reach))
         for piece in range(0, len(maybe), CHUNK):
             pairs = maybe[piece : piece + CHUNK]
-            sample = candidates[pairs // altitude.shape[1]]
+            at = pairs // altitude.shape[1]
+            sample = candidates[at]
             entry, leaves = _ray_crossings(x[sample], y[sample], east[candidates].ravel()[pairs], north[candidates].ravel()[pairs], ring_x, ring_y)
+            entry = np.where(inside[at], 0.0, entry)  # a ray that starts inside is inside at once
             hit = entry < reach.ravel()[pairs]
             if under_reach is not None:
                 hit &= leaves > under_reach.ravel()[pairs]

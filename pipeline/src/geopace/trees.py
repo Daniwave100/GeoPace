@@ -112,17 +112,39 @@ def crowns_along(lat, lon, elevation_m, model: TreesModel, *, corridor_m: float 
     exactly the trees that can reach the road, out to the buildings' own corridor, is both the set
     that shades and the set worth drawing — so the shadows on screen and the numbers on the strip
     cannot drift apart, and the file has no tree in it that could never shade anybody.
+
+    The course is walked in chunks only to ask the city for one box at a time. Each crown is then
+    measured against **the whole course line**, not against the chunk whose box it came back in:
+    a model that hands each patch of canopy out exactly once (nyc_trees.py) gives it to whichever
+    box it lands in, and round a bend that is not always the road it stands beside. Measured
+    against the chunk alone, such a patch would be dropped by the chunk that was offered it and
+    never seen by the chunk it shades.
     """
     lat, lon = np.asarray(lat, dtype=float), np.asarray(lon, dtype=float)
     road_m = np.asarray(elevation_m, dtype=float)
+    per_lat, per_lon = meters_per_degree(float(lat.mean()))
+    road_x, road_y = lon * per_lon, lat * per_lat
     kept: dict[str, Crown] = {}
-    for box, chunk in corridor_boxes(lat, lon, corridor_m, chunk_m):
-        road_lat, road_lon = lat[chunk], lon[chunk]
-        lowest_road_m = float(road_m[chunk].min())
+    for box, _chunk in corridor_boxes(lat, lon, corridor_m, chunk_m):
         for crown in model.within(*box):
             if crown.id in kept:
                 continue
-            away_m = distance_to_the_road(crown.ring, road_lat, road_lon)
-            if away_m <= min(corridor_m, max(crown.top_m - lowest_road_m, 0.0) * reach_per_meter):
+            nearby = _road_near(crown.ring, road_x, road_y, per_lat, per_lon, corridor_m)
+            if nearby is None:
+                continue
+            away_m = distance_to_the_road(crown.ring, lat[nearby], lon[nearby])
+            if away_m <= min(corridor_m, max(crown.top_m - road_m[nearby[0]], 0.0) * reach_per_meter):
                 kept[crown.id] = crown
     return list(kept.values())
+
+
+def _road_near(ring: np.ndarray, road_x: np.ndarray, road_y: np.ndarray, per_lat: float, per_lon: float, corridor_m: float) -> np.ndarray | None:
+    """Which course samples are close enough to this crown to be worth measuring properly, nearest
+    first, or None where none of them are. The middle of the outline and its own reach are enough
+    to rule out the rest of a marathon in one subtraction each."""
+    ring_x, ring_y = ring[:, 0] * per_lon, ring[:, 1] * per_lat
+    middle_x, middle_y = float(ring_x.mean()), float(ring_y.mean())
+    radius_m = float(np.hypot(ring_x - middle_x, ring_y - middle_y).max())
+    to_middle = np.hypot(road_x - middle_x, road_y - middle_y)
+    near = np.flatnonzero(to_middle <= corridor_m + radius_m)
+    return None if len(near) == 0 else near[np.argsort(to_middle[near])]

@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from geopace import berlin_trees
 from geopace.bundle import BundleInvalid, validate_bundle
 from geopace.provenance import Attribution, Source
 from geopace.shade import REACH_PER_METER, leaf_shaded, shade_table, sunlit
@@ -61,7 +62,7 @@ class TestACrownIsNotAWall:
         assert not leaf_shaded(lat, lon, elevation, leafy, *one_sun(8, 90, len(lat)))[here, 0][0]
         assert not sunlit(lat, lon, elevation, solid, *one_sun(8, 90, len(lat)))[here, 0][0]
 
-    def test_a_runner_under_the_crown_is_in_leafy_shade_whatever_the_sun_is_doing(self):
+    def test_a_runner_under_the_crown_is_in_leafy_shade_while_the_sun_is_high(self):
         """A crown 4 m across over the road, with the sun nearly overhead: the sample under it is
         shaded from every side, and at 80 degrees the shadow reaches only 2.5 m past the leaves,
         so its neighbours ten metres up and down the road are not."""
@@ -71,6 +72,30 @@ class TestACrownIsNotAWall:
         for azimuth in (90, 180, 270):
             shaded = leaf_shaded(lat, lon, elevation, over_the_road, *one_sun(80, azimuth, len(lat)))[:, 0]
             assert list(north[shaded]) == [0.0]
+
+    def test_and_out_of_it_again_when_the_sun_drops_under_the_leaves(self):
+        """Standing under a street tree at a low sun, the light comes in sideways: the ray leaves
+        the crown 4 m away and 1.1 m up, under leaves that start at 4 m. A wall of the same
+        outline would still have the runner in shade — which is the difference this models, and
+        along the real courses it is several kilometres of road standing under a tree."""
+        lat, lon, elevation, north = road_north()
+        here = north == 0
+        over_the_road = [crown(east_m=0, north_m=0, radius_m=4, top_m=14, underside_m=4)]
+        solid = [block(east_m=0, north_m=0, width_m=8, depth_m=8, height_m=14)]
+
+        assert not leaf_shaded(lat, lon, elevation, over_the_road, *one_sun(15, 90, len(lat)))[here, 0][0]
+        assert not sunlit(lat, lon, elevation, solid, *one_sun(15, 90, len(lat)))[here, 0][0]
+        # And it comes back as the sun climbs over the edge of the crown: 4 m out, 4 m up.
+        assert leaf_shaded(lat, lon, elevation, over_the_road, *one_sun(46, 90, len(lat)))[here, 0][0]
+
+    def test_a_crown_whose_leaves_are_too_low_to_walk_under_is_not_over_the_runner(self):
+        """The guard that keeps a record's outline from being read as a roof (shade.py's
+        clearance) holds for a crown too: leaves a metre over the road are not shade, they are a
+        bush the outline has landed on."""
+        lat, lon, elevation, _ = road_north()
+        too_low = [crown(east_m=0, north_m=0, radius_m=4, top_m=1.5, underside_m=0.5)]
+
+        assert not leaf_shaded(lat, lon, elevation, too_low, *one_sun(60, 90, len(lat))).any()
 
     def test_a_crown_whose_leaves_start_under_the_road_is_not_over_it_at_all(self):
         """A tree down a bank beside a viaduct: its outline holds the road's plan position, but the
@@ -296,3 +321,28 @@ class TestTheCommittedCrowns:
         in_the_table = self.unpacked(sun, "in_leaf_shade")[take]
 
         assert (on_screen == in_the_table).mean() > 0.99, f"{course}: the crowns drawn and the table disagree"
+
+
+class TestATreeWithNoName:
+    """Crowns are kept in a dictionary keyed on their id (trees.crowns_along), so a blank one would
+    collapse every unnamed tree into a single entry — and the build would report the smaller number
+    as a fact. Berlin's service names every tree today; this is the guard for the day it doesn't."""
+
+    def test_a_tree_the_register_does_not_name_falls_back_to_its_own_place(self):
+        page = (
+            '<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" '
+            'xmlns:baumbestand="baumbestand" numberReturned="2">'
+            + "".join(
+                f"<wfs:member><baumbestand:strassenbaeume><baumbestand:baumhoehe>9.0</baumbestand:baumhoehe>"
+                f"<baumbestand:kronedurch>5.0</baumbestand:kronedurch><baumbestand:geom>"
+                f'<gml:Point srsName="urn:ogc:def:crs:EPSG::25833"><gml:pos>{easting} 5819000.0</gml:pos></gml:Point>'
+                f"</baumbestand:geom></baumbestand:strassenbaeume></wfs:member>"
+                for easting in (389000.0, 389020.0)
+            )
+            + "</wfs:FeatureCollection>"
+        )
+
+        trees = berlin_trees.parse_trees([page])
+
+        assert len({tree[0] for tree in trees}) == 2
+        assert all(tree[0] for tree in trees)

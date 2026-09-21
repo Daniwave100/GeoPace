@@ -44,10 +44,6 @@ WFS = "http://www.opengis.net/wfs/2.0"
 # height across 22,667 Berlin trees that carry both (12,971 street trees at 0.67, 9,696 park trees
 # at 0.56, measured 2026-09-21 over five 2 km squares of the city).
 CROWN_SHARE_OF_HEIGHT = 0.6
-# What the register calls a conifer. Its shade doesn't depend on the leaves the way a broadleaf's
-# does; it is counted so the leaf-state note can say how much of the course's shade is evergreen.
-CONIFERS = "Nadelbäume"
-
 SOURCE = Source(
     id="berlin-tree-register",
     title="Baumbestand Berlin: the city's register of its street trees and park trees (Geoportal Berlin)",
@@ -158,17 +154,6 @@ def parse_trees(pages: list[str]) -> list[tuple[str, float, float, float, float]
     return trees
 
 
-def leaf_groups(pages: list[str]) -> dict[str, int]:
-    """How many trees of each species group the register lists here: broadleaf, conifer, shrub."""
-    groups: dict[str, int] = {}
-    for page in pages:
-        for member in ET.fromstring(page).findall(f"{{{WFS}}}member"):
-            for feature in member:
-                group = (feature.findtext(f"{{{LAYER}}}art_gruppe") or "unrecorded").strip()
-                groups[group] = groups.get(group, 0) + 1
-    return groups
-
-
 def _feature_tree(feature: ET.Element) -> tuple[str, float, float, float, float] | None:
     height_m = _number(feature, "baumhoehe")
     if height_m is None or height_m < MIN_CROWN_M:
@@ -178,7 +163,10 @@ def _feature_tree(feature: ET.Element) -> tuple[str, float, float, float, float]
         return None
     easting, northing = (float(value) for value in position.text.split()[:2])
     lon, lat = from_utm33(easting, northing)
-    name = feature.get(f"{{{GML}}}id") or feature.findtext(f"{{{LAYER}}}gisid") or ""
+    # Its own place, where the register gives no identifier: crowns are kept in a dictionary keyed
+    # on this, so an empty name would quietly collapse every unnamed tree into one and the build
+    # would report the smaller count as a fact.
+    name = feature.get(f"{{{GML}}}id") or feature.findtext(f"{{{LAYER}}}gisid") or f"{lon:.6f},{lat:.6f}"
     return name, float(lon), float(lat), height_m, _number(feature, "kronedurch") or 0.0
 
 
