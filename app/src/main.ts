@@ -5,6 +5,7 @@ import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
 import { loadWhiteModel, type WhiteModel, WhiteModelError } from "./bundle/white-model";
 import { type Encoding, ENCODINGS } from "./core/encoding";
+import { aidLayer } from "./core/aid-layer";
 import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { type Vicinity, vicinityOf } from "./core/map-bounds";
@@ -87,7 +88,7 @@ type City = { state: "none" } | { state: "loading" } | { state: "drawn"; model: 
  * the moment this runner reaches each 10 m of road: a new wave or a new goal is a new layer.
  */
 function layersFor(bundle: CourseBundle, planner: Planner): Layer[] {
-  return [hillsLayer(bundle), shadeLayer(bundle, planner)].filter((layer) => layer !== null);
+  return [hillsLayer(bundle), shadeLayer(bundle, planner), aidLayer(bundle, planner)].filter((layer) => layer !== null);
 }
 
 const storage = browserStorage();

@@ -14,6 +14,22 @@ export function renderSources(container: HTMLElement, bundle: CourseBundle): voi
     // the thing the Shade layer's halftone rests on (PLAN.md D60).
     ...(bundle.course.leaves ? [html("li", {}, "Trees on race day: ", link(bundle.course.leaves.source, bundle.course.leaves.state), " ", html("small", { text: bundle.course.leaves.note }))] : []),
     ...bundle.course.landmarks.map((landmark) => html("li", {}, "Landmark: ", link(landmark.source, landmark.name))),
+    // The organizer's refreshment points: one line per edition, because every station on a list
+    // comes from the same page and fifteen identical links would say less than one (#12).
+    ...bundle.editions.flatMap((edition) =>
+      edition.aid_stations && edition.aid_stations.length > 0
+        ? [
+            html(
+              "li",
+              {},
+              `Aid stations, ${edition.edition}: `,
+              link(edition.aid_stations[0].source, `${edition.aid_stations.length} refreshment points, the organizer's own list`),
+              " ",
+              html("small", { text: `Checked ${edition.aid_stations[0].accessed}.${edition.aid_stations.some((station) => station.carried_over) && edition.carried_over ? ` ${edition.carried_over.reason}` : ""}` }),
+            ),
+          ]
+        : [],
+    ),
   ];
   container.replaceChildren(html("details", {}, html("summary", { text: "Sources" }), html("ul", { class: "sources" }, ...items)));
 }
