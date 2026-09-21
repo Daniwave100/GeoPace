@@ -17,6 +17,7 @@ import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
 import { loadStripSize, saveStripSize } from "./core/strip-size";
+import { shadeLayer } from "./core/shade-layer";
 import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
 import { distanceNumber, formatNearby, type Units, unitName } from "./core/units";
 import { loadWhiteModelChoice, saveWhiteModelChoice, type WhiteModelChoice } from "./core/white-model";
@@ -77,9 +78,16 @@ interface Showing {
 /** How the city's own buildings are getting on for the course that is showing (app/src/bundle/white-model.ts). */
 type City = { state: "none" } | { state: "loading" } | { state: "drawn"; model: WhiteModel } | { state: "failed"; why: string };
 
-/** The layers a course has. Each later ticket adds its own here, and gets its switch, its rows, its marks and its clause. */
-function layersFor(bundle: CourseBundle): Layer[] {
-  return [hillsLayer(bundle)];
+/**
+ * The layers a course has. Each later ticket adds its own here, and gets its switch, its rows,
+ * its marks and its clause. A layer that has nothing to say for this course — Shade, where nobody
+ * has the city's buildings — leaves itself out, and gets no switch (PLAN.md D47).
+ *
+ * Shade is built from the plan as well as the course, because what it says is where the sun is at
+ * the moment this runner reaches each 10 m of road: a new wave or a new goal is a new layer.
+ */
+function layersFor(bundle: CourseBundle, planner: Planner): Layer[] {
+  return [hillsLayer(bundle), shadeLayer(bundle, planner)].filter((layer) => layer !== null);
 }
 
 const storage = browserStorage();
@@ -231,10 +239,11 @@ async function show(courseId: string): Promise<void> {
 
   showing?.ride.leave(); // a Ride through the course that is going away stops asking for frames
   const course = plannerCourse(bundle);
-  const layers = layersFor(bundle);
+  const planner = createPlanner(course, loadPlan(storage, course));
+  const layers = layersFor(bundle, planner);
   const stops = stopsFor(bundle);
   const rideScene: RideScene = { line: bundle.measured.course_line, stops, notMeasured: bundle.measured.elevation_not_measured };
-  showing = { bundle, course, planner: createPlanner(course, loadPlan(storage, course)), km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, vicinity: vicinityOf(bundle.measured.course_line), ride: startRide(rideScene), city: { state: bundle.measured.white_model ? "loading" : "none" } };
+  showing = { bundle, course, planner, km: 0, layers, screen: onScreen(layerState, layers), baseRow: heightRow(bundle), stops, rideScene, vicinity: vicinityOf(bundle.measured.course_line), ride: startRide(rideScene), city: { state: bundle.measured.white_model ? "loading" : "none" } };
   wasRiding = false;
   wasPlaying = false;
   whiteModel?.show(null); // the last course's buildings go with it
@@ -248,6 +257,8 @@ async function show(courseId: string): Promise<void> {
 function usePlan(plan: RacePlan): void {
   if (!showing) return;
   showing.planner = createPlanner(showing.course, plan);
+  // A layer can rest on the plan as well as on the course: Sun answers "when you get there".
+  showing.layers = layersFor(showing.bundle, showing.planner);
   savePlan(storage, plan);
   showPlan();
 }

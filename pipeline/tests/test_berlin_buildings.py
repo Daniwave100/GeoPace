@@ -158,3 +158,25 @@ def test_a_parsed_block_is_the_shape_the_corridor_expects():
 
     assert all(isinstance(building, Building) for building in standing)
     assert all(building.ring.ndim == 2 and building.ring.shape[1] == 2 for building in standing)
+
+class TestAServiceThatSaysNo:
+    """A WFS answers a query it doesn't like with HTTP 200 and an exception document. Read as an
+    empty answer, that would be "no buildings here" — cached for good, with the shade worked out
+    from a city with a hole in it. The height filter the wide bands use is exactly the kind of
+    query a service rejects."""
+
+    REFUSAL = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1" version="2.0.0">'
+        '<ows:Exception exceptionCode="InvalidParameterValue" locator="FILTER">'
+        "<ows:ExceptionText>Unknown property name hoehe</ows:ExceptionText>"
+        "</ows:Exception></ows:ExceptionReport>"
+    )
+
+    def test_a_refusal_is_not_an_empty_answer(self):
+        with pytest.raises(ValueError, match="without a numberReturned"):
+            berlin_buildings._count(self.REFUSAL, "numberReturned")
+
+    def test_a_real_answer_still_counts(self):
+        page = '<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" numberReturned="7" numberMatched="7"/>'
+        assert berlin_buildings._count(page, "numberReturned") == 7

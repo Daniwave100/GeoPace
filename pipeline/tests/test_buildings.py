@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from geopace.buildings import Building, BuildingsModel, buildings_along, corridor_boxes, simplify_ring, surface_height_m
+from geopace.buildings import Building, BuildingsModel, buildings_along, corridor_boxes, distance_to_the_road, simplify_ring
 from geopace.provenance import Attribution, Source
 
 EARTH_RADIUS_M = 6_371_008.8
@@ -41,41 +41,6 @@ def synthetic_buildings(buildings: list[Building]) -> BuildingsModel:
         source=Source(id="synthetic-buildings", title="Synthetic buildings", url="https://example.org/buildings", licence="test data", accessed="2026-09-19"),
         attribution=Attribution(text="Synthetic buildings", url="https://example.org/buildings"),
     )
-
-
-class TestSurfaceHeight:
-    """The surface the White model is drawn from and shade (#9) will be measured against."""
-
-    def test_a_point_inside_a_footprint_reads_the_roof(self):
-        # A 20 m square on ground 30 m above sea level, 12 m tall: its roof is at 42 m.
-        building = square("b1", 52.5, 13.4, side_m=20, ground_m=30.0, height_m=12.0)
-        surface = surface_height_m([building], np.array([52.5]), np.array([13.4]), ground_m=np.array([30.0]))
-        assert surface == pytest.approx([42.0])
-
-    def test_a_point_outside_every_footprint_reads_the_ground(self):
-        building = square("b1", 52.5, 13.4, side_m=20, ground_m=30.0, height_m=12.0)
-        # 100 m north of it, well clear of the 20 m square.
-        lat = 52.5 + math.degrees(100 / EARTH_RADIUS_M)
-        surface = surface_height_m([building], np.array([lat]), np.array([13.4]), ground_m=np.array([30.0]))
-        assert surface == pytest.approx([30.0])
-
-    def test_the_taller_of_two_overlapping_buildings_wins(self):
-        low = square("low", 52.5, 13.4, side_m=40, ground_m=30.0, height_m=8.0)
-        high = square("high", 52.5, 13.4, side_m=10, ground_m=30.0, height_m=25.0)
-        surface = surface_height_m([low, high], np.array([52.5]), np.array([13.4]), ground_m=np.array([30.0]))
-        assert surface == pytest.approx([55.0])
-
-    def test_a_building_on_higher_ground_is_measured_from_its_own_ground(self):
-        """Two identical blocks, one on a 30 m hill: the surface follows the ground under each."""
-        low = square("low", 52.5, 13.4, side_m=20, ground_m=0.0, height_m=10.0)
-        high = square("high", 52.6, 13.4, side_m=20, ground_m=30.0, height_m=10.0)
-        surface = surface_height_m([low, high], np.array([52.5, 52.6]), np.array([13.4, 13.4]), ground_m=np.array([0.0, 30.0]))
-        assert surface == pytest.approx([10.0, 40.0])
-
-    def test_no_buildings_leaves_the_ground_alone(self):
-        ground = np.array([12.0, 13.0])
-        surface = surface_height_m([], np.array([52.5, 52.6]), np.array([13.4, 13.4]), ground_m=ground)
-        assert surface == pytest.approx(ground)
 
 
 class TestCorridor:

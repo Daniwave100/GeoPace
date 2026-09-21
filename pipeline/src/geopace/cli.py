@@ -1,14 +1,15 @@
 """Command line: `uv run geopace build <course>` rebuilds data/derived/<course>/ from raw inputs."""
 
 import argparse
+import datetime as dt
 import hashlib
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from geopace import berlin_buildings, berlin_dgm1, berlin_dom1, geoid_egm2008, nyc_buildings, nyc_dem, nyc_lidar, white_model
-from geopace.buildings import BuildingsModel
+from geopace import berlin_buildings, berlin_dgm1, berlin_dom1, geoid_egm2008, nyc_buildings, nyc_dem, nyc_lidar, shade, white_model
+from geopace.buildings import DEFAULT_CORRIDOR_M, BuildingsModel
 from geopace.bundle import build_course_bundle, validate_bundle, write_bundle
 from geopace.cache import cache_dir, download
 from geopace.course_facts import CourseFacts, load_course_facts
@@ -82,6 +83,7 @@ def build(course_id: str) -> Path:
         buildings = data.buildings()
         model = white_model.build_white_model(bundle, buildings, geoid=geoid)
         white_model.note_in_bundle(bundle, model, buildings)
+        build_shade(bundle, buildings, editions)
         validate_bundle(bundle)
         white_out = out.parent / white_model.FILE_NAME
         white_model.write_white_model(model, white_out)
@@ -103,6 +105,29 @@ def build(course_id: str) -> Path:
     )
     print(f"  wrote {out.relative_to(REPO)} ({out.stat().st_size / 1024:.0f} KB)")
     return out
+
+
+def build_shade(bundle: dict, buildings: BuildingsModel, editions) -> None:
+    """Which 10 m of road has the sun on it, every five minutes of race day (#9).
+
+    The shade is worked out from a wider set of the same buildings than the White model draws —
+    a tall building reaches the course from far outside the drawn corridor (PLAN.md D58) — and
+    that set is never written anywhere: what the app gets is one bit per sample and step.
+
+    The table is for the latest edition's race day. The app checks the day before it uses it.
+    """
+    line = bundle["measured"]["course_line"]
+    lat, lon, elevation_m = line["lat"], line["lon"], line["elevation_m"]
+    day = dt.date.fromisoformat(max(editions, key=lambda edition: edition.edition).date.day)
+    for_shade = shade.shade_buildings(lat, lon, elevation_m, buildings)
+    table = shade.shade_table(lat, lon, elevation_m, for_shade, day=day, timezone=bundle["course"]["timezone"])
+    shade.note_in_bundle(bundle, table, buildings, counted=len(for_shade), corridor_m=DEFAULT_CORRIDOR_M, furthest_m=shade.FURTHEST_M)
+    in_sun = table.in_sun
+    print(
+        f"  sun: {len(table.steps)} steps of {table.step_minutes} min on {day}, "
+        f"{table.steps[0]:%H:%M} to {table.steps[-1]:%H:%M}, from {len(for_shade)} buildings"
+    )
+    print(f"  shade: {in_sun.mean():.0%} of the course-by-moment table is in the sun; {table.always_in_sun.sum()} samples are never shaded at any hour")
 
 
 def main(argv: list[str] | None = None) -> None:

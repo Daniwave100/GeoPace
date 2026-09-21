@@ -50,6 +50,17 @@ describe("a strip row's trace", () => {
     expect(paths.measured[0].line).toBe("M100.0 77.0L200.0 77.0L200.0 23.0L300.0 23.0");
   });
 
+  it("hangs a two-way row from the middle of itself, where there is no value to mark", () => {
+    // A binary row (Sun) has no zero between its two states. The strip draws a line at a baseline
+    // that is a number, and none at "middle", because a dotted rule across a row reads as the
+    // app's own "not measured here".
+    const binary = { domain: [-1, 1] as [number, number], baseline: "middle" as const, stepped: true };
+    const paths = tracePaths(binary, bins([1, -1, 1]), box);
+
+    expect(paths.baselineY).toBe(50); // the middle of a row 60 tall starting at 20
+    expect(paths.measured[0].area).toContain("50.0"); // the fill hangs from there, both ways
+  });
+
   it("marks how much, bin by bin, from the baseline to the value, and only where the value is measured", () => {
     const grade = { domain: [-4, 4] as [number, number], baseline: 0, stepped: false };
     const paths = tracePaths(grade, bins([2, -2, 4, 1], [2]), box, [0.2, -0.2, 0.9, 0]);

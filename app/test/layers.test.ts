@@ -7,6 +7,8 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import { ENCODINGS, type Encoding } from "../src/core/encoding";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
 import { type Layer, NO_LAYERS, onScreen, pressEverything, pressLayer } from "../src/core/layers";
+import { createPlanner, defaultPlan, plannerCourse } from "../src/core/planner";
+import { shadeLayer } from "../src/core/shade-layer";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -14,7 +16,9 @@ const nyc = bundleFor("nyc");
 const berlin = bundleFor("berlin");
 
 /** A stand-in for a layer a later ticket will add, to show the system isn't built around Hills. */
-const sun: Layer = { id: "sun", name: "Sun", rows: () => [], lineMarks: () => [], lineLabels: () => [], clause: () => ({ text: "In the sun for 55 to 80% of this stretch.", encoding: "measured" }) };
+const wind: Layer = { id: "wind", name: "Wind", rows: () => [], lineMarks: () => [], lineLabels: () => [], clause: () => ({ text: "Crosswind from your left.", encoding: "measured" }) };
+/** Shade, the second layer there really is: built from the course and from one runner's plan (#9). */
+const shade = shadeLayer(nyc, createPlanner(plannerCourse(nyc), defaultPlan(plannerCourse(nyc))))!;
 
 describe("the layer switches", () => {
   it("start with nothing on: the first screen shows little", () => {
@@ -28,8 +32,21 @@ describe("the layer switches", () => {
   });
 
   it("keep one layer on at a time: pressing another swaps it", () => {
-    const swapped = pressLayer(pressLayer(NO_LAYERS, "hills"), "sun");
-    expect(swapped.active).toBe("sun");
+    const swapped = pressLayer(pressLayer(NO_LAYERS, "hills"), "shade");
+    expect(swapped.active).toBe("shade");
+  });
+
+  it("only exist for layers the course has: no buildings, no Shade switch", () => {
+    const noBuildings = structuredClone(nyc);
+    delete noBuildings.measured.sun;
+    const course = plannerCourse(noBuildings);
+
+    expect(layersFor(noBuildings).map((layer) => layer.id)).toEqual(["hills"]);
+    expect(layersFor(nyc).map((layer) => layer.id)).toEqual(["hills", "shade"]);
+
+    function layersFor(bundle: typeof nyc): Layer[] {
+      return [hillsLayer(bundle), shadeLayer(bundle, createPlanner(plannerCourse(bundle), defaultPlan(course)))].filter((layer) => layer !== null);
+    }
   });
 
   it("leave the layer alone when Show everything is pressed, and the other way round", () => {
@@ -41,7 +58,7 @@ describe("the layer switches", () => {
 });
 
 describe("what a layer puts on screen", () => {
-  const layers = [hillsLayer(nyc), sun];
+  const layers = [hillsLayer(nyc), shade, wind];
 
   it("is nothing at all while no layer is on", () => {
     const screen = onScreen(NO_LAYERS, layers);
@@ -67,14 +84,15 @@ describe("what a layer puts on screen", () => {
   });
 
   it("shows only the layer that is on", () => {
-    const screen = onScreen(pressLayer(NO_LAYERS, "sun"), layers);
-    expect(screen.rows).toEqual([]);
-    expect(screen.clause(24.5, "km")?.text).toMatch(/In the sun/);
+    const screen = onScreen(pressLayer(NO_LAYERS, "shade"), layers);
+    expect(screen.rows.map((row) => row.name)).toEqual(["Shade"]);
+    // What it says is Sun's own business (sun.test.ts); that it says something here is this test's.
+    expect(screen.clause(24.5, "km")?.text).toMatch(/^(In (the sun|shade)|No shade)/);
   });
 
   it("opens every layer's rows with Show everything, without marking the map or lengthening the sentence", () => {
     const screen = onScreen(pressEverything(NO_LAYERS), layers);
-    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort"]);
+    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort", "Shade"]);
     expect(screen.lineMarks).toEqual([]);
     expect(screen.clause(24.5, "km")).toBeNull();
   });

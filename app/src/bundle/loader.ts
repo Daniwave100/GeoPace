@@ -71,7 +71,38 @@ function columnProblems(bundle: CourseBundle): string[] {
     return [`measured.course_line columns have different lengths (${lengths.join(", ")})`];
   }
   const i = line.km.findIndex((km, idx) => idx > 0 && km <= line.km[idx - 1]);
-  return i > 0 ? [`measured.course_line.km must increase, but km[${i}] = ${line.km[i]} follows ${line.km[i - 1]}`] : [];
+  if (i > 0) return [`measured.course_line.km must increase, but km[${i}] = ${line.km[i]} follows ${line.km[i - 1]}`];
+  return sunProblems(bundle, line.km.length);
+}
+
+/**
+ * The sun table is read by indexing into its bits (core/sun.ts), and an index past the end of a
+ * Uint8Array is `undefined`, which reads as 0, which reads as "in shade". So a truncated or
+ * mis-strided table would draw a made-up sun and shade over the whole course, as measured fact.
+ * These are the same four things the pipeline checks before it writes one (bundle.py).
+ */
+function sunProblems(bundle: CourseBundle, samples: number): string[] {
+  const sun = bundle.measured.sun;
+  if (!sun) return [];
+  const problems: string[] = [];
+  if (sun.samples !== samples) problems.push(`measured.sun covers ${sun.samples} samples but the course line has ${samples}`);
+  for (const name of ["altitude_deg", "azimuth_deg"] as const) {
+    if (sun[name].length !== sun.steps) problems.push(`measured.sun.${name} has ${sun[name].length} values for ${sun.steps} steps`);
+  }
+  if (sun.bytes_per_sample !== Math.ceil(sun.steps / 8)) {
+    problems.push(`measured.sun.bytes_per_sample is ${sun.bytes_per_sample}, but ${sun.steps} steps need ${Math.ceil(sun.steps / 8)}`);
+  }
+  const bytes = bytesInBase64(sun.in_sun);
+  if (bytes !== sun.samples * sun.bytes_per_sample) {
+    problems.push(`measured.sun.in_sun is ${bytes} bytes, but ${sun.samples} samples of ${sun.bytes_per_sample} bytes need ${sun.samples * sun.bytes_per_sample}`);
+  }
+  return problems;
+}
+
+/** How many bytes a base64 string stands for, without decoding it. */
+function bytesInBase64(text: string): number {
+  const padding = text.endsWith("==") ? 2 : text.endsWith("=") ? 1 : 0;
+  return Math.floor((text.length / 4) * 3) - padding;
 }
 
 function describe(error: ErrorObject): string {

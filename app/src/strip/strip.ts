@@ -274,7 +274,8 @@ function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, heig
   const paths = tracePaths(row, bins, { x, top, height }, row.howMuch?.(binCount));
   const solid = ENCODINGS[row.encoding].cssClass;
   const gap = ENCODINGS["not-measured"].cssClass;
-  if (row.baseline !== "bottom") group.append(svg("line", { x1: x(bins[0].startKm), x2: x(bins[bins.length - 1].endKm), y1: paths.baselineY, y2: paths.baselineY, class: "strip-baseline" }));
+  // Only a value the runner can read against is drawn; a two-way row's own middle is not one.
+  if (typeof row.baseline === "number") group.append(svg("line", { x1: x(bins[0].startKm), x2: x(bins[bins.length - 1].endKm), y1: paths.baselineY, y2: paths.baselineY, class: "strip-baseline" }));
   for (const block of paths.noValue) group.append(svg("rect", { x: block.x, y: top + 2, width: block.width, height: height - 4, class: `${gap} trace-block` }));
   for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }));
   // How much, as well as where: filled from the same ramps as the marks on the map, so a hill is the same colour on both.

@@ -94,6 +94,44 @@
             "corridor_m": { "description": "How far either side of the course a building had to be to be kept.", "type": "number", "exclusiveMinimum": 0 }
           }
         },
+        "sun": {
+          "description": "Where the sun is through race day, and whether it reaches each course sample at the moment a runner gets there. Binary, never a share: a 10 m sample either has direct sun on it at that moment or it hasn't (PLAN.md D58). Absent for a course nobody has building data for, and then the app has no Sun layer. Only the steps whose sun stands at least floor_deg over `reference` are here — all of race day worth modelling, not only the race window, so a runner who types in their own start time is answered too. Outside those steps the app says the sun is down, or that it is too low to reach a city street, stated rather than worked out.",
+          "type": "object",
+          "required": ["step_minutes", "first_step", "steps", "samples", "floor_deg", "reference", "altitude_deg", "azimuth_deg", "bytes_per_sample", "in_sun", "buildings"],
+          "additionalProperties": false,
+          "properties": {
+            "step_minutes": { "description": "How far apart the steps are, in minutes.", "type": "number", "exclusiveMinimum": 0 },
+            "first_step": {
+              "description": "The first step, ISO-8601 with its UTC offset in the course's time zone. The steps are evenly spaced in real time, so step t is this plus t * step_minutes.",
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$"
+            },
+            "steps": { "description": "How many steps the table holds.", "type": "integer", "minimum": 1 },
+            "samples": { "description": "How many course samples it holds: one row per course_line sample, in the same order.", "type": "integer", "minimum": 2 },
+            "floor_deg": { "description": "The lowest sun shade was worked out for. Below it a city street is in shadow whatever anyone computes, so no step under it is here.", "type": "number", "exclusiveMinimum": 0 },
+            "reference": { "description": "Where altitude_deg and azimuth_deg are worked out: the start line. The table itself uses the sun at each sample's own place, a fifth of a degree away over 20 km of city.", "$ref": "#/$defs/position" },
+            "altitude_deg": { "description": "The sun's height over the reference place at each step, in degrees.", "type": "array", "minItems": 1, "items": { "type": "number" } },
+            "azimuth_deg": { "description": "The sun's bearing at each step, degrees clockwise from true north.", "type": "array", "minItems": 1, "items": { "type": "number" } },
+            "bytes_per_sample": { "description": "How many bytes one sample's row of steps takes: steps rounded up to a whole byte.", "type": "integer", "minimum": 1 },
+            "in_sun": {
+              "description": "One bit per sample and step, base64. Sample-major, so each sample's row starts on a byte: sample i at step t is bit (7 - t % 8) of byte i * bytes_per_sample + t // 8, and 1 means the sun reaches it. The spare bits at the end of a row are 0.",
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+            },
+            "buildings": {
+              "description": "What the shade was worked out from. A wider set than the White model draws and never shipped: a tall building reaches the course from far outside the drawn corridor, so beyond `within_m` a building is kept only if its height is at least its distance divided by `reach_per_meter`.",
+              "type": "object",
+              "required": ["counted", "within_m", "furthest_m", "reach_per_meter"],
+              "additionalProperties": false,
+              "properties": {
+                "counted": { "description": "How many buildings could reach the course at all.", "type": "integer", "minimum": 0 },
+                "within_m": { "description": "Inside this, every building was kept whatever its height.", "type": "number", "exclusiveMinimum": 0 },
+                "furthest_m": { "description": "Nothing further away than this was asked for.", "type": "number", "exclusiveMinimum": 0 },
+                "reach_per_meter": { "description": "How far a metre of building reaches at the floor: 1 / tan(floor_deg).", "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          }
+        },
         "difficulty_model": {
           "description": "The published model behind course_line.difficulty.",
           "type": "object",

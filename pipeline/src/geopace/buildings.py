@@ -12,9 +12,9 @@ A building here is a block: one flat roof over one outline. That is what a white
 is as tall as the ridge, so its shadow is as long as the ridge's and its eaves are a little too
 low; the source note on each city's data says which height the city publishes.
 
-`surface_height_m` is the surface itself: how high the city is at a place, roof or ground. The
-White model's geometry is drawn from the same buildings, so the shadows on screen and the shade
-numbers a later ticket works out (#9) can't disagree.
+These same blocks are what shade is worked out from (shade.py), which is why the shadows on
+screen and the numbers on the strip can't disagree — a test re-derives the shade from the
+committed White model and checks it against the committed table.
 """
 
 import hashlib
@@ -60,27 +60,13 @@ class Building:
 class BuildingsModel:
     """One city's building data, as the pipeline reads it."""
 
-    # (south, west, north, east) degrees -> every building whose outline meets that box.
-    within: Callable[[float, float, float, float], list[Building]]
+    # (south, west, north, east) degrees, and the least height above its own ground a building
+    # must have -> every building whose outline meets that box. Shade asks for a wide band of
+    # city and only the buildings in it tall enough to reach the course (shade.py); both cities'
+    # services do that filtering themselves, so what isn't wanted is never downloaded.
+    within: Callable[..., list[Building]]
     source: Source
     attribution: Attribution
-
-
-def surface_height_m(buildings: list[Building], lat, lon, ground_m) -> np.ndarray:
-    """How high the city stands at each place: the tallest roof over it, or the ground.
-
-    `ground_m` is the bare-earth height at each place, in meters above sea level, and is what
-    comes back wherever no building stands. This is the surface building shade is measured
-    against (#9) and the one the White model's blocks are built from.
-    """
-    lat = np.atleast_1d(np.asarray(lat, dtype=float))
-    lon = np.atleast_1d(np.asarray(lon, dtype=float))
-    surface = np.array(np.broadcast_to(np.asarray(ground_m, dtype=float), lat.shape), dtype=float)
-    for building in buildings:
-        inside = inside_ring(building.ring, lat, lon)
-        if inside.any():
-            surface[inside] = np.maximum(surface[inside], building.roof_m)
-    return surface
 
 
 def inside_ring(ring: np.ndarray, lat, lon) -> np.ndarray:
@@ -143,16 +129,25 @@ def buildings_along(lat, lon, model: BuildingsModel, corridor_m: float = DEFAULT
 
 def near_the_road(ring: np.ndarray, road_lat: np.ndarray, road_lon: np.ndarray, corridor_m: float) -> bool:
     """Whether any of these road samples is within `corridor_m` of the outline (or inside it)."""
+    return distance_to_the_road(ring, road_lat, road_lon) <= corridor_m
+
+
+def distance_to_the_road(ring: np.ndarray, road_lat: np.ndarray, road_lon: np.ndarray) -> float:
+    """Metres from the outline to the nearest of these road samples; 0 where the road is inside it.
+
+    The distance is to the outline itself, not to the middle of the building: a block a hundred
+    metres deep whose front wall is on the pavement is one the runner sees, and one whose shadow
+    falls on the road.
+    """
     if inside_ring(ring, road_lat, road_lon).any():
-        return True
+        return 0.0
     middle_lat = float(road_lat.mean())
     road_x, road_y = _meters_from(middle_lat, road_lat, road_lon)
     ring_x, ring_y = _meters_from(middle_lat, ring[:, 1], ring[:, 0])
-    limit = corridor_m**2
+    closest = np.inf
     for i in range(len(ring_x)):
-        if (_distance_squared_to_segment(road_x, road_y, ring_x[i - 1], ring_y[i - 1], ring_x[i], ring_y[i]) <= limit).any():
-            return True
-    return False
+        closest = min(closest, float(_distance_squared_to_segment(road_x, road_y, ring_x[i - 1], ring_y[i - 1], ring_x[i], ring_y[i]).min()))
+    return float(np.sqrt(closest))
 
 
 def _distance_squared_to_segment(x, y, x1: float, y1: float, x2: float, y2: float) -> np.ndarray:
@@ -249,7 +244,7 @@ class BoxesNotCached(FileNotFoundError):
     """Downloads were turned off and some of the corridor isn't in the cache."""
 
 
-def cached_pages(folder: Path, box: tuple[float, float, float, float], suffix: str, url_for: Callable[[int], str], count_in: Callable[[str], int], allow_download: bool) -> list[str]:
+def cached_pages(folder: Path, box: tuple[float, float, float, float], suffix: str, url_for: Callable[[int], str], count_in: Callable[[str], int], allow_download: bool, min_height_m: float = 0.0) -> list[str]:
     """Every page of one city's answer for one box, kept on disk. Delete the folder to refresh.
 
     Both cities' services answer a box a page at a time, and differ only in how they are asked
@@ -257,11 +252,13 @@ def cached_pages(folder: Path, box: tuple[float, float, float, float], suffix: s
     the page beginning at `start`, and `count_in` reads that page's own count out of it. The
     reading stops at the first page that isn't full.
 
-    A box is named after itself, so moving the course fetches fresh boxes and leaves the old
-    files to be deleted rather than silently reusing them.
+    A box is named after itself — and after the least height asked for, so the wide bands shade
+    is worked out from never come back as the corridor's own answer — so moving the course
+    fetches fresh boxes and leaves the old files to be deleted rather than silently reusing them.
     """
     south, west, north, east = box
-    name = hashlib.sha1(f"{south:.6f},{west:.6f},{north:.6f},{east:.6f}".encode()).hexdigest()[:12]
+    key = f"{south:.6f},{west:.6f},{north:.6f},{east:.6f}" + (f",h>{min_height_m:.1f}" if min_height_m > 0 else "")
+    name = hashlib.sha1(key.encode()).hexdigest()[:12]
     pages: list[str] = []
     start = 0
     while True:

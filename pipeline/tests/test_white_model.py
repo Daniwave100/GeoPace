@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from geopace.buildings import Building, inside_ring, near_the_road, surface_height_m
+from geopace.buildings import inside_ring, near_the_road
 from geopace.white_model import FILE_NAME, SCHEMA_VERSION, WhiteModelInvalid, validate_white_model
 
 REPO = Path(__file__).parents[2]
@@ -124,33 +124,9 @@ def test_every_block_really_is_within_the_corridor_of_the_course(course):
         assert near_the_road(ring, lat, lon, reach_m), f"block {i} of {course} is outside the corridor"
 
 
-@pytest.mark.parametrize("course", COURSES)
-def test_the_blocks_on_screen_and_the_surface_shade_will_read_are_the_same_thing(course):
-    """The ticket's own requirement: the geometry the app draws comes from the surface #9 will
-    measure shade against. They are the same blocks, and this is what says so — read the file
-    back as buildings, ask the surface how high the city stands over each one's own middle, and
-    it has to answer that block's roof, or something taller standing over it."""
-    model = committed(course, FILE_NAME)
-    blocks = model["buildings"]
-    buildings = [
-        Building(id=str(i), ring=ring_of(model, i), ground_m=base, roof_m=roof)
-        for i, (base, roof) in enumerate(zip(blocks["base_m"], blocks["roof_m"]))
-    ]
-
-    checked = 0
-    for i in range(0, len(buildings), 500):
-        middle = buildings[i].ring.mean(axis=0)
-        lat, lon = np.array([middle[1]]), np.array([middle[0]])
-        if not inside_ring(buildings[i].ring, lat, lon)[0]:
-            continue  # a middle outside its own outline: an L-shaped block, not this test's business
-        # Everything within a block's own width can reach over it; nothing else can.
-        near = [b for b in buildings if abs(b.ring[0][0] - middle[0]) < 0.002 and abs(b.ring[0][1] - middle[1]) < 0.002]
-        surface = surface_height_m(near, lat, lon, ground_m=np.array([buildings[i].ground_m]))
-
-        assert surface[0] >= buildings[i].roof_m - 1e-6, f"block {i} of {course} is not in the surface over itself"
-        assert surface[0] == pytest.approx(max(b.roof_m for b in near if inside_ring(b.ring, lat, lon)[0]))
-        checked += 1
-    assert checked > 20  # the sampling actually looked at something
+# Whether the blocks on screen cast the shade the numbers claim is checked where both live:
+# tests/test_shade.py works the shade out again from this very file and holds it against the
+# table the app reads.
 
 
 @pytest.mark.parametrize("course", COURSES)

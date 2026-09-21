@@ -90,6 +90,12 @@ export interface Planner {
   /** The moment this runner's race starts. */
   startInstant: Date;
   at(km: number): Readout;
+  /**
+   * Just the moment the runner reaches `km`, without the words that go round it. The Shade layer
+   * asks this for every one of four thousand samples whenever the plan changes; `at` would build
+   * a time of day and a zone name for each.
+   */
+  instantAtKm(km: number): Date;
   /** The other direction: the km the runner has reached at that moment (0 before the start). */
   kmAtInstant(instant: Date): number;
   /**
@@ -144,6 +150,7 @@ export function createPlanner(course: PlannerCourse, plan: RacePlan): Planner {
     startInstant: clock.startInstant,
     kmAtInstant: (instant) => clock.kmAtElapsedSeconds((instant.getTime() - clock.startInstant.getTime()) / 1000),
     at,
+    instantAtKm: clock.instantAtKm,
     splits(stepKm) {
       // Marks are counted (1, 2, 3 steps), not added up, so a long table never drifts off them.
       const marks = Math.floor(clock.lineLengthKm / stepKm + ON_THE_MARK);

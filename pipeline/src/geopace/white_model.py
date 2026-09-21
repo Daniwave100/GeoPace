@@ -25,6 +25,7 @@ import numpy as np
 
 from geopace import __version__
 from geopace.buildings import DEFAULT_CORRIDOR_M, Building, BuildingsModel, buildings_along, simplify_ring
+from geopace.bundle import credit
 from geopace.elevation import GeoidModel
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schema" / "white-model.schema.json"
@@ -82,8 +83,7 @@ def note_in_bundle(bundle: dict, model: dict, buildings: BuildingsModel) -> None
         "buildings": len(model["buildings"]["ring"]),
         "corridor_m": model["corridor_m"],
     }
-    bundle["sources"].append(buildings.source.to_json())
-    bundle["attributions"].append(buildings.attribution.to_json())
+    credit(bundle, buildings.source, buildings.attribution)
 
 
 def _blocks_json(found: list[Building], geoid: GeoidModel) -> dict:

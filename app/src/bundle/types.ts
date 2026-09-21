@@ -30,6 +30,12 @@ export interface CourseBundle {
      * bundle carries the credits for it, so they can be shown before the geometry arrives.
      */
     white_model?: { file: string; buildings: number; corridor_m: number };
+    /**
+     * Where the sun is through race day, and whether it reaches each course sample at the moment
+     * a runner gets there: the Shade layer's data (app/src/core/sun.ts). Binary, never a share.
+     * Absent for a course nobody has building data for, and then there is no Shade layer.
+     */
+    sun?: SunBlock;
     difficulty_model: {
       name: string;
       description: string;
@@ -40,6 +46,31 @@ export interface CourseBundle {
   };
   sources: { id: string; title: string; url: string; licence: string; accessed: string; note?: string }[];
   attributions: { text: string; url: string }[];
+}
+
+/**
+ * The sun table. `in_sun` is one bit per sample and step, base64: sample-major, so sample i at
+ * step t is bit (7 - t % 8) of byte i * bytes_per_sample + t // 8, and 1 means the sun reaches
+ * it. Only the steps whose sun stands at least `floor_deg` over `reference` are here; outside
+ * them the app says the sun is down, or that it is too low to reach a street, rather than
+ * pretending to have worked shade out.
+ */
+export interface SunBlock {
+  step_minutes: number;
+  /** The first step, ISO-8601 with its offset. The rest are evenly spaced after it. */
+  first_step: string;
+  steps: number;
+  /** One row per course_line sample, in the same order. */
+  samples: number;
+  floor_deg: number;
+  /** Where altitude_deg and azimuth_deg are worked out: the start line. */
+  reference: { lat: number; lon: number };
+  altitude_deg: number[];
+  azimuth_deg: number[];
+  bytes_per_sample: number;
+  in_sun: string;
+  /** What the shade was worked out from: a wider set of buildings than the White model draws. */
+  buildings: { counted: number; within_m: number; furthest_m: number; reach_per_meter: number };
 }
 
 /**
