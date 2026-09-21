@@ -71,7 +71,12 @@ function columnProblems(bundle: CourseBundle): string[] {
     return [`measured.course_line columns have different lengths (${lengths.join(", ")})`];
   }
   const i = line.km.findIndex((km, idx) => idx > 0 && km <= line.km[idx - 1]);
-  return i > 0 ? [`measured.course_line.km must increase, but km[${i}] = ${line.km[i]} follows ${line.km[i - 1]}`] : [];
+  if (i > 0) return [`measured.course_line.km must increase, but km[${i}] = ${line.km[i]} follows ${line.km[i - 1]}`];
+  const sun = bundle.measured.sun;
+  if (sun && sun.samples !== line.km.length) {
+    return [`measured.sun covers ${sun.samples} samples but the course line has ${line.km.length}`];
+  }
+  return [];
 }
 
 function describe(error: ErrorObject): string {
