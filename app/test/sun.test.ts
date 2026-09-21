@@ -14,7 +14,7 @@ import type { CourseBundle, Edition } from "../src/bundle/types";
 import { createPlanner, type Goal, plannerCourse, type RacePlan } from "../src/core/planner";
 import { sunPosition } from "../src/core/solar";
 import { readSunTable, sunAlong } from "../src/core/sun";
-import { sunLayer } from "../src/core/sun-layer";
+import { shadeLayer } from "../src/core/shade-layer";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -153,20 +153,19 @@ describe("the moment the runner gets there", () => {
   });
 });
 
-describe("the Sun layer", () => {
-  const layerFor = (bundle: CourseBundle) => sunLayer(bundle, plannerFor(bundle, firstWavePlan(bundle)))!;
+describe("the Shade layer", () => {
+  const layerFor = (bundle: CourseBundle) => shadeLayer(bundle, plannerFor(bundle, firstWavePlan(bundle)))!;
 
-  it("puts two rows on the strip: where the sun is when you get there, and what has no shade at all", () => {
-    const [now, allDay] = layerFor(nyc).rows();
+  it("puts one row on the strip: where the sun is on the road when you get there", () => {
+    // One row, not two: the owner had the time-independent one taken out on 09-21. What it said
+    // is still in the sentence, where it is true.
+    const rows = layerFor(nyc).rows();
 
-    expect(now.name).toBe("Sun");
-    expect(now.scale("km")).toBe("sun above the line, shade below");
-    expect(allDay.name).toBe("All-day sun");
-    expect(allDay.scale("km")).toBe("in the sun at every hour we model");
+    expect(rows.map((row) => row.name)).toEqual(["Shade"]);
+    expect(rows[0].scale("km")).toBe("when you get there");
     // The Verrazzano, four minutes in for a four-hour runner: open water and an open sky.
-    expect(now.valueAt(1.5, "km")).toEqual({ text: "In the sun", notMeasured: null });
-    expect(allDay.valueAt(1.5, "km").text).toBe("Sun all day");
-    expect(allDay.valueAt(27, "km").text).toBe("Some shade");
+    expect(rows[0].valueAt(1.5, "km")).toEqual({ text: "In the sun", notMeasured: null });
+    expect(rows[0].valueAt(27, "km").text).toBe("In shade");
   });
 
   it("draws nothing dashed on a course where everything is measured", () => {
@@ -174,20 +173,17 @@ describe("the Sun layer", () => {
     // its strip may be dashed or grey. The Sun row hangs from the middle of itself rather than
     // from a value, because a dotted rule across a row reads as "not measured here" (the owner
     // asked what it was, 09-21).
-    const [now, allDay] = layerFor(berlin).rows();
+    const [row] = layerFor(berlin).rows();
 
-    expect(now.baseline).toBe("middle");
-    expect(allDay.baseline).toBe("bottom");
-    for (const row of [now, allDay]) {
-      expect(row.bins(400).every((bin) => bin.measured && bin.value !== null)).toBe(true);
-    }
+    expect(row.baseline).toBe("middle");
+    expect(row.bins(400).every((bin) => bin.measured && bin.value !== null)).toBe(true);
     expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding === "measured")).toBe(true);
   });
 
   it("says what the numbers rest on, where the numbers are", () => {
-    const [now] = layerFor(berlin).rows();
+    const [row] = layerFor(berlin).rows();
 
-    expect(now.summary?.("km")).toBe("clear sky, buildings only");
+    expect(row.summary?.("km")).toBe("clear sky, no trees");
     expect(layerFor(berlin).key).toMatch(/clear sky/i);
     expect(layerFor(berlin).key).toMatch(/trees are not in yet/i);
   });
@@ -216,7 +212,7 @@ describe("the Sun layer", () => {
     expect(layer.clause(27, "mi")?.text).toMatch(/(ft|mi)\./);
     // At the very end of a stretch there is no distance worth printing, and none is printed.
     const course = madeUpCourse();
-    const atTheEdge = sunLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const atTheEdge = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 } }))!;
     expect(atTheEdge.clause(0.49, "km")?.text).toBe("No shade, at any hour.");
     // And nowhere along either real course does it come out as a distance of nothing.
     for (const bundle of [berlin, nyc]) {
@@ -225,12 +221,12 @@ describe("the Sun layer", () => {
     }
     // Every clause here rests on a start time carried over from 2025, and says so.
     expect(layer.clause(27, "km")?.carriedOver).toBe(true);
-    expect(sunLayer(berlin, plannerFor(berlin, firstWavePlan(berlin)))!.clause(27, "km")?.carriedOver).toBe(false);
+    expect(shadeLayer(berlin, plannerFor(berlin, firstWavePlan(berlin)))!.clause(27, "km")?.carriedOver).toBe(false);
   });
 
   it("greys what it didn't work out, on the strip, on the map and in words", () => {
     const course = madeUpCourse();
-    const layer = sunLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "09:30", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const layer = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "09:30", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
     const clause = layer.clause(1.0, "km");
 
     expect(clause?.encoding).toBe("not-measured");
@@ -244,7 +240,7 @@ describe("the Sun layer", () => {
     const noBuildings = structuredClone(berlin);
     delete noBuildings.measured.sun;
 
-    expect(sunLayer(noBuildings, plannerFor(noBuildings, firstWavePlan(noBuildings)))).toBeNull();
+    expect(shadeLayer(noBuildings, plannerFor(noBuildings, firstWavePlan(noBuildings)))).toBeNull();
   });
 });
 

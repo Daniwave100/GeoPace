@@ -12,7 +12,7 @@ import type { Encoding } from "./encoding";
 import type { Units } from "./units";
 
 /** Every layer GeoPace will have (PLAN.md D35). The ones that exist are listed once, in `main.ts`. */
-export type LayerId = "hills" | "sun" | "wind" | "aid" | "crowds" | "bottlenecks" | "watch-trouble";
+export type LayerId = "hills" | "shade" | "wind" | "aid" | "crowds" | "bottlenecks" | "watch-trouble";
 
 export interface Layer {
   id: LayerId;

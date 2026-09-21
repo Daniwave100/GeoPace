@@ -17,7 +17,7 @@ import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
 import { loadStripSize, saveStripSize } from "./core/strip-size";
-import { sunLayer } from "./core/sun-layer";
+import { shadeLayer } from "./core/shade-layer";
 import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
 import { distanceNumber, formatNearby, type Units, unitName } from "./core/units";
 import { loadWhiteModelChoice, saveWhiteModelChoice, type WhiteModelChoice } from "./core/white-model";
@@ -80,14 +80,14 @@ type City = { state: "none" } | { state: "loading" } | { state: "drawn"; model: 
 
 /**
  * The layers a course has. Each later ticket adds its own here, and gets its switch, its rows,
- * its marks and its clause. A layer that has nothing to say for this course — Sun, where nobody
+ * its marks and its clause. A layer that has nothing to say for this course — Shade, where nobody
  * has the city's buildings — leaves itself out, and gets no switch (PLAN.md D47).
  *
- * Sun is built from the plan as well as the course, because what it says is where the sun is at
+ * Shade is built from the plan as well as the course, because what it says is where the sun is at
  * the moment this runner reaches each 10 m of road: a new wave or a new goal is a new layer.
  */
 function layersFor(bundle: CourseBundle, planner: Planner): Layer[] {
-  return [hillsLayer(bundle), sunLayer(bundle, planner)].filter((layer) => layer !== null);
+  return [hillsLayer(bundle), shadeLayer(bundle, planner)].filter((layer) => layer !== null);
 }
 
 const storage = browserStorage();

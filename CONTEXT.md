@@ -177,16 +177,19 @@ _Avoid_: overlay, heat map, toggle (the toggle is only the switch)
 The layer of height, grade, and the effort a grade costs compared with flat ground.
 _Avoid_: elevation layer, profile
 
-**Sun**:
+**Shade**:
 The layer of whether the sun is on the road, at the moment the runner reaches it. Binary, every
 10 m: in the sun, or in a building's shade. Never a share of a kilometre and never a range (D58).
-_Avoid_: shade layer, heat, percentage in sun
+The owner named it Shade rather than Sun on 09-21, so that saying "the Shade layer" can't be
+confused with the sun itself.
+_Avoid_: sun layer, heat, percentage in sun
 
-**All-day sun**:
+**Never shaded**:
 Said of a stretch of road that is in the sun at **every** hour the shade is worked out for: the
-bridges and the wide avenues. A fact about the place, not about one runner's morning, and the Sun
-layer's second row.
-_Avoid_: always sunny, exposure score
+bridges and the wide avenues. A fact about the place, not about one runner's morning. It had a
+row of its own for a day and the owner had it taken out (09-21); it is said in the sentence,
+where it is true, and nowhere else.
+_Avoid_: always sunny, exposure score, all-day sun
 
 **Sun table**:
 The Course Bundle's own answer for the Sun layer: one bit for every course sample and every
