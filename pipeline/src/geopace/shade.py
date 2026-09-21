@@ -46,7 +46,7 @@ import numpy as np
 from geopace.buildings import DEFAULT_CHUNK_M, DEFAULT_CORRIDOR_M, Building, BuildingsModel, corridor_boxes, distance_to_the_road, inside_ring, meters_per_degree
 from geopace.bundle import credit
 from geopace.provenance import Source
-from geopace.sun import day_steps, steps_above, sun_position
+from geopace.sun import day_steps, steps_above
 
 # Where the sun itself comes from. Public domain (a work of the US government), and named in the
 # bundle's own sources so a runner can go and read the equations.
@@ -144,19 +144,19 @@ def shade_table(
     """
     lat, lon = np.asarray(lat, dtype=float), np.asarray(lon, dtype=float)
     reference = (float(lat[0]), float(lon[0]))  # the start line
-    steps, altitude_ref, azimuth_ref = steps_above(day_steps(day, timezone, step_minutes), *reference, floor_deg=floor_deg)
+    # The sun at every sample, for every step of race day it stands above the floor everywhere on
+    # the course. The ephemeris the bundle carries is the start line's own row of that same table.
+    steps, altitude, azimuth = steps_above(day_steps(day, timezone, step_minutes), lat, lon, floor_deg=floor_deg)
     if not steps:
         raise ValueError(f"The sun never reaches {floor_deg:.0f} degrees over ({reference[0]:.4f}, {reference[1]:.4f}) on {day}: there is no shade to work out.")
     _check_evenly_spaced(steps, step_minutes)
-    when = np.array([step.timestamp() for step in steps])
-    altitude, azimuth = sun_position(when[None, :], lat[:, None], lon[:, None])
     return ShadeTable(
         steps=steps,
         step_minutes=step_minutes,
         floor_deg=floor_deg,
         reference=reference,
-        altitude_deg=altitude_ref,
-        azimuth_deg=azimuth_ref,
+        altitude_deg=altitude[0],
+        azimuth_deg=azimuth[0],
         in_sun=sunlit(lat, lon, elevation_m, buildings, altitude, azimuth),
     )
 

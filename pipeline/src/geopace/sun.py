@@ -68,15 +68,22 @@ def day_steps(day: dt.date, timezone: str, step_minutes: int) -> list[dt.datetim
     return [(start.astimezone(dt.UTC) + i * step).astimezone(zone) for i in range(count)]
 
 
-def steps_above(steps: list[dt.datetime], lat: float, lon: float, floor_deg: float) -> tuple[list[dt.datetime], np.ndarray, np.ndarray]:
-    """The steps whose sun stands at least `floor_deg` over this place, with where the sun is.
+def steps_above(steps: list[dt.datetime], lat, lon, floor_deg: float) -> tuple[list[dt.datetime], np.ndarray, np.ndarray]:
+    """The steps whose sun stands at least `floor_deg` over **every** one of these places, and
+    where the sun is at each of them: two (places, steps) arrays of degrees.
 
     Below the floor a city street is in shadow whatever we compute, so those moments are answered
     with "no direct sun", stated rather than worked out (PLAN.md D58), and never reach the table.
+    Every place, not just one: a marathon is 20 km across, and the sun stands a fifth of a degree
+    lower at the far end of it. Asking only at the start line let the last column of New York's
+    table ship a worked-out answer for 4,041 samples whose own sun was under the floor — measured
+    on one side of a five-minute step and stated on the other, for the same 9.9-degree sun.
     """
-    altitude, azimuth = sun_position(np.array([step.timestamp() for step in steps]), lat, lon)
-    high = np.flatnonzero(altitude >= floor_deg)
-    return [steps[i] for i in high], altitude[high], azimuth[high]
+    lat, lon = np.atleast_1d(np.asarray(lat, dtype=float)), np.atleast_1d(np.asarray(lon, dtype=float))
+    when = np.array([step.timestamp() for step in steps])
+    altitude, azimuth = sun_position(when[None, :], lat[:, None], lon[:, None])
+    high = np.flatnonzero(altitude.min(axis=0) >= floor_deg)
+    return [steps[i] for i in high], altitude[:, high], azimuth[:, high]
 
 
 def _hour_angle_deg(when: np.ndarray, century: np.ndarray, lon: np.ndarray) -> np.ndarray:

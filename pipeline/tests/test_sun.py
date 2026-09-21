@@ -100,15 +100,35 @@ def test_the_steps_we_model_are_the_ones_with_the_sun_high_enough():
     compute, so the answer there is stated rather than worked out (PLAN.md D58)."""
     steps, altitude, azimuth = steps_above(day_steps(dt.date(2026, 9, 27), "Europe/Berlin", 5), *BERLIN, floor_deg=10)
 
-    assert len(steps) == len(altitude) == len(azimuth)
+    assert len(steps) == altitude.shape[1] == azimuth.shape[1]
     assert altitude.min() >= 10
     # Berlin's sun clears 10 degrees in the middle of the morning and drops back in the evening,
     # bracketing a race that starts at 08:45 and is over by mid-afternoon.
     assert steps[0].strftime("%H:%M") == "08:15"
     assert steps[-1].strftime("%H:%M") == "17:40"
     # The sun swings from the east, through south at midday, to the west: never backwards.
-    assert np.all(np.diff(azimuth) > 0)
-    assert azimuth[0] < 180 < azimuth[-1]
+    assert np.all(np.diff(azimuth[0]) > 0)
+    assert azimuth[0, 0] < 180 < azimuth[0, -1]
+
+
+def test_the_floor_is_asked_of_every_place_on_the_course_not_just_the_first():
+    """A marathon is 20 km across, and the sun stands lower at the far end of it.
+
+    New York's start line is the southernmost point of its course, and so the sunniest: asked only
+    there, the table's last column shipped a worked-out answer for 4,041 samples whose own sun was
+    under the floor. Asked of every place, the window closes when the *dimmest* end of the course
+    falls under it.
+    """
+    day = day_steps(dt.date(2026, 11, 1), "America/New_York", 5)
+    staten_island, the_bronx = (40.603, -74.065), (40.815, -73.926)
+
+    at_the_start, _, _ = steps_above(day, *staten_island, floor_deg=10)
+    the_whole_course, altitude, _ = steps_above(day, [staten_island[0], the_bronx[0]], [staten_island[1], the_bronx[1]], floor_deg=10)
+
+    assert altitude.shape[0] == 2
+    assert altitude.min() >= 10  # every place, at every step in the table
+    assert len(the_whole_course) < len(at_the_start)
+    assert the_whole_course[-1] < at_the_start[-1]
 
 
 def test_new_yorks_window_is_an_hour_earlier_than_a_summer_clock_would_say():

@@ -129,11 +129,22 @@ def credit(bundle: dict, source: Source, attribution: Attribution | None = None)
 
     The buildings are read twice over — once for the blocks the White model draws, once for the
     wider set shade is worked out from — and a runner should see one entry, not two.
+
+    The same dataset registered twice has to say the same thing both times. Letting the second
+    registration fall silently would publish whichever licence, URL or `accessed:` date happened
+    to run first, for data the other half of the screen rests on.
     """
-    if all(listed["id"] != source.id for listed in bundle["sources"]):
+    listed = next((entry for entry in bundle["sources"] if entry["id"] == source.id), None)
+    if listed is None:
         bundle["sources"].append(source.to_json())
-    if attribution is not None and all(listed["text"] != attribution.text for listed in bundle["attributions"]):
-        bundle["attributions"].append(attribution.to_json())
+    elif listed != source.to_json():
+        raise ValueError(f"Two different sources are both called {source.id!r}: {listed} and {source.to_json()}")
+    if attribution is not None:
+        credited = next((entry for entry in bundle["attributions"] if entry["text"] == attribution.text), None)
+        if credited is None:
+            bundle["attributions"].append(attribution.to_json())
+        elif credited != attribution.to_json():
+            raise ValueError(f"Two different links are both credited as {attribution.text!r}: {credited} and {attribution.to_json()}")
 
 
 def check_length(length_m: float, certified_m: float, traced: bool = False) -> None:

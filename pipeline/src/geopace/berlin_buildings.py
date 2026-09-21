@@ -128,8 +128,18 @@ def _tall_in_the_box(min_x: float, min_y: float, max_x: float, max_y: float, min
 
 
 def _count(text: str, attribute: str) -> int:
+    """How many features a page holds, as the service itself says.
+
+    A WFS answers a query it doesn't like with HTTP 200 and an exception document, which has no
+    count on it at all. Read as zero, that is "there are no buildings here": the build would say
+    so, cache the refusal for good, and work the shade out from a city with a hole in it. So a
+    page without a count is an error, not an empty answer.
+    """
     root = ET.fromstring(text)
-    return int(root.get(attribute, "0"))
+    counted = root.get(attribute)
+    if counted is None:
+        raise ValueError(f"Berlin's building service answered without a {attribute}. It says: {' '.join(text.split())[:300]}")
+    return int(counted)
 
 
 def parse_buildings(pages: list[str]) -> list[tuple[str, np.ndarray, float]]:
