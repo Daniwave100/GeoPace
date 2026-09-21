@@ -56,7 +56,8 @@ WAVE_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 #   tea           tea, hot or cold
 #   refill        a runner's own bottle or hydration pack can be topped up here
 #   own-bottle    a runner's own container, handed in beforehand, is waiting here
-SERVES = ("water", "sports-drink", "gel", "fruit", "tea", "refill", "own-bottle")
+#   medical       medical volunteers and supplies are here
+SERVES = ("water", "sports-drink", "gel", "fruit", "tea", "refill", "own-bottle", "medical")
 
 
 class EditionFactsInvalid(ValueError):

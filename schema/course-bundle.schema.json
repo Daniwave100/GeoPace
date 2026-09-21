@@ -284,7 +284,7 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "enum": ["water", "sports-drink", "gel", "fruit", "tea", "refill", "own-bottle"] }
+          "items": { "enum": ["water", "sports-drink", "gel", "fruit", "tea", "refill", "own-bottle", "medical"] }
         },
         "carried_over": { "description": "Copied from the edition named in the edition's carried_over; the app flags it to the runner.", "type": "boolean" },
         "detail": { "description": "Anything the vocabulary can't hold \u2014 a brand, a sponsor's bottle. Shown, never reasoned about.", "type": "string", "minLength": 1 },
