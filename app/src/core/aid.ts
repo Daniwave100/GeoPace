@@ -2,9 +2,12 @@
 //
 // A station is a *sourced fact*: what the organizer says will be on the road, with the page it
 // came from and the day we read it (PLAN.md D19). Not a measurement and not what runners say —
-// the strongest claim anyone can make about a race that hasn't happened yet. Where it is last
-// year's list, every station says so and the app greys it, exactly as it does a carried-over wave
-// time (D38).
+// the strongest claim anyone can make about a race that hasn't happened yet.
+//
+// Where it is last year's list, the sentence says so and is greyed, as a carried-over wave time is
+// (D38) — but the marks on the map are not. Grey on the course line means *not measured here*, and
+// last year's refreshment list is not an unmeasured value; it is a fact with a date on it. So the
+// date is in the words and in the label's note, and the mark stays what it is.
 //
 // Two numbers, on purpose. `kmMarked` is what the organizer published and what the sign by the
 // road will say; `km` is where that lands on the course line the app measures everything else

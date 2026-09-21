@@ -7,9 +7,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { AidStationFact, CourseBundle } from "../src/bundle/types";
-import { aidLayer, toNextWaterKm } from "../src/core/aid-layer";
+import { aidLayer, furthestWithoutWater, toNextWaterKm } from "../src/core/aid-layer";
 import { type AidStation, aidStations, nextServing, servesInWords } from "../src/core/aid";
 import { checkFueling, type FuelItem, type FuelKind, sanitizeFueling, WATER_WITHIN_KM } from "../src/core/fueling";
+import { somewhereFree } from "../src/plan/fueling-panel";
 import { createPlanner, plannerCourse, type RacePlan } from "../src/core/planner";
 
 const berlin = parseCourseBundle(JSON.parse(readFileSync(new URL("../../data/derived/berlin/course-bundle.json", import.meta.url), "utf8")), "berlin");
@@ -89,6 +90,17 @@ describe("the Aid layer", () => {
     expect(row.valueAt(9.02, "km").text).toBe("water here");
   });
 
+  it("measures its own reach by the water, not by the stations", () => {
+    // The row counts the run to the next *water*, so a list with a gel depot in it — which is
+    // exactly what New York's will be — must not have its scale set by the depot. Otherwise the
+    // trace climbs past the top of the row and the header states a maximum it exceeds.
+    const withADepot = [station(5, ["water"]), station(12, ["gel"]), station(20, ["water"])];
+
+    expect(furthestWithoutWater(withADepot, 42)).toBe(22); // finish to the last water, not 8 to the depot
+    expect(furthestWithoutWater([station(5, ["water"]), station(20, ["water"])], 42)).toBe(22);
+    expect(Math.max(...[10, 16, 30].map((km) => toNextWaterKm(km, withADepot, 42)))).toBeLessThanOrEqual(furthestWithoutWater(withADepot, 42));
+  });
+
   it("counts the run to the finish as thirst once the last station is behind you", () => {
     const stations = [station(5, ["water"])];
 
@@ -106,6 +118,14 @@ describe("the Aid layer", () => {
     expect(layer.clause(41, "km")?.text).toBe("No more aid stations.");
   });
 
+  it("puts the same note on the map label as in the sentence, so the two never disagree", () => {
+    const layer = layerFor(berlin)!;
+    const label = layer.lineLabels().find((mark) => mark.text("km").startsWith("9 km"))!;
+
+    expect(label.note).toBe(layer.clause(9.02, "km")?.note);
+    expect(label.note).toMatch(/Maurten DRINK MIX 160/);
+  });
+
   it("flags a station carried over from last year's list, and says why", () => {
     // New York's will be this, the day somebody copies NYRR's page in: the waves are this year's
     // and the refreshment list is last year's, and the runner is told which is which.
@@ -117,6 +137,9 @@ describe("the Aid layer", () => {
 
     expect(clause.carriedOver).toBe(true);
     expect(clause.note).toContain("This is 2025's list. The 2026 list is not published yet.");
+    // And a reader who can't see the grey hears what was carried over. Not "a start time", which
+    // is what carrying over meant when only a wave time could be carried over.
+    expect(clause.carriedOverSaid).toBe(" (from an earlier edition's list of refreshment points)");
   });
 });
 
@@ -189,6 +212,25 @@ describe("the fueling check", () => {
     const warnings = checkFueling([item(6.5, "gel", "one"), item(18.5, "station-water", "two")], berlinStations, 42.285);
 
     expect(warnings.map((warning) => warning.itemId)).toEqual(["one", "two"]);
+  });
+});
+
+describe("where a new item goes", () => {
+  it("is five kilometres past the last one, while there is room for it", () => {
+    expect(somewhereFree([], 42.285)).toBe(5);
+    expect(somewhereFree([item(5, "gel"), item(12, "gel")], 42.285)).toBe(17);
+  });
+
+  it("is never on top of an item that is already there", () => {
+    // Once anything sits at the finish, "five past the last one" is the finish for ever after, and
+    // a stack of rows at exactly 42.285 is a plan the runner can't take apart again.
+    const atTheEnd = [item(42.285, "gel")];
+
+    const next = somewhereFree(atTheEnd, 42.285);
+
+    expect(next).toBeLessThan(42.285);
+    expect(next).toBeGreaterThan(0);
+    expect(somewhereFree([...atTheEnd, { id: "x", km: next, kind: "gel" }], 42.285)).not.toBe(next);
   });
 });
 

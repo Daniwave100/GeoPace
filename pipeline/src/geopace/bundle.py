@@ -255,9 +255,25 @@ def validate_bundle(bundle: dict) -> None:
         for error in sorted(validator.iter_errors(bundle), key=lambda e: list(e.absolute_path))
     ]
     if not problems:
-        problems = _column_problems(bundle["measured"]["course_line"]) + _sun_problems(bundle["measured"])
+        problems = _column_problems(bundle["measured"]["course_line"]) + _sun_problems(bundle["measured"]) + _aid_station_problems(bundle)
     if problems:
         raise BundleInvalid("Course Bundle is invalid:\n  - " + "\n  - ".join(problems))
+
+
+def _aid_station_problems(bundle: dict) -> list[str]:
+    """A station has to stand on the course. The editions file is hand-edited and knows nothing
+    about how long this course is; here the course line is at hand, so a typed 300 for 30 is named
+    as the mistake it is rather than drawn three hundred kilometres past the finish."""
+    length_km = bundle["measured"]["course_line"]["length_m"] / 1000
+    problems = []
+    for edition in bundle["editions"]:
+        for station in edition.get("aid_stations", []):
+            if station["km"] > length_km:
+                problems.append(
+                    f"editions[{edition['edition']}].aid_stations ({station['label']}) is at km {station['km_marked']}, "
+                    f"which is {station['km']:.2f} km along a course line of {length_km:.2f} km"
+                )
+    return problems
 
 
 def _column_problems(line: dict) -> list[str]:

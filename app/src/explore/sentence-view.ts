@@ -8,6 +8,9 @@ import { ENCODINGS } from "../core/encoding";
 import type { Clause } from "../core/layers";
 import { html } from "../dom";
 
+/** What carrying over meant when only a wave time could be carried over. */
+const CARRIED_OVER_SAID = " (from a start time carried over from an earlier edition)";
+
 export interface SentenceView {
   show(clauses: Clause[]): void;
 }
@@ -30,8 +33,8 @@ function clauseNode(clause: Clause): HTMLElement {
   // Struck through only where the value itself is in doubt; the words after it stay standing.
   node.append(clause.encoding === "not-measured" ? html("s", { text: clause.text }) : clause.text);
   if (look.saidAfter) node.append(` ${look.saidAfter}`);
-  // A screen reader can't see grey: it is told in words.
-  if (clause.carriedOver) node.append(html("span", { class: "visually-hidden", text: " (from a start time carried over from an earlier edition)" }));
+  // A screen reader can't see grey: it is told in words — the clause's own, where it has them.
+  if (clause.carriedOver) node.append(html("span", { class: "visually-hidden", text: clause.carriedOverSaid ?? CARRIED_OVER_SAID }));
   return node;
 }
 

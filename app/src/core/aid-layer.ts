@@ -21,6 +21,8 @@ import { formatDistance, formatNearby, type Units } from "./units";
 const MARK_REACH_KM = 0.04;
 /** Nearer than this and the sentence says the runner is at the station rather than counting down to it. */
 const AT_IT_KM = 0.05;
+/** What a reader who can't see the grey is told instead. Not a start time: a refreshment list. */
+const LAST_YEARS_LIST = " (from an earlier edition's list of refreshment points)";
 
 /**
  * The Aid layer for this course and edition, or null where the edition has no published station
@@ -33,7 +35,11 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
   const line = bundle.measured.course_line;
   const lengthKm = line.km[line.km.length - 1];
   const carriedOver = stations.some((station) => station.carriedOver) ? planner.edition.carried_over : undefined;
-  const furthestDryKm = Math.max(...stations.map((station, i) => station.km - (i === 0 ? 0 : stations[i - 1].km)), lengthKm - stations[stations.length - 1].km);
+  // The row counts the run to the next *water*, so its reach is the longest stretch without water
+  // — not the longest between stations. They are the same on a course where every station has
+  // water, as Berlin's fifteen do, and they part the moment a list holds a gel depot between two
+  // of them, which is exactly what New York's will (see its editions file).
+  const furthestDryKm = furthestWithoutWater(stations, lengthKm);
 
   const row: StripRow = {
     id: "aid",
@@ -54,9 +60,11 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     encoding: "measured",
   }));
 
+  // The same note the sentence gives, so picking a station on the map says what standing on it
+  // says: the brand, whose bottle can be waiting, and whether this is last year's list.
   const labels: MarkLabel[] = stations.map((station) => ({
     encoding: "measured",
-    note: station.carriedOver && carriedOver ? `${carriedOver.reason} This station is ${carriedOver.from_edition}'s.` : station.note,
+    note: noteFor(station, carriedOver),
     atKm: station.km,
     startKm: station.km,
     text: () => `${station.label}: ${servesInWords(station)}`,
@@ -74,6 +82,12 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     lineLabels: () => labels,
     clause: (km, units) => clauseFor(km, stations, units, carriedOver),
   };
+}
+
+/** The longest stretch of road with no water on it: from the start, between stations, and to the finish. */
+export function furthestWithoutWater(stations: AidStation[], lengthKm: number): number {
+  const water = stations.filter((station) => station.serves.includes("water")).map((station) => station.km);
+  return Math.max(...[...water, lengthKm].map((km, i) => km - (i === 0 ? 0 : [...water, lengthKm][i - 1])));
 }
 
 /** One slice of the course, for the row. */
@@ -115,6 +129,7 @@ function clauseFor(km: number, stations: AidStation[], units: Units, carriedOver
       encoding: "measured",
       note: noteFor(here, carriedOver),
       carriedOver: here.carriedOver,
+      carriedOverSaid: LAST_YEARS_LIST,
     };
   }
   const next = stations.find((station) => station.km > km);
@@ -124,6 +139,7 @@ function clauseFor(km: number, stations: AidStation[], units: Units, carriedOver
     encoding: "measured",
     note: noteFor(next, carriedOver),
     carriedOver: next.carriedOver,
+    carriedOverSaid: LAST_YEARS_LIST,
   };
 }
 

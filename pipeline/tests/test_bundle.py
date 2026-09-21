@@ -194,3 +194,15 @@ def test_the_schema_itself_refuses_edition_facts_that_contradict_themselves(synt
     assert "waves" in broken(lambda edition: [wave.update(start_local=None, start=None, note="Not published.") for wave in edition["waves"]])
     # An unconfirmed date that doesn't say how it is known.
     assert "date" in broken(lambda edition: edition["date"].update(confirmed=False))
+
+
+def test_an_aid_station_past_the_finish_is_named_not_drawn(synthetic_facts):
+    """The editions file is hand-edited and knows nothing about how long the course is; the bundle
+    does, so a typed 300 for 30 is caught here rather than drawn past the finish (#12)."""
+    bundle = build(synthetic_facts, gentle_hill)
+    bundle["editions"][0]["aid_stations"] = [
+        {"km": 300.0, "km_marked": 300, "label": "300 km", "serves": ["water"], "carried_over": False, "source": "https://example.org/course", "accessed": "2026-09-21"}
+    ]
+
+    with pytest.raises(BundleInvalid, match=r"aid_stations \(300 km\) is at km 300, which is 300\.00 km along a course line of"):
+        validate_bundle(bundle)

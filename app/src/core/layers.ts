@@ -36,8 +36,14 @@ export interface Clause {
   encoding: Encoding;
   /** More, for whoever asks: why a value is not measured here. */
   note?: string;
-  /** true when it rests on a start time carried over from an earlier edition: greyed and flagged. */
+  /** true when it rests on something carried over from an earlier edition: greyed and flagged. */
   carriedOver?: boolean;
+  /**
+   * What a reader who can't see the grey is told instead. Left out, it is a start time, which is
+   * what carrying over meant when only wave times could be: a layer that carries something else
+   * over — Aid carries a whole list of refreshment points — says so in its own words.
+   */
+  carriedOverSaid?: string;
 }
 
 /** One slice of a row, as wide as the strip can draw. */
