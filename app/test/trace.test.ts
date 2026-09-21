@@ -6,7 +6,7 @@ import { linearScale } from "../src/core/layout";
 import { tracePaths } from "../src/core/trace";
 
 const bins = (values: (number | null)[], notMeasured: number[] = []): RowBin[] =>
-  values.map((value, i) => ({ startKm: i, midKm: i + 0.5, endKm: i + 1, value, measured: !notMeasured.includes(i) }));
+  values.map((value, i) => ({ startKm: i, midKm: i + 0.5, endKm: i + 1, value, encoding: notMeasured.includes(i) ? ("not-measured" as const) : ("measured" as const) }));
 const box = { x: linearScale([0, 10], [100, 1100]), top: 20, height: 60 };
 const smooth = { domain: [0, 10] as [number, number], baseline: "bottom" as const, stepped: false };
 
@@ -66,8 +66,8 @@ describe("a strip row's trace", () => {
     const paths = tracePaths(grade, bins([2, -2, 4, 1], [2]), box, [0.2, -0.2, 0.9, 0]);
 
     expect(paths.howMuchBlocks).toEqual([
-      { x: 100, width: 100, y: 36.5, height: 13.5, howMuch: 0.2 }, // above the flat line: a climb
-      { x: 200, width: 100, y: 50, height: 13.5, howMuch: -0.2 }, // below it: a descent
+      { x: 100, width: 100, y: 36.5, height: 13.5, howMuch: 0.2, encoding: "measured" }, // above the flat line: a climb
+      { x: 200, width: 100, y: 50, height: 13.5, howMuch: -0.2, encoding: "measured" }, // below it: a descent
       // bin 2 is steep but not measured: no block; bin 3 is flat: no block
     ]);
     expect(tracePaths(grade, bins([2, -2]), box).howMuchBlocks).toEqual([]);

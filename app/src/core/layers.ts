@@ -47,8 +47,12 @@ export interface RowBin {
   endKm: number;
   /** In the row's own metric unit; null where the row has no value (outside a model's range). */
   value: number | null;
-  /** false where the value is filled in rather than measured. */
-  measured: boolean;
+  /**
+   * The kind of claim this slice makes. Usually the row's own, but a row can be more than one:
+   * a filled-in stretch is `not-measured` inside a measured row, and a stretch of shade a tree
+   * casts is `depends-on-leaves` inside the same Shade row as the shade a wall casts.
+   */
+  encoding: Encoding;
 }
 
 /** A row of the strip: a thin trace with a light fill, a labelled scale, and the value under the cursor. */

@@ -110,7 +110,7 @@ export function heightRow(bundle: CourseBundle): StripRow {
 }
 
 function rowBin(bin: HillBin, value: number | null): RowBin {
-  return { startKm: bin.startKm, midKm: bin.midKm, endKm: bin.endKm, value, measured: bin.measured };
+  return { startKm: bin.startKm, midKm: bin.midKm, endKm: bin.endKm, value, encoding: bin.measured ? "measured" : "not-measured" };
 }
 
 /** The strip redraws at the same width far more often than the width changes. */

@@ -2,6 +2,13 @@
 // blocks, with the shadows the sun casts through them at the moment the runner reaches each
 // kilometre (PLAN.md D30, §6 "Street model").
 //
+// Its trees stand beside them as crowns: a patch of leaves with a top and an underside, floating
+// where the leaves are and nothing where the trunk is, which is what lets the low sun of both race
+// mornings come in underneath them exactly as the shade table says it does. They are drawn in the
+// poster's halftone (PLAN.md D28) — white, printed in dots — so a tree cannot be mistaken for a
+// building, and the same halftone says the same thing on the strip, on the course line and in the
+// sentence (core/encoding.ts).
+//
 // The shadows are true, which is the whole point of the keyless look (D4): the geometry is ours,
 // from each city's own open data, and the sun is computed from the race clock, so a shadow on
 // screen is the shadow that will be there on race day. Photoreal's shadows were photographed
@@ -36,12 +43,38 @@ const SKIRT_M = 25;
  * thing on screen, and a white city would undo that: the blocks go to a grey that still reads as
  * the same model, and the shadows lighten so they are not black on black.
  */
-const BLOCK_LOOK: Record<Theme, { face: string; shadowDarkness: number }> = {
+const BLOCK_LOOK: Record<Theme, { face: string; shadowDarkness: number; leafDot: string }> = {
   // A roof turned to the sun is the brightest thing on screen after the course, a shade over the
   // paper it stands on, so the blocks read against the ground without an outline round them.
-  light: { face: "#ffffff", shadowDarkness: 0.26 },
-  dark: { face: "#9c9c95", shadowDarkness: 0.45 },
+  // `leafDot` is the ink of the halftone the crowns are printed in: the same face, dotted.
+  light: { face: "#ffffff", shadowDarkness: 0.26, leafDot: "#9c9c95" },
+  dark: { face: "#9c9c95", shadowDarkness: 0.45, leafDot: "#5a5a55" },
 };
+
+/**
+ * The crowns' halftone, as a material of our own: the block's own face, printed in dots.
+ *
+ * Screen-space, which is what a halftone is — dots in the plane of the paper, the same size
+ * wherever the thing they are printing happens to be. `dotPx` is one dot and its white together.
+ */
+const CROWN_MATERIAL = "GeoPaceCrown";
+const CROWN_DOT_PX = 5.0;
+const CROWN_SOURCE = `
+uniform vec4 faceColor;
+uniform vec4 dotColor;
+uniform float dotPx;
+
+czm_material czm_getMaterial(czm_materialInput materialInput)
+{
+    czm_material material = czm_getDefaultMaterial(materialInput);
+    vec2 inCell = fract(gl_FragCoord.xy / (dotPx * czm_pixelRatio)) - 0.5;
+    float inDot = 1.0 - smoothstep(0.22, 0.30, length(inCell));
+    vec4 color = czm_gammaCorrect(mix(faceColor, dotColor, inDot));
+    material.diffuse = color.rgb;
+    material.alpha = 1.0;
+    return material;
+}
+`;
 
 export interface WhiteModelInScene {
   /** The buildings for the course that is showing, or null while it has none (or they haven't arrived). */
@@ -54,6 +87,17 @@ export interface WhiteModelInScene {
 
 export function createWhiteModel(viewer: Viewer): WhiteModelInScene {
   const face = Material.fromType("Color", { color: Color.fromCssColorString(BLOCK_LOOK.light.face) });
+  // Making one material of a new type is CesiumJS's public way of registering the type; the
+  // crowns then ask for it by name. It needs a browser, which is why it is made here and not at
+  // the top of the module.
+  const leaves = new Material({
+    fabric: {
+      type: CROWN_MATERIAL,
+      uniforms: { faceColor: Color.fromCssColorString(BLOCK_LOOK.light.face), dotColor: Color.fromCssColorString(BLOCK_LOOK.light.leafDot), dotPx: CROWN_DOT_PX },
+      source: CROWN_SOURCE,
+    },
+  });
+  let crowns: Primitive | undefined;
   let blocks: Primitive | undefined;
   let drawn: WhiteModel | null = null; // the model `blocks` was built from
   let wanted: WhiteModel | null = null;
@@ -72,20 +116,26 @@ export function createWhiteModel(viewer: Viewer): WhiteModelInScene {
     const on = wanted !== null && choice.buildings === "on" && !aside;
     if (!on) {
       if (blocks) viewer.scene.primitives.remove(blocks); // remove() destroys it: the geometry is big
-      blocks = undefined;
+      if (crowns) viewer.scene.primitives.remove(crowns);
+      blocks = crowns = undefined;
       drawn = null;
     } else if (drawn !== wanted) {
       if (blocks) viewer.scene.primitives.remove(blocks);
-      blocks = viewer.scene.primitives.add(buildBlocks(wanted as WhiteModel, face));
+      if (crowns) viewer.scene.primitives.remove(crowns);
+      const model = wanted as WhiteModel;
+      blocks = viewer.scene.primitives.add(buildBlocks(model, face));
+      crowns = model.trees && model.trees.ring.length > 0 ? viewer.scene.primitives.add(buildCrowns(model, leaves)) : undefined;
       drawn = wanted;
     }
     showFace();
     showShadows();
   }
 
-  /** The blocks' one colour, which follows the theme whether or not the shadows are on. */
+  /** The blocks' one colour and the crowns' two, which follow the theme whether or not the shadows are on. */
   function showFace(): void {
     face.uniforms.color = Color.fromCssColorString(BLOCK_LOOK[theme].face);
+    leaves.uniforms.faceColor = Color.fromCssColorString(BLOCK_LOOK[theme].face);
+    leaves.uniforms.dotColor = Color.fromCssColorString(BLOCK_LOOK[theme].leafDot);
   }
 
   function showShadows(): void {
@@ -165,5 +215,37 @@ function buildBlocks(model: WhiteModel, face: Material): Primitive {
     shadows: ShadowMode.ENABLED,
     asynchronous: true,
     releaseGeometryInstances: true, // the outlines are the app's biggest lump of data; only the mesh is kept
+  });
+}
+
+/**
+ * The crowns, as one more lump of geometry: a slab of leaves from the underside to the top, and
+ * nothing at all beneath it. No skirt, unlike a block — the gap under a crown is the whole point,
+ * and it is where the low sun of both race mornings gets through (PLAN.md D60).
+ */
+function buildCrowns(model: WhiteModel, leaves: Material): Primitive {
+  const { underside_m, top_m, ring } = model.trees as NonNullable<WhiteModel["trees"]>;
+  const instances: GeometryInstance[] = [];
+  for (let i = 0; i < ring.length; i += 1) {
+    instances.push(
+      new GeometryInstance({
+        geometry: new PolygonGeometry({
+          polygonHierarchy: new PolygonHierarchy(Cartesian3.fromDegreesArray(ring[i])),
+          height: underside_m[i],
+          extrudedHeight: top_m[i],
+          vertexFormat: MaterialAppearance.MaterialSupport.BASIC.vertexFormat,
+          // Both faces: a runner under a tree is looking up at the underside of it.
+          closeTop: true,
+          closeBottom: true,
+        }),
+      }),
+    );
+  }
+  return new Primitive({
+    geometryInstances: instances,
+    appearance: new MaterialAppearance({ material: leaves, materialSupport: MaterialAppearance.MaterialSupport.BASIC, closed: true, translucent: false }),
+    shadows: ShadowMode.ENABLED,
+    asynchronous: true,
+    releaseGeometryInstances: true,
   });
 }

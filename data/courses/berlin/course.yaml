@@ -37,6 +37,19 @@ start:
 # Places: km = distance along the course file to the point closest to the landmark, rounded to
 # 0.1 km; `source` locates the landmark. Half marathon and Finish: the certified positions
 # (21.0975 km, 42.195 km) scaled onto the course file (x 42.28 / 42.195).
+# What the trees along the course are wearing on race day (PLAN.md D60). The German Weather
+# Service's phenological year puts the colouring of the leaves at the start of late autumn, two
+# seasons after the early autumn the Berlin Marathon is run in.
+leaves:
+  state: full leaf
+  note: >-
+    Late September is early autumn in Berlin. The German Weather Service's phenological year puts
+    the colouring of the leaves at the start of late autumn, two seasons later, so the trees along
+    the course are in leaf on race day and a crown is about as thick as the city's register
+    describes it.
+  source: https://www.dwd.de/DE/klimaumwelt/klimaueberwachung/phaenologie/produkte/phaenouhr/phaenouhr.html
+  accessed: 2026-09-21
+
 landmarks:
   - name: Victory Column (Großer Stern)
     km: 0.7

@@ -532,7 +532,7 @@ input {
   color: var(--grey-text);
 }
 
-/* ── The four encodings, in words ───────────────────────────────────────────────────────── */
+/* ── The five encodings, in words ───────────────────────────────────────────────────────── */
 
 /* Measured is solid: plain ink, nothing added. */
 .enc-measured {
@@ -554,6 +554,13 @@ input {
   text-decoration-thickness: 2px;
 }
 
+/* Shade that depends on the leaves: the poster's halftone, under the words rather than round them,
+   because it is a measured claim with a condition on it, not a weaker kind of claim. */
+.enc-leafy {
+  padding-bottom: 1px;
+  border-bottom: 3px dotted currentColor;
+}
+
 /* A sample wears hazard-stripe tape and the word itself. */
 .enc-sample {
   padding: 0 6px;
@@ -561,7 +568,7 @@ input {
   background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, currentColor 26%, transparent) 4px 8px);
 }
 
-/* ── The four encodings, on the strip ───────────────────────────────────────────────────── */
+/* ── The five encodings, on the strip ───────────────────────────────────────────────────── */
 
 svg .enc-measured {
   fill: none;
@@ -593,6 +600,15 @@ svg .enc-not-measured.trace-block {
   fill: var(--grey);
   fill-opacity: 0.3;
   stroke: none;
+}
+
+/* On the strip a leafy stretch is the row's own solid trace — the shade is measured — and it is the
+   fill under it that is halftone (the trace-how-much block takes the dots, strip/strip.ts). */
+svg .enc-leafy {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
 }
 
 svg .enc-sample {
@@ -692,6 +708,13 @@ button.map-label {
   background: #c9c9c5;
   border-color: #5c5c58;
   border-style: dashed;
+}
+
+/* Shade that depends on the leaves: ink on paper, with the halftone dots under it. */
+.map-label.enc-leafy {
+  padding: 2px 7px;
+  color: #000;
+  background: radial-gradient(circle at 2px 2px, #b9b9b4 1.2px, #f4f4f0 1.3px) 0 0 / 5px 5px;
 }
 
 /* A sample wears the hazard tape, on paper so the stripes show. */

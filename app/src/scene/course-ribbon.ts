@@ -63,6 +63,7 @@ uniform float dashEndPx;
 uniform vec4 edgeColor;
 uniform float edgePx;
 uniform float dashAndGapPx;
+uniform float dashShare;
 #ifdef AT_ROAD_HEIGHT
 uniform float behindStrength;
 #endif
@@ -125,7 +126,7 @@ czm_material czm_getMaterial(czm_materialInput materialInput)
 
     // Dashes are counted along the line on screen, the way CesiumJS's own dashed line does it.
     vec2 alongLine = rotate(v_polylineAngle) * gl_FragCoord.xy;
-    float inDash = step(fract(alongLine.x / (dashAndGapPx * czm_pixelRatio)), 0.5) * dashColor.a;
+    float inDash = step(fract(alongLine.x / (dashAndGapPx * czm_pixelRatio)), dashShare) * dashColor.a;
     vec4 beside = mix(bandColor, vec4(dashColor.rgb, 1.0), inDash);
 
     vec4 color = coreColor;
@@ -197,7 +198,7 @@ export class CourseRibbonProperty implements MaterialProperty {
 
 function sameLook(a: MarkLook | null, b: MarkLook | null): boolean {
   if (a === null || b === null) return a === b;
-  return a.widthPx === b.widthPx && a.color === b.color && a.edge === b.edge && a.edgePx === b.edgePx && a.gap === b.gap && a.rimPx === b.rimPx;
+  return a.widthPx === b.widthPx && a.color === b.color && a.edge === b.edge && a.edgePx === b.edgePx && a.gap === b.gap && a.rimPx === b.rimPx && a.dashShare === b.dashShare;
 }
 
 function uniformsFor(look: MarkLook | null, behindStrength: number | null): Record<string, unknown> {
@@ -207,6 +208,7 @@ function uniformsFor(look: MarkLook | null, behindStrength: number | null): Reco
     coreEndPx: COURSE_WIDTH_PX / 2 - COURSE_EDGE_PX,
     coreEdgeEndPx: COURSE_WIDTH_PX / 2,
     dashAndGapPx: DASH_AND_GAP_PX,
+    dashShare: look?.dashShare ?? 0.5,
     ...(behindStrength === null ? {} : { behindStrength }),
   };
   // The plain course: nothing beside the white edge, so "beside" is more of the white edge.

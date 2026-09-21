@@ -15,6 +15,13 @@ export interface CourseBundle {
     start: { lat: number; lon: number };
     /** km on the same scale as course_line.km; source locates the landmark */
     landmarks: { name: string; km: number; source: string }[];
+    /**
+     * What the trees along the course are wearing on race day: a hand-maintained fact about the
+     * date and the city, with its source. Absent for a course nobody has written one for. How much
+     * leaf is on a given day is nobody's to predict, which is why a tree's shade is drawn as shade
+     * that depends on the leaves rather than as a measurement.
+     */
+    leaves?: { state: string; note: string; source: string };
   };
   /** Sourced facts about each year's running of the course, oldest first. Never empty. */
   editions: Edition[];
@@ -29,7 +36,7 @@ export interface CourseBundle {
      * (app/src/bundle/white-model.ts). Absent for a course nobody has building data for. The
      * bundle carries the credits for it, so they can be shown before the geometry arrives.
      */
-    white_model?: { file: string; buildings: number; corridor_m: number };
+    white_model?: { file: string; buildings: number; corridor_m: number; trees?: number };
     /**
      * Where the sun is through race day, and whether it reaches each course sample at the moment
      * a runner gets there: the Shade layer's data (app/src/core/sun.ts). Binary, never a share.
@@ -69,8 +76,16 @@ export interface SunBlock {
   azimuth_deg: number[];
   bytes_per_sample: number;
   in_sun: string;
+  /**
+   * The third state, packed exactly like `in_sun`: 1 where every building lets the sun through but
+   * a tree's crown does not. Never 1 where `in_sun` is 0 — a building's shade is the stronger claim
+   * and wins. Absent for a course with no tree data, and then the layer has two states.
+   */
+  in_leaf_shade?: string;
   /** What the shade was worked out from: a wider set of buildings than the White model draws. */
   buildings: { counted: number; within_m: number; furthest_m: number; reach_per_meter: number };
+  /** What the leafy shade was worked out from. One set, not two: a tree never reaches from outside the corridor. */
+  trees?: { counted: number; within_m: number; leaves_when_surveyed: string; crown_depth_share: number[] };
 }
 
 /**

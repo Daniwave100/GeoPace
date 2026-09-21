@@ -189,6 +189,16 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
       "defs",
       {},
       svg("pattern", { id: "strip-stripes", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, svg("rect", { width: 3, height: 6, fill: "var(--ink)" })),
+      // The poster's halftone: shade that depends on the leaves is the same teal as the shade a
+      // wall casts, with the paper showing through it in dots (PLAN.md D28, core/encoding.ts).
+      // The dots are knocked out of the colour rather than printed in it, because a pattern's own
+      // contents inherit from the pattern, never from the shape that uses it: `currentColor` here
+      // would be the strip's ink, not the row's teal. So the colour is the rect underneath.
+      svg(
+        "pattern",
+        { id: "strip-leaf-dots", width: 4, height: 4, patternUnits: "userSpaceOnUse" },
+        svg("circle", { cx: 2, cy: 2, r: 1.15, fill: "var(--paper)" }),
+      ),
     ),
   );
 
@@ -279,7 +289,14 @@ function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, heig
   for (const block of paths.noValue) group.append(svg("rect", { x: block.x, y: top + 2, width: block.width, height: height - 4, class: `${gap} trace-block` }));
   for (const piece of paths.measured) group.append(svg("path", { d: piece.area, class: `${solid} trace-fill` }));
   // How much, as well as where: filled from the same ramps as the marks on the map, so a hill is the same colour on both.
-  for (const block of paths.howMuchBlocks) group.append(svg("rect", { x: block.x, y: block.y, width: block.width + 0.4, height: block.height, fill: rampColor(block.howMuch), class: "trace-how-much" }));
+  for (const block of paths.howMuchBlocks) {
+    const shape = { x: block.x, y: block.y, width: block.width + 0.4, height: block.height, class: "trace-how-much" };
+    group.append(svg("rect", { ...shape, fill: rampColor(block.howMuch) }));
+    // A slice whose claim depends on the leaves is the same colour with the paper dotted through
+    // it: shade, and a condition on it. The dots are in the strip's own coordinates, so a run of
+    // slices is one field of halftone rather than a row of separately dotted blocks.
+    if (block.encoding === "depends-on-leaves") group.append(svg("rect", { ...shape, fill: "url(#strip-leaf-dots)" }));
+  }
   for (const piece of paths.measured) group.append(svg("path", { d: piece.line, class: solid }));
   for (const line of paths.notMeasured) group.append(svg("path", { d: line, class: gap }));
   return group;

@@ -48,6 +48,22 @@ class Bridge:
 
 
 @dataclass(frozen=True)
+class LeafState:
+    """What the trees along the course are wearing on race day.
+
+    A fact about the date and the city, not about the course: Berlin runs in late September and
+    New York on the first Sunday in November, and the leaves are what make a tree's shade a thing
+    that depends on the season at all (PLAN.md D60). It is stated for the runner and sourced like
+    every other fact here; how much leaf is on a given day is nobody's to predict, which is why
+    the layer draws tree shade as shade that depends on the leaves rather than as a measurement.
+    """
+
+    state: str  # in a few words: "full leaf", "turning — some leaves down"
+    note: str  # the sentence under it, for whoever asks
+    source: str
+
+
+@dataclass(frozen=True)
 class CourseFacts:
     id: str
     name: str
@@ -65,6 +81,8 @@ class CourseFacts:
     start_lon: float
     landmarks: list[Landmark]
     bridges: list[Bridge]
+    # What the trees are wearing on race day, where the course has trees at all.
+    leaves: LeafState | None
 
 
 def load_course_facts(path: Path) -> CourseFacts:
@@ -86,6 +104,11 @@ def parse_course_facts(raw: dict) -> CourseFacts:
     for i, waypoint in enumerate(route.get("waypoints", [])):
         if not {"at", "lat", "lon"} <= set(waypoint):
             problems.append(f"route.waypoints[{i}] needs `at` (where it is, in words), `lat` and `lon`")
+    if "leaves" in raw:
+        check_sourced("leaves", raw["leaves"], problems)
+        for key in ("state", "note"):
+            if not str(raw["leaves"].get(key, "")).strip():
+                problems.append(f"leaves needs a `{key}`")
     for i, landmark in enumerate(raw.get("landmarks", [])):
         check_sourced(f"landmarks[{i}] ({landmark.get('name', '?')})", landmark, problems)
     for i, bridge in enumerate(raw.get("bridges", [])):
@@ -130,6 +153,7 @@ def parse_course_facts(raw: dict) -> CourseFacts:
             )
             for bridge in raw.get("bridges", [])
         ],
+        leaves=LeafState(state=raw["leaves"]["state"], note=raw["leaves"]["note"], source=raw["leaves"]["source"]) if "leaves" in raw else None,
     )
 
 

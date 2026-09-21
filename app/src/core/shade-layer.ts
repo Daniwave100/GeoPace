@@ -7,8 +7,16 @@
 // blocks from the same buildings and the same clock, which is why the ticket asks that the two
 // agree.
 //
-// What it rests on, and says out loud: a clear sky, the buildings only (trees are #10), and the
-// road surface rather than a runner's head. Where the sun is under the floor the pipeline works
+// Three states, not two (PLAN.md D60, issue #10): the city's trees cast shade as well, and shade a
+// leaf casts is not shade a wall casts — the runner gets it while the leaves are on and not
+// otherwise. So leafy shade is the same teal in the poster's halftone, on the strip and beside the
+// line alike, and the sentence says it in words: "In leafy shade for the next 300 m." A wall wins
+// wherever both apply, because shade you get whatever the trees do is the stronger claim.
+//
+// What it rests on, and says out loud: a clear sky, the road surface rather than a runner's head,
+// and the trees as each city last recorded them — Berlin tree by tree in the register it keeps,
+// New York from a scan half of which was flown before the leaves were out. The words under the
+// sentence say which, and what race day brings. Where the sun is under the floor the pipeline works
 // shade out above, nothing was measured and the layer says so rather than filling in silently.
 //
 // The time-independent fact — stretches with no shade at any hour we model, which is the bridges
@@ -16,6 +24,7 @@
 // one sun chart is fine"): a row that is empty for 38 of Berlin's 42 km asks more of the screen
 // than it gives back. It keeps its place in the sentence, which says it where it is true.
 import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
+import type { Encoding } from "./encoding";
 import type { Clause, HowMuch, Layer, LineMark, RowBin, RowValue, StripRow } from "./layers";
 import type { Planner } from "./planner";
 import { sunAlong, type SunAt, type SunRun, type SunState } from "./sun";
@@ -47,6 +56,9 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
   // at a 10-degree sun ten metres of height moves a block's reach by nearly sixty. Those
   // stretches are greyed here exactly as Hills greys them (PLAN.md D45, D47).
   const gaps = bundle.measured.elevation_not_measured;
+  // What the trees are wearing on race day, and what the survey caught them in: the two halves of
+  // the one honest thing this layer can say about a leaf (PLAN.md D60).
+  const leaves = leafNote(bundle, along.table.hasTrees);
 
   const row: StripRow = {
     id: "shade",
@@ -57,14 +69,18 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     // under the strip, where there is room for it.
     scale: () => "when you get there",
     // What every number here rests on, where the numbers are (issue #9: the clear-sky caveat).
-    summary: () => "clear sky, no trees",
+    summary: () => (along.table.hasTrees ? "clear sky, buildings and trees" : "clear sky, no trees"),
     bins: (count) => binned(count).map((bin) => rowBin(bin, along.states, gaps)),
     domain: [-1, 1],
     // The middle of this row is not a value: there is no zero between sun and shade.
     baseline: "middle",
     stepped: true,
     valueAt: (km) => valueAt(along.at(km), floorDeg, filledIn(gaps, km)),
-    howMuch: (count) => binned(count).map((bin) => (rowBin(bin, along.states, gaps).measured ? howMuch(dominant(along.states, bin)) : 0)),
+    // The fill follows the slice's own value, never a second count of its own: with three states
+    // to share out, "the commonest state" and "sun or shade" can disagree — 40 sun, 35 shade, 25
+    // leafy is a shaded slice whose commonest single state is sun — and the row would then be
+    // drawn below the middle in the colour of above it.
+    howMuch: (count) => binned(count).map((bin) => fillOf(rowBin(bin, along.states, gaps))),
   };
 
   // The sun being down is not a thing to mark: there is no sun on the runner and no building
@@ -74,9 +90,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     ...along.runs
       .filter((run) => run.state !== "down")
       .flatMap((run) =>
-        measuredParts(run, gaps).map(
-          (part): LineMark => ({ fromKm: part.fromKm, toKm: part.toKm, encoding: run.state === "unknown" ? "not-measured" : "measured", howMuch: howMuch(run.state) || undefined }),
-        ),
+        measuredParts(run, gaps).map((part): LineMark => ({ fromKm: part.fromKm, toKm: part.toKm, encoding: encodingOf(run.state), howMuch: howMuch(run.state) || undefined })),
       ),
     ...gaps.map((gap): LineMark => ({ fromKm: gap.km_start, toKm: gap.km_end, encoding: "not-measured" })),
   ].sort((a, b) => a.fromKm - b.fromKm);
@@ -84,12 +98,42 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
   return {
     id: "shade",
     name: "Shade",
-    key: "Warm is the sun on you when you get there; teal is a building's shade. A clear sky is assumed, and trees are not in yet.",
+    key: along.table.hasTrees
+      ? ["Warm is the sun on you when you get there; solid teal is a building's shade, and dotted teal a tree's — that one you get while the leaves are on.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
+      : "Warm is the sun on you when you get there; teal is a building's shade. A clear sky is assumed, and trees are not in yet.",
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],
-    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km)),
+    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km), leaves),
   };
+}
+
+/**
+ * What a tree's shade rests on: the leaves on race day, and the survey the crowns came from.
+ * Both empty for a course nobody has written a leaf state for — the halftone still means what it
+ * means, there is simply nothing more to say about it.
+ */
+interface LeafNote {
+  /** One sentence for the key under the strip: what the trees are wearing on race day. */
+  onRaceDay: string;
+  /** The longer reason, printed under the sentence where a clause depends on the leaves. */
+  why?: string;
+}
+
+function leafNote(bundle: CourseBundle, hasTrees: boolean): LeafNote {
+  const leaves = bundle.course.leaves;
+  const surveyed = bundle.measured.sun?.trees?.leaves_when_surveyed;
+  if (!hasTrees || !leaves) return { onRaceDay: "" };
+  return {
+    onRaceDay: `On race day the trees here are ${leaves.state}.`,
+    why: [`On race day the trees here are ${leaves.state}. ${leaves.note}`, surveyed ? `The crowns this is worked out from were ${surveyed}.` : ""].filter(Boolean).join(" "),
+  };
+}
+
+/** Which kind of claim a stretch in this state makes. */
+function encodingOf(state: SunState): Encoding {
+  if (state === "unknown") return "not-measured";
+  return state === "leafy" ? "depends-on-leaves" : "measured";
 }
 
 /** The hours of race day the table covers, for saying so when a runner arrives outside them. */
@@ -99,7 +143,7 @@ interface ModelledHours {
   timezone: string;
 }
 
-function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorDeg: number, carriedOver: boolean, hours: ModelledHours, gap: NotMeasuredSpan | undefined): Clause | null {
+function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorDeg: number, carriedOver: boolean, hours: ModelledHours, gap: NotMeasuredSpan | undefined, leaves: LeafNote): Clause | null {
   // The sentence's own last clause already says the sun is down; twice is not clearer.
   if (at.state === "down") return null;
   if (at.state === "unknown") {
@@ -117,9 +161,11 @@ function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorD
   // told, and it is the stretch of never-shaded road that is worth a distance, not this moment's.
   const text = at.alwaysInSun
     ? `No shade${howFar(at.alwaysUntilKm, km, lengthKm, units)}, at any hour.`
-    : `In ${at.state === "sun" ? "the sun" : "shade"}${howFar(at.untilKm, km, lengthKm, units)}.`;
+    : `In ${whereYouAre(at.state)}${howFar(at.untilKm, km, lengthKm, units)}.`;
   // The shade was worked out from the road's own height. Where that height is filled in, so is this.
   if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}`, carriedOver };
+  // A tree's shade is a claim with a condition on it, and the condition is printed with it.
+  if (at.state === "leafy") return { text, encoding: "depends-on-leaves", note: leaves.why, carriedOver };
   return { text, encoding: "measured", carriedOver };
 }
 
@@ -152,8 +198,8 @@ function measuredParts(run: SunRun, gaps: NotMeasuredSpan[]): { fromKm: number; 
 
 /** The value under the cursor, and why it is a filled-in one where it is. */
 function valueAt(at: SunAt, floorDeg: number, gap: NotMeasuredSpan | undefined): RowValue {
-  if (at.state === "sun" || at.state === "shade") {
-    const text = at.state === "sun" ? "In the sun" : "In shade";
+  if (at.state === "sun" || at.state === "shade" || at.state === "leafy") {
+    const text = `In ${whereYouAre(at.state)}`;
     return { text, notMeasured: gap ? `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}` : null };
   }
   if (at.state === "down") return { text: "The sun is down", notMeasured: null };
@@ -162,8 +208,20 @@ function valueAt(at: SunAt, floorDeg: number, gap: NotMeasuredSpan | undefined):
     : { text: "Not worked out", notMeasured: "You reach here outside the hours of race day the shade was worked out for." };
 }
 
+/** The words for a state, as they read after "In ": "the sun", "shade", "leafy shade". */
+function whereYouAre(state: SunState): string {
+  return state === "sun" ? "the sun" : state === "leafy" ? "leafy shade" : "shade";
+}
+
+/** Leafy shade is the same teal as a wall's: it is shade. What differs is the claim, not the depth. */
 function howMuch(state: SunState): HowMuch {
-  return state === "sun" ? MARK : state === "shade" ? -MARK : 0;
+  return state === "sun" ? MARK : state === "shade" || state === "leafy" ? -MARK : 0;
+}
+
+/** How a slice of the strip is filled: warm above the line, teal below, nothing where it is filled in. */
+function fillOf(bin: RowBin): HowMuch {
+  if (bin.value === null || bin.encoding === "not-measured") return 0;
+  return bin.value > 0 ? MARK : -MARK;
 }
 
 /** One slice of the course, and which of its samples fall in it. */
@@ -183,23 +241,22 @@ interface ShadeBin {
  */
 function rowBin(bin: ShadeBin, states: SunState[], gaps: NotMeasuredSpan[]): RowBin {
   const inside = states.slice(bin.from, bin.to);
-  const known = inside.filter((state) => state === "sun" || state === "shade");
+  const known = inside.filter((state) => state === "sun" || state === "shade" || state === "leafy");
   const sunlit = known.filter((state) => state === "sun").length;
+  const value = known.length === 0 ? null : sunlit * 2 >= known.length ? 1 : -1;
   const filledIn = gaps.some((gap) => gap.km_start < bin.endKm && gap.km_end > bin.startKm);
+  // The value is what most of the slice is; the claim is the weakest one in it. A ninety-metre
+  // slice that is thirty metres of wall and sixty of leaf is shade — and it is shade that depends
+  // on the leaves, because saying "solid" over it would promise the runner sixty metres of shade
+  // they only get while the leaves are on. Same rule as "not measured if any of it isn't" (D59).
+  const leafy = inside.some((state) => state === "leafy");
   return {
     startKm: bin.startKm,
     midKm: bin.midKm,
     endKm: bin.endKm,
-    value: known.length === 0 ? null : sunlit * 2 >= known.length ? 1 : -1,
-    measured: !filledIn && !inside.some((state) => state === "unknown"),
+    value,
+    encoding: filledIn || inside.some((state) => state === "unknown") ? "not-measured" : value === -1 && leafy ? "depends-on-leaves" : "measured",
   };
-}
-
-/** A bin is drawn as the state most of it is in: the line and the map keep every 10 m of it. */
-function dominant(states: SunState[], bin: ShadeBin): SunState {
-  const counts = new Map<SunState, number>();
-  for (let sample = bin.from; sample < bin.to; sample += 1) counts.set(states[sample], (counts.get(states[sample]) ?? 0) + 1);
-  return [...counts].sort((a, b) => b[1] - a[1])[0][0];
 }
 
 /** The strip redraws at the same width far more often than the width changes. */

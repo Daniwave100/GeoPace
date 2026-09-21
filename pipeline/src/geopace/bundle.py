@@ -81,6 +81,7 @@ def build_course_bundle(
             "certified_distance_m": facts.certified_distance_m,
             "start": {"lat": facts.start_lat, "lon": facts.start_lon},
             "landmarks": [{"name": mark.name, "km": mark.km, "source": mark.source} for mark in facts.landmarks],
+            **({"leaves": {"state": facts.leaves.state, "note": facts.leaves.note, "source": facts.leaves.source}} if facts.leaves else {}),
         },
         "editions": [_edition_json(edition) for edition in editions],
         "measured": {
@@ -261,9 +262,15 @@ def _sun_problems(measured: dict) -> list[str]:
             problems.append(f"sun.{name} has {len(sun[name])} values for {sun['steps']} steps")
     if sun["bytes_per_sample"] != math.ceil(sun["steps"] / 8):
         problems.append(f"sun.bytes_per_sample is {sun['bytes_per_sample']}, but {sun['steps']} steps need {math.ceil(sun['steps'] / 8)}")
-    bits = len(base64.b64decode(sun["in_sun"]))
-    if bits != sun["samples"] * sun["bytes_per_sample"]:
-        problems.append(f"sun.in_sun is {bits} bytes, but {sun['samples']} samples of {sun['bytes_per_sample']} bytes need {sun['samples'] * sun['bytes_per_sample']}")
+    wanted = sun["samples"] * sun["bytes_per_sample"]
+    # Both columns of bits are read the same way and are the same size; a short or mis-strided
+    # leafy column would put a tree's shade somewhere there is no tree, drawn as measured fact.
+    for column in ("in_sun", "in_leaf_shade"):
+        if column not in sun:
+            continue
+        bits = len(base64.b64decode(sun[column]))
+        if bits != wanted:
+            problems.append(f"sun.{column} is {bits} bytes, but {sun['samples']} samples of {sun['bytes_per_sample']} bytes need {wanted}")
     return problems
 
 

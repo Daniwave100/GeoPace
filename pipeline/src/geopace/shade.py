@@ -24,6 +24,11 @@ lower than atan(h / d). Everything else here is bookkeeping around it.
     out. It is also what bounds the reach above: without a floor, a building at sunrise reaches
     the horizon.
 
+  - **The road under a roof, and the road under a tree.** A roof over the road shades it at every
+    hour, which is right: Berlin's course runs through the Brandenburg Gate. A crown does not —
+    at a low sun the light comes in sideways, under the leaves — so the runner standing under a
+    street tree is traced like anybody else, from a ray that starts inside the outline.
+
   - **The road can be above a roof.** In New York three samples on the Queensboro's lower deck
     sit over a building beside the bridge, whose outline holds the road's plan position without
     standing over the road at all (PLAN.md §10). A roof that clears the road by less than a
@@ -31,9 +36,15 @@ lower than atan(h / d). Everything else here is bookkeeping around it.
     the road — Berlin's course runs through the Brandenburg Gate, 21 m up — shades it at every
     hour, which is right.
 
-What this does not model: trees (a third state, #10), the far side of the street (the course is
-one line and no road width is known), cloud (every number here assumes a clear sky), and the
-height of a runner (the answer is for the road surface).
+  - **Trees are a third state, not a fourth kind of wall** (PLAN.md D58, D60). The same ray is
+    traced past the city's crowns (trees.py), and where it gets past every building but not past
+    the leaves the answer is *leafy shade* — shade the runner only gets while the leaves are on.
+    A building wins wherever both apply: shade you get whatever the trees do is the stronger
+    claim, and it is the one drawn solid.
+
+What this does not model: the far side of the street (the course is one line and no road width is
+known), cloud (every number here assumes a clear sky), and the height of a runner (the answer is
+for the road surface).
 """
 
 import base64
@@ -47,6 +58,7 @@ from geopace.buildings import DEFAULT_CHUNK_M, DEFAULT_CORRIDOR_M, Building, Bui
 from geopace.bundle import credit
 from geopace.provenance import Source
 from geopace.sun import day_steps, steps_above
+from geopace.trees import CROWN_DEPTH_SHARE, Crown, TreesModel
 
 # Where the sun itself comes from. Public domain (a work of the US government), and named in the
 # bundle's own sources so a runner can go and read the equations.
@@ -70,6 +82,10 @@ DEFAULT_STEP_MINUTES = 5
 # How far a roof has to clear the road before the road is taken to run under it. A lorry needs
 # about four metres; two is a record's outline overlapping a road it doesn't stand over.
 UNDER_A_ROOF_M = 4.0
+# How far a crown has to clear the road before the runner is taken to be under it. Lower than a
+# building's headroom: a branch two and a half metres up is over the road, where a roof that low
+# is a record's outline overlapping a road it doesn't stand over.
+UNDER_THE_LEAVES_M = 2.5
 # Pairs of (sample, moment) worked out in one go. Only memory: each pair costs a few numbers per
 # wall of the building being asked about.
 CHUNK = 2_000_000
@@ -94,23 +110,30 @@ class ShadeTable:
     reference: tuple[float, float]
     altitude_deg: np.ndarray
     azimuth_deg: np.ndarray
-    # (samples, steps): True where the sun reaches that sample at that moment.
+    # (samples, steps): True where no building stands between that sample and the sun.
     in_sun: np.ndarray
+    # (samples, steps): True where the buildings let the sun through but a crown does not — the
+    # third state (PLAN.md D58). Never true where `in_sun` is false: a building's shade wins.
+    # All false for a course whose city has no tree data, and then the app has two states again.
+    in_leaf_shade: np.ndarray
 
     @property
     def always_in_sun(self) -> np.ndarray:
         """The time-independent column: never shaded at any hour we model — the bridges and the
-        wide avenues (PLAN.md D58). The app works this out again from the table it is sent."""
-        return self.in_sun.all(axis=1)
+        wide avenues (PLAN.md D58). Leaves count: a road under trees is not a road with no shade.
+        The app works this out again from the table it is sent."""
+        return (self.in_sun & ~self.in_leaf_shade).all(axis=1)
 
     def to_json(self) -> dict:
         """The table as the Course Bundle carries it: the steps, the sun, and the bits.
 
         One bit per sample and step, packed sample by sample so a row starts on a byte: the app
-        reads sample i, step t as bit (7 - t % 8) of byte i * bytes_per_sample + t // 8.
+        reads sample i, step t as bit (7 - t % 8) of byte i * bytes_per_sample + t // 8. Leafy
+        shade is a second column of the same bits, laid out the same way, and is left out
+        altogether for a course with no tree data rather than shipped as a field of zeros.
         """
         packed = np.packbits(self.in_sun, axis=1)  # rows are padded with zeros to a whole byte
-        return {
+        table = {
             "step_minutes": self.step_minutes,
             "first_step": self.steps[0].isoformat(),
             "steps": len(self.steps),
@@ -122,6 +145,9 @@ class ShadeTable:
             "bytes_per_sample": int(packed.shape[1]),
             "in_sun": base64.b64encode(packed.tobytes()).decode("ascii"),
         }
+        if self.in_leaf_shade.any():
+            table["in_leaf_shade"] = base64.b64encode(np.packbits(self.in_leaf_shade, axis=1).tobytes()).decode("ascii")
+        return table
 
 
 def shade_table(
@@ -132,6 +158,7 @@ def shade_table(
     *,
     day: dt.date,
     timezone: str,
+    crowns: list[Crown] | None = None,
     step_minutes: int = DEFAULT_STEP_MINUTES,
     floor_deg: float = SUN_FLOOR_DEG,
 ) -> ShadeTable:
@@ -141,6 +168,10 @@ def shade_table(
     all of daylight worth modelling, not just the race window, so a runner who types in their own
     start time is answered too. The sun itself is worked out at each sample's own place, which
     over 20 km of city is a fifth of a degree different from the start line's.
+
+    With `crowns`, the same ray is traced past the city's trees as well, and every sample the
+    buildings leave in the sun is asked again: what gets past the walls but not past the leaves is
+    leafy shade (PLAN.md D60).
     """
     lat, lon = np.asarray(lat, dtype=float), np.asarray(lon, dtype=float)
     reference = (float(lat[0]), float(lon[0]))  # the start line
@@ -150,6 +181,7 @@ def shade_table(
     if not steps:
         raise ValueError(f"The sun never reaches {floor_deg:.0f} degrees over ({reference[0]:.4f}, {reference[1]:.4f}) on {day}: there is no shade to work out.")
     _check_evenly_spaced(steps, step_minutes)
+    in_sun = sunlit(lat, lon, elevation_m, buildings, altitude, azimuth)
     return ShadeTable(
         steps=steps,
         step_minutes=step_minutes,
@@ -157,7 +189,8 @@ def shade_table(
         reference=reference,
         altitude_deg=altitude[0],
         azimuth_deg=azimuth[0],
-        in_sun=sunlit(lat, lon, elevation_m, buildings, altitude, azimuth),
+        in_sun=in_sun,
+        in_leaf_shade=leaf_shaded(lat, lon, elevation_m, crowns or [], altitude, azimuth, in_sun=in_sun),
     )
 
 
@@ -168,11 +201,45 @@ def sunlit(lat, lon, elevation_m, buildings: list[Building], altitude_deg, azimu
     answer. Heights (`elevation_m` and each building's `roof_m`) are metres above sea level in one
     datum, which is what the pipeline's two building readers already give.
     """
+    walls = [(building.ring, building.roof_m, -np.inf) for building in buildings]
+    return ~_blocked(lat, lon, elevation_m, walls, altitude_deg, azimuth_deg, clearance_m=UNDER_A_ROOF_M)
+
+
+def leaf_shaded(lat, lon, elevation_m, crowns: list[Crown], altitude_deg, azimuth_deg, *, in_sun=None) -> np.ndarray:
+    """(samples, moments) — True where the buildings let the sun through but a crown does not.
+
+    The third state (PLAN.md D58, D60). A crown blocks between its underside and its top, not from
+    the ground up, so the ray has to be under the top where it goes into the outline and over the
+    underside where it comes out: at the low sun both races are run under, that is the difference
+    between shade and the light that comes in beneath a row of street trees.
+
+    `in_sun` is the buildings' own answer. It saves the work on every moment already in shade, and
+    it is what makes a building's shade win where both apply.
+    """
+    shape = (len(np.atleast_1d(np.asarray(lat, dtype=float))), int(np.shape(altitude_deg)[-1]))
+    reaching = np.broadcast_to(np.ones(shape, dtype=bool) if in_sun is None else np.asarray(in_sun, dtype=bool), shape)
+    if not crowns:
+        return np.zeros(shape, dtype=bool)
+    leaves = [(crown.ring, crown.top_m, crown.underside_m) for crown in crowns]
+    return _blocked(lat, lon, elevation_m, leaves, altitude_deg, azimuth_deg, clearance_m=UNDER_THE_LEAVES_M, only_where=reaching) & reaching
+
+
+def _blocked(lat, lon, elevation_m, blockers, altitude_deg, azimuth_deg, *, clearance_m: float, only_where=None) -> np.ndarray:
+    """(samples, moments) — True where one of these shapes stands between that sample and the sun.
+
+    A blocker is (outline, top above sea level, underside above sea level); a wall's underside is
+    -inf, because it blocks from the ground up. `clearance_m` is how far the top has to stand over
+    the road before a sample inside the outline counts as under it at all.
+
+    `only_where` is a hint, not a filter: moments it rules out are simply not worked out, which is
+    how the trees skip everything the buildings have already shaded.
+    """
     lat, lon = np.asarray(lat, dtype=float), np.asarray(lon, dtype=float)
     road_m = np.asarray(elevation_m, dtype=float)
     altitude = np.broadcast_to(np.asarray(altitude_deg, dtype=float), (len(lat), np.shape(altitude_deg)[-1]))
     azimuth = np.broadcast_to(np.asarray(azimuth_deg, dtype=float), altitude.shape)
-    lit = np.ones(altitude.shape, dtype=bool)
+    blocked = np.zeros(altitude.shape, dtype=bool)
+    worth_asking = np.ones(altitude.shape, dtype=bool) if only_where is None else np.asarray(only_where, dtype=bool)
 
     # A flat frame in metres east and north of the middle of the course: good to centimetres over
     # a city, and every distance and bearing below is a subtraction in it.
@@ -184,34 +251,54 @@ def sunlit(lat, lon, elevation_m, buildings: list[Building], altitude_deg, azimu
     east, north = np.sin(np.radians(azimuth)), np.cos(np.radians(azimuth))
     lowest_rise = max(float(rise.min()), 1e-6)
 
-    for building in buildings:
-        ring_x = (building.ring[:, 0] - lon0) * per_lon
-        ring_y = (building.ring[:, 1] - lat0) * per_lat
-        over_the_road = building.roof_m - road_m  # how far its roof stands over each sample
-        # Furthest this block could reach any sample, with the lowest sun we are asked about.
+    for ring, top_m, underside_m in blockers:
+        ring_x = (ring[:, 0] - lon0) * per_lon
+        ring_y = (ring[:, 1] - lat0) * per_lat
+        over_the_road = top_m - road_m  # how far its top stands over each sample
+        open_still = worth_asking & ~blocked
+        # Furthest this shape could reach any sample, with the lowest sun we are asked about.
         near = _within(x, y, ring_x, ring_y, over_the_road / lowest_rise)
-        candidates = np.flatnonzero(near & (over_the_road > 0) & lit.any(axis=1))
+        candidates = np.flatnonzero(near & (over_the_road > 0) & open_still.any(axis=1))
         if len(candidates) == 0:
             continue
-        # A sample inside the outline is under the roof, or the outline is only overlapping a road
+        # A sample inside the outline is under the top, or the outline is only overlapping a road
         # it doesn't stand over (the Queensboro's lower deck).
-        indoors = inside_ring(building.ring, lat[candidates], lon[candidates])
-        under_the_roof = candidates[indoors & (over_the_road[candidates] >= UNDER_A_ROOF_M)]
-        lit[under_the_roof] = False
-        candidates = candidates[~indoors]
+        indoors = inside_ring(ring, lat[candidates], lon[candidates])
+        enough_headroom = over_the_road[candidates] >= clearance_m
+        if underside_m == -np.inf:
+            # A roof over the road shades it at every moment: Berlin's course runs through the
+            # Brandenburg Gate, and there is no hour at which the sun gets under 21 m of stone.
+            blocked[candidates[indoors & enough_headroom]] = True
+            candidates = candidates[~indoors]
+            inside = np.zeros(len(candidates), dtype=bool)
+        else:
+            # A crown over the road does not. Standing under a street tree at a low sun the light
+            # comes in sideways, under the leaves — which is the whole reason a crown has an
+            # underside — so the runner beneath one is traced like anybody else, from a ray that
+            # is inside the outline from its very first metre.
+            keep = ~indoors | enough_headroom
+            inside = indoors[keep]
+            candidates = candidates[keep]
         if len(candidates) == 0:
             continue
-        away = _distance_to_ring(x[candidates], y[candidates], ring_x, ring_y)
+        away = np.where(inside, 0.0, _distance_to_ring(x[candidates], y[candidates], ring_x, ring_y))
         reach = over_the_road[candidates, None] / rise[candidates]
-        maybe = np.flatnonzero(lit[candidates] & (away[:, None] < reach))
+        # Where the ray would still be under the shape's underside as it leaves the outline, it
+        # has passed beneath it. A wall has no underside, and this is skipped.
+        under_reach = None if underside_m == -np.inf else (underside_m - road_m[candidates, None]) / rise[candidates]
+        maybe = np.flatnonzero(open_still[candidates] & (away[:, None] < reach))
         for piece in range(0, len(maybe), CHUNK):
             pairs = maybe[piece : piece + CHUNK]
-            sample = candidates[pairs // altitude.shape[1]]
-            entry = _ray_entry(x[sample], y[sample], east[candidates].ravel()[pairs], north[candidates].ravel()[pairs], ring_x, ring_y)
-            blocked = entry < reach.ravel()[pairs]
+            at = pairs // altitude.shape[1]
+            sample = candidates[at]
+            entry, leaves = _ray_crossings(x[sample], y[sample], east[candidates].ravel()[pairs], north[candidates].ravel()[pairs], ring_x, ring_y)
+            entry = np.where(inside[at], 0.0, entry)  # a ray that starts inside is inside at once
+            hit = entry < reach.ravel()[pairs]
+            if under_reach is not None:
+                hit &= leaves > under_reach.ravel()[pairs]
             step = pairs % altitude.shape[1]
-            lit[sample[blocked], step[blocked]] = False
-    return lit
+            blocked[sample[hit], step[hit]] = True
+    return blocked
 
 
 def _within(x: np.ndarray, y: np.ndarray, ring_x: np.ndarray, ring_y: np.ndarray, reach: np.ndarray) -> np.ndarray:
@@ -233,13 +320,17 @@ def _distance_to_ring(x: np.ndarray, y: np.ndarray, ring_x: np.ndarray, ring_y: 
     return closest
 
 
-def _ray_entry(ox: np.ndarray, oy: np.ndarray, east: np.ndarray, north: np.ndarray, ring_x: np.ndarray, ring_y: np.ndarray) -> np.ndarray:
-    """How far along each ray the outline is first crossed, in metres; infinity where it is missed.
+def _ray_crossings(ox: np.ndarray, oy: np.ndarray, east: np.ndarray, north: np.ndarray, ring_x: np.ndarray, ring_y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """How far along each ray the outline is first and last crossed, in metres; infinity and
+    minus infinity where it is missed.
 
     The ray leaves (ox, oy) towards the sun. A wall runs from a to b, so the crossing is where
-    o + r * u meets a + s * d for some r >= 0 and s between 0 and 1: two lines, one division.
+    o + r * u meets a + s * d for some r >= 0 and s between 0 and 1: two lines, one division. The
+    ray only climbs, so the first crossing is where it is lowest inside the outline and the last
+    is where it is highest: between them is every height the shape could stop it at.
     """
     entry = np.full(ox.shape, np.inf)
+    leaves = np.full(ox.shape, -np.inf)
     for i in range(len(ring_x)):
         ax, ay = ring_x[i - 1], ring_y[i - 1]
         dx, dy = ring_x[i] - ax, ring_y[i] - ay
@@ -250,7 +341,8 @@ def _ray_entry(ox: np.ndarray, oy: np.ndarray, east: np.ndarray, north: np.ndarr
             s = (wx * north - wy * east) / denominator
         crosses = np.isfinite(r) & (denominator != 0) & (r >= 0) & (s >= 0) & (s <= 1)
         entry = np.where(crosses, np.minimum(entry, r), entry)
-    return entry
+        leaves = np.where(crosses, np.maximum(leaves, r), leaves)
+    return entry, leaves
 
 
 def _check_evenly_spaced(steps: list[dt.datetime], step_minutes: int) -> None:
@@ -304,11 +396,13 @@ def _bands(corridor_m: float, furthest_m: float) -> list[tuple[float, float]]:
     return list(zip(edges, edges[1:]))
 
 
-def note_in_bundle(bundle: dict, table: ShadeTable, buildings: BuildingsModel, *, counted: int, corridor_m: float, furthest_m: float) -> None:
+def note_in_bundle(bundle: dict, table: ShadeTable, buildings: BuildingsModel, *, counted: int, corridor_m: float, furthest_m: float, trees: TreesModel | None = None, crowns: int = 0, trees_within_m: float = DEFAULT_CORRIDOR_M) -> None:
     """Put the table in the Course Bundle, and name what it was worked out from.
 
     The buildings are credited whether or not the White model drew them: the answer on screen
-    rests on them either way, and the wider set is the same city's data.
+    rests on them either way, and the wider set is the same city's data. The trees are credited
+    the same way, with what the survey caught them wearing — a scan taken with the leaves off says
+    so here, beside the numbers that rest on it (PLAN.md D60).
     """
     sun = table.to_json()
     sun["buildings"] = {
@@ -317,6 +411,14 @@ def note_in_bundle(bundle: dict, table: ShadeTable, buildings: BuildingsModel, *
         "furthest_m": furthest_m,
         "reach_per_meter": round(REACH_PER_METER, 2),
     }
+    if trees is not None:
+        sun["trees"] = {
+            "counted": crowns,
+            "within_m": trees_within_m,
+            "leaves_when_surveyed": trees.leaves_when_surveyed,
+            "crown_depth_share": [round(share, 2) for share in CROWN_DEPTH_SHARE],
+        }
+        credit(bundle, trees.source, trees.attribution)
     bundle["measured"]["sun"] = sun
     credit(bundle, buildings.source, buildings.attribution)
     credit(bundle, SOLAR_SOURCE)

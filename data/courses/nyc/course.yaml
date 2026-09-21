@@ -257,6 +257,20 @@ start:
 # the course line closest to the coordinate its `source` gives, rounded to 0.1 km. Half marathon
 # and Finish: the certified positions (21.0975 km, 42.195 km) scaled onto the course line
 # (x 42.688 / 42.195).
+# What the trees along the course are wearing on race day (PLAN.md D60). The first Sunday in
+# November falls inside Central Park's own foliage season, which the Conservancy tracks week by
+# week; how much leaf is left on the day is nobody's to predict in advance.
+leaves:
+  state: turning — some leaves down
+  note: >-
+    Race day falls inside Central Park's foliage season. The Central Park Conservancy tracks the
+    park's trees through it week by week — no change, changing, peak, post-peak — and whether the
+    trees on the first Sunday in November are still thick or half bare is not knowable in advance.
+    That is why a tree's shade is drawn here as shade that depends on the leaves, never as a
+    measurement of how dark it will be.
+  source: https://www.centralparknyc.org/fall-foliage
+  accessed: 2026-09-21
+
 landmarks:
   - name: Verrazzano-Narrows Bridge
     km: 0.9
