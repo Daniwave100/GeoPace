@@ -1,4 +1,4 @@
-"""White-model exporter: the corridor's buildings as geometry the app can draw.
+"""White-model exporter: the corridor's buildings and trees as geometry the app can draw.
 
 The White model is what GeoPace opens with when nobody has a key (PLAN.md D30): the city's real
 buildings along the course as plain white blocks, with shadows cast by the sun at the moment the
@@ -9,6 +9,10 @@ It lives beside the Course Bundle rather than inside it: a marathon's worth of b
 is many times everything else about a course put together, and nothing but the 3D scene ever
 wants it. The bundle names it, counts it, and carries its credits, so the app knows it is there
 and shows who the data belongs to whether or not the geometry has arrived.
+
+The trees beside it are crowns, not blocks: a patch of leaves with a top and an underside, standing
+off the ground (trees.py). They are here because the shade on the strip rests on them, and a shadow
+on screen that no tree cast would be the one thing the keyless view must never do.
 
 Two things happen here and nowhere else:
   - heights above sea level become heights above the WGS84 ellipsoid, with the same geoid model
@@ -27,9 +31,10 @@ from geopace import __version__
 from geopace.buildings import DEFAULT_CORRIDOR_M, Building, BuildingsModel, buildings_along, simplify_ring
 from geopace.bundle import credit
 from geopace.elevation import GeoidModel
+from geopace.trees import Crown, TreesModel
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schema" / "white-model.schema.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FILE_NAME = "white-model.json"
 
 # How far a point of an outline may sit from the wall it is on before it is dropped. A quarter of
@@ -47,11 +52,13 @@ class WhiteModelInvalid(ValueError):
     """The White model doesn't match its schema. The message lists every problem."""
 
 
-def build_white_model(bundle: dict, buildings: BuildingsModel, *, geoid: GeoidModel, corridor_m: float = DEFAULT_CORRIDOR_M) -> dict:
-    """The buildings along this bundle's own course line, as the app draws them.
+def build_white_model(bundle: dict, buildings: BuildingsModel, *, geoid: GeoidModel, corridor_m: float = DEFAULT_CORRIDOR_M, trees: TreesModel | None = None, crowns: list[Crown] | None = None) -> dict:
+    """The buildings and trees along this bundle's own course line, as the app draws them.
 
-    The course line is taken from the bundle rather than measured again, so the blocks are found
-    along exactly the road the app draws and the Ride rides.
+    The course line is taken from the bundle rather than measured again, so the blocks stand
+    beside exactly the road the app draws and the Ride rides. The crowns are handed in rather
+    than found here: they are the same list the shade was worked out from, so a tree's shadow on
+    screen and its leafy shade on the strip are the same tree (PLAN.md D60).
     """
     line = bundle["measured"]["course_line"]
     lat, lon = np.asarray(line["lat"], dtype=float), np.asarray(line["lon"], dtype=float)
@@ -68,12 +75,17 @@ def build_white_model(bundle: dict, buildings: BuildingsModel, *, geoid: GeoidMo
         "sources": [buildings.source.to_json()],
         "attributions": [buildings.attribution.to_json()],
     }
+    if trees is not None:
+        model["trees"] = _crowns_json(crowns or [], geoid)
+        model["sources"].append(trees.source.to_json())
+        model["attributions"].append(trees.attribution.to_json())
+        print(f"  trees: {len(crowns or [])} crowns drawn")
     validate_white_model(model)
     return model
 
 
-def note_in_bundle(bundle: dict, model: dict, buildings: BuildingsModel) -> None:
-    """Say in the Course Bundle that these buildings exist, and who they belong to.
+def note_in_bundle(bundle: dict, model: dict, buildings: BuildingsModel, trees: TreesModel | None = None) -> None:
+    """Say in the Course Bundle that these buildings and trees exist, and who they belong to.
 
     The credits go in the bundle as well as in the White model's own file: the app must show them
     whenever the data is on screen, and it reads the bundle first.
@@ -82,8 +94,11 @@ def note_in_bundle(bundle: dict, model: dict, buildings: BuildingsModel) -> None
         "file": FILE_NAME,
         "buildings": len(model["buildings"]["ring"]),
         "corridor_m": model["corridor_m"],
+        **({"trees": len(model["trees"]["ring"])} if "trees" in model else {}),
     }
     credit(bundle, buildings.source, buildings.attribution)
+    if trees is not None:
+        credit(bundle, trees.source, trees.attribution)
 
 
 def _blocks_json(found: list[Building], geoid: GeoidModel) -> dict:
@@ -107,6 +122,30 @@ def _blocks_json(found: list[Building], geoid: GeoidModel) -> dict:
     return {"base_m": base, "roof_m": roof, "ring": rings}
 
 
+def _crowns_json(crowns: list[Crown], geoid: GeoidModel) -> dict:
+    """Every crown: its outline, where the leaves start and where they end, above the ellipsoid.
+
+    The same geoid step the blocks and the road get (PLAN.md D51), from the same model, so a
+    crown cannot float over the street it stands on.
+    """
+    if not crowns:
+        return {"underside_m": [], "top_m": [], "ring": []}
+    middles = np.array([crown.ring.mean(axis=0) for crown in crowns])
+    sea_level_above_ellipsoid = np.asarray(geoid.offset(middles[:, 1], middles[:, 0]), dtype=float)
+    if not np.all(np.isfinite(sea_level_above_ellipsoid)):
+        bad = int(np.flatnonzero(~np.isfinite(sea_level_above_ellipsoid))[0])
+        raise ValueError(f"The geoid model has no value at crown {crowns[bad].id} ({middles[bad, 1]:.6f}, {middles[bad, 0]:.6f}). Does the model cover this city?")
+    underside, top, rings = [], [], []
+    for crown, offset in zip(crowns, sea_level_above_ellipsoid):
+        ring = simplify_ring(crown.ring, SIMPLIFY_M)
+        if len(ring) < 3:
+            continue
+        underside.append(round(crown.underside_m + float(offset), 2))
+        top.append(round(max(crown.top_m, crown.underside_m) + float(offset), 2))
+        rings.append([round(float(value), DEGREE_DIGITS) for point in ring for value in point])
+    return {"underside_m": underside, "top_m": top, "ring": rings}
+
+
 def load_schema() -> dict:
     with open(SCHEMA_PATH, encoding="utf-8") as f:
         return json.load(f)
@@ -116,21 +155,23 @@ def validate_white_model(model: dict) -> None:
     validator = jsonschema.Draft202012Validator(load_schema())
     problems = [f"{_path(error.absolute_path)}: {error.message}" for error in sorted(validator.iter_errors(model), key=lambda e: list(e.absolute_path))]
     if not problems:
-        problems = _column_problems(model["buildings"])
+        problems = _column_problems(model["buildings"], "buildings", "base_m", "roof_m")
+        if not problems and "trees" in model:
+            problems = _column_problems(model["trees"], "trees", "underside_m", "top_m")
     if problems:
         raise WhiteModelInvalid("The White model is invalid:\n  - " + "\n  - ".join(problems))
 
 
-def _column_problems(blocks: dict) -> list[str]:
-    lengths = {name: len(blocks[name]) for name in ("base_m", "roof_m", "ring")}
+def _column_problems(blocks: dict, what: str, under: str, over: str) -> list[str]:
+    lengths = {name: len(blocks[name]) for name in (under, over, "ring")}
     if len(set(lengths.values())) > 1:
-        return [f"buildings columns have different lengths: {lengths}"]
-    for i, (base, roof) in enumerate(zip(blocks["base_m"], blocks["roof_m"])):
-        if roof < base:
-            return [f"buildings[{i}] has its roof ({roof} m) below its base ({base} m)"]
+        return [f"{what} columns have different lengths: {lengths}"]
+    for i, (below, above) in enumerate(zip(blocks[under], blocks[over])):
+        if above < below:
+            return [f"{what}[{i}] has its {over} ({above} m) below its {under} ({below} m)"]
     for i, ring in enumerate(blocks["ring"]):
         if len(ring) % 2 != 0:
-            return [f"buildings.ring[{i}] has {len(ring)} numbers, which is not a whole number of lon/lat pairs"]
+            return [f"{what}.ring[{i}] has {len(ring)} numbers, which is not a whole number of lon/lat pairs"]
     return []
 
 

@@ -81,6 +81,7 @@ def build_course_bundle(
             "certified_distance_m": facts.certified_distance_m,
             "start": {"lat": facts.start_lat, "lon": facts.start_lon},
             "landmarks": [{"name": mark.name, "km": mark.km, "source": mark.source} for mark in facts.landmarks],
+            **({"leaves": {"state": facts.leaves.state, "note": facts.leaves.note, "source": facts.leaves.source}} if facts.leaves else {}),
         },
         "editions": [_edition_json(edition) for edition in editions],
         "measured": {

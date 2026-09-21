@@ -7,7 +7,7 @@
   "required": ["schema_version", "course_id", "generated_at", "pipeline_version", "corridor_m", "simplified_m", "buildings", "sources", "attributions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "course_id": { "$ref": "#/$defs/id" },
     "generated_at": {
       "description": "When the pipeline wrote this file, ISO-8601 with an explicit UTC offset.",
@@ -48,8 +48,31 @@
         }
       }
     },
+    "trees": {
+      "description": "The crowns along the course, as flat-topped patches of leaves standing off the ground. Absent for a course with no tree data. Unlike a building a crown does not block the sun from the ground up, so it carries an underside as well as a top, and the low sun both races are run under comes in beneath it (PLAN.md D60). Parallel columns: index i of every column describes the same crown.",
+      "type": "object",
+      "required": ["underside_m", "top_m", "ring"],
+      "additionalProperties": false,
+      "properties": {
+        "underside_m": {
+          "description": "Where the leaves start, in metres above the WGS84 ellipsoid. Worked out from the tree's height, never measured: no survey says where a crown begins.",
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "top_m": {
+          "description": "Where the leaves end, in metres above the WGS84 ellipsoid. Never below underside_m.",
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "ring": {
+          "description": "Each crown seen from above, as lon, lat, lon, lat\u2026 in degrees, going round once and not repeating the first point. A single tree is a disc; a patch of canopy traced off a raster is its own shape.",
+          "type": "array",
+          "items": { "type": "array", "minItems": 6, "items": { "type": "number" } }
+        }
+      }
+    },
     "sources": {
-      "description": "Every dataset these blocks were built from.",
+      "description": "Every dataset these blocks and crowns were built from.",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -67,7 +90,7 @@
       }
     },
     "attributions": {
-      "description": "Credits the app must show whenever these buildings are on screen.",
+      "description": "Credits the app must show whenever these buildings and crowns are on screen.",
       "type": "array",
       "minItems": 1,
       "items": {

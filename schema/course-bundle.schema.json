@@ -30,6 +30,17 @@
         },
         "certified_distance_m": { "type": "number", "exclusiveMinimum": 0 },
         "start": { "$ref": "#/$defs/position" },
+        "leaves": {
+          "description": "What the trees along the course are wearing on race day: a fact about the date and the city, hand-maintained with its source. Absent for a course nobody has written one for. How much leaf is on a given day is nobody's to predict, which is why tree shade is drawn as shade that depends on the leaves rather than as a measurement.",
+          "type": "object",
+          "required": ["state", "note", "source"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "description": "In a few words: \"full leaf\", \"turning \u2014 some leaves down\".", "type": "string", "minLength": 1 },
+            "note": { "description": "The sentence under it, for whoever asks.", "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/url" }
+          }
+        },
         "landmarks": {
           "type": "array",
           "items": {
@@ -91,7 +102,8 @@
           "properties": {
             "file": { "description": "The file's name, beside this bundle.", "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*\\.json$" },
             "buildings": { "description": "How many blocks it holds.", "type": "integer", "minimum": 0 },
-            "corridor_m": { "description": "How far either side of the course a building had to be to be kept.", "type": "number", "exclusiveMinimum": 0 }
+            "corridor_m": { "description": "How far either side of the course a building had to be to be kept.", "type": "number", "exclusiveMinimum": 0 },
+            "trees": { "description": "How many crowns it holds, where the course has tree data. The same crowns the leafy shade was worked out from.", "type": "integer", "minimum": 0 }
           }
         },
         "sun": {
@@ -117,6 +129,29 @@
               "description": "One bit per sample and step, base64. Sample-major, so each sample's row starts on a byte: sample i at step t is bit (7 - t % 8) of byte i * bytes_per_sample + t // 8, and 1 means the sun reaches it. The spare bits at the end of a row are 0.",
               "type": "string",
               "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+            },
+            "in_leaf_shade": {
+              "description": "The third state, packed exactly like in_sun: 1 where every building lets the sun through but a tree's crown does not \u2014 shade the runner gets only while the leaves are on (PLAN.md D58, D60). Never 1 where in_sun is 0: a building's shade is the stronger claim and wins. Absent for a course with no tree data, and then the layer has two states.",
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+            },
+            "trees": {
+              "description": "What the leafy shade was worked out from. Unlike the buildings there is one set, not two: a tree never reaches the course from outside the corridor, so what shades is what is drawn.",
+              "type": "object",
+              "required": ["counted", "within_m", "leaves_when_surveyed", "crown_depth_share"],
+              "additionalProperties": false,
+              "properties": {
+                "counted": { "description": "How many crowns could reach the course at all.", "type": "integer", "minimum": 0 },
+                "within_m": { "description": "No crown further than this from the course was kept, however tall.", "type": "number", "exclusiveMinimum": 0 },
+                "leaves_when_surveyed": { "description": "What the survey caught the trees wearing, in the runner's words. Not the state on race day, which is course.leaves.", "type": "string", "minLength": 1 },
+                "crown_depth_share": {
+                  "description": "How deep a crown is taken to be, as a share of the tree's height: the least and the most. Worked out, never measured \u2014 no survey says where a crown starts.",
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
             },
             "buildings": {
               "description": "What the shade was worked out from. A wider set than the White model draws and never shipped: a tall building reaches the course from far outside the drawn corridor, so beyond `within_m` a building is kept only if its height is at least its distance divided by `reach_per_meter`.",

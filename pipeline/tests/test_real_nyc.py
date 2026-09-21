@@ -95,7 +95,7 @@ def test_committed_nyc_bundle_matches_the_schema_and_the_real_course():
     check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])
     # The data it was built from is named, with a licence and the date it was fetched — the
     # buildings once, though both the White model and the shade table are worked out from them.
-    assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "geoid-egm2008", "openstreetmap", "nyc-building-footprints", "noaa-solar"} == {s["id"] for s in bundle["sources"]}
+    assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "geoid-egm2008", "openstreetmap", "nyc-building-footprints", "nyc-land-cover-2017", "noaa-solar"} == {s["id"] for s in bundle["sources"]}
     assert [s["id"] for s in bundle["sources"]].count("nyc-building-footprints") == 1
 
 
