@@ -192,7 +192,7 @@ where it is true, and nowhere else.
 _Avoid_: always sunny, exposure score, all-day sun
 
 **Sun table**:
-The Course Bundle's own answer for the Sun layer: one bit for every course sample and every
+The Course Bundle's own answer for the Shade layer: one bit for every course sample and every
 five-minute step of race day whose sun stands above the floor. The app looks up the column the
 runner's arrival falls in; it never works shade out itself.
 _Avoid_: shade map, sun grid
