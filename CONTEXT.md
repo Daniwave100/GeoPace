@@ -178,8 +178,27 @@ The layer of height, grade, and the effort a grade costs compared with flat grou
 _Avoid_: elevation layer, profile
 
 **Sun**:
-The layer of how much of a stretch is in direct sun when the runner gets there, always as a range.
-_Avoid_: shade layer, heat
+The layer of whether the sun is on the road, at the moment the runner reaches it. Binary, every
+10 m: in the sun, or in a building's shade. Never a share of a kilometre and never a range (D58).
+_Avoid_: shade layer, heat, percentage in sun
+
+**All-day sun**:
+Said of a stretch of road that is in the sun at **every** hour the shade is worked out for: the
+bridges and the wide avenues. A fact about the place, not about one runner's morning, and the Sun
+layer's second row.
+_Avoid_: always sunny, exposure score
+
+**Sun table**:
+The Course Bundle's own answer for the Sun layer: one bit for every course sample and every
+five-minute step of race day whose sun stands above the floor. The app looks up the column the
+runner's arrival falls in; it never works shade out itself.
+_Avoid_: shade map, sun grid
+
+**Floor**:
+The lowest sun shade is worked out for, 10°. Below it a city street is in shadow whatever anyone
+computes, so the answer there is *no direct sun*, stated rather than measured, and greyed like any
+filled-in value.
+_Avoid_: cutoff, threshold, minimum altitude
 
 **Wind**:
 The layer of how the wind has historically met a runner on each stretch on race morning.
