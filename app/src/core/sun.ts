@@ -1,4 +1,4 @@
-// The Sun layer's data: for every 10 m of road, is the sun on it at the moment the runner gets
+// The Shade layer's data: for every 10 m of road, is the sun on it at the moment the runner gets
 // there? Binary, never a share (PLAN.md D58) — "60% of this kilometre" was an artefact of
 // chopping the course into kilometres, and what a runner can picture is sun, shade, sun, shade.
 //
@@ -80,8 +80,11 @@ export function readSunTable(bundle: CourseBundle): SunTable | null {
     firstStepMs,
     stepMs,
     stepAt(ms) {
-      const step = Math.round((ms - firstStepMs) / stepMs);
-      return step >= 0 && step < block.steps ? step : null;
+      // Only inside the hours the table covers. Rounding alone would answer from the first or
+      // last column for a moment up to half a step outside them — where the sun is under the
+      // floor and the whole point is that nobody worked it out.
+      if (ms < firstStepMs || ms > firstStepMs + (block.steps - 1) * stepMs) return null;
+      return Math.round((ms - firstStepMs) / stepMs);
     },
     inSun,
     alwaysInSun(sample) {

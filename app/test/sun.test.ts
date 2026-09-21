@@ -193,7 +193,10 @@ describe("the Shade layer", () => {
     const marks = layer.lineMarks();
 
     expect(marks.length).toBeGreaterThan(20);
-    expect(new Set(marks.map((mark) => Math.sign(mark.howMuch ?? 0)))).toEqual(new Set([1, -1]));
+    // Warm where the sun is on the runner, teal where a building has them in shade, and grey with
+    // no colour at all where the road's own height is filled in.
+    expect(new Set(marks.map((mark) => Math.sign(mark.howMuch ?? 0)))).toEqual(new Set([1, 0, -1]));
+    expect(marks.filter((mark) => mark.encoding === "not-measured").every((mark) => mark.howMuch === undefined)).toBe(true);
     // Warm where the sun is on the runner, teal where a building has them in shade: the layer
     // says how much and which way, and core/mark-look.ts picks the colour (PLAN.md D47).
     for (const mark of marks) expect(Math.abs(mark.howMuch ?? 0)).toBeLessThanOrEqual(1);
@@ -222,6 +225,40 @@ describe("the Shade layer", () => {
     // Every clause here rests on a start time carried over from 2025, and says so.
     expect(layer.clause(27, "km")?.carriedOver).toBe(true);
     expect(shadeLayer(berlin, plannerFor(berlin, firstWavePlan(berlin)))!.clause(27, "km")?.carriedOver).toBe(false);
+  });
+
+  it("greys the stretches whose height was filled in, because the shade rests on that height", () => {
+    // CLAUDE.md's own trap: a height that was filled in must never look measured, on the map, on
+    // the strip or in the sentence. The ray is cast from the road's height, and at a 10° sun ten
+    // metres of it move a building's reach by nearly sixty.
+    const layer = layerFor(nyc);
+    const gaps = nyc.measured.elevation_not_measured;
+    const greyed = layer.lineMarks().filter((mark) => mark.encoding === "not-measured");
+
+    expect(greyed.map((mark) => [mark.fromKm, mark.toKm])).toEqual(gaps.map((gap) => [gap.km_start, gap.km_end]));
+    // Nothing solid is left lying over one of them.
+    for (const solid of layer.lineMarks().filter((mark) => mark.encoding === "measured")) {
+      for (const gap of gaps) expect(Math.min(solid.toKm, gap.km_end) - Math.max(solid.fromKm, gap.km_start)).toBeLessThanOrEqual(0);
+    }
+    // The Verrazzano's unscanned span, on the strip and in the sentence.
+    const onTheSpan = (gaps[0].km_start + gaps[0].km_end) / 2;
+    expect(layer.rows()[0].valueAt(onTheSpan, "km").notMeasured).toMatch(/filled in, not measured\. Verrazzano/);
+    expect(layer.clause(onTheSpan, "km")).toMatchObject({ encoding: "not-measured" });
+    expect(layer.rows()[0].bins(400).filter((bin) => !bin.measured).length).toBeGreaterThan(0);
+    // Berlin measures every metre of its course, so nothing there is greyed.
+    expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding === "measured")).toBe(true);
+  });
+
+  it("leaves a hole in the row where there is nothing to say, rather than calling the dark 'shade'", () => {
+    // A runner still out after sunset is not in a building's shade: the layer has no value for
+    // them, the map marks nothing, and the sentence's own sun clause says the sun is down.
+    const course = madeUpCourse();
+    const atNight = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "20:00", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+
+    expect(atNight.rows()[0].valueAt(0.5, "km")).toEqual({ text: "The sun is down", notMeasured: null });
+    expect(atNight.rows()[0].bins(100).every((bin) => bin.value === null)).toBe(true);
+    expect(atNight.lineMarks()).toEqual([]);
+    expect(atNight.clause(0.5, "km")).toBeNull();
   });
 
   it("greys what it didn't work out, on the strip, on the map and in words", () => {

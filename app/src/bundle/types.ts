@@ -32,8 +32,8 @@ export interface CourseBundle {
     white_model?: { file: string; buildings: number; corridor_m: number };
     /**
      * Where the sun is through race day, and whether it reaches each course sample at the moment
-     * a runner gets there: the Sun layer's data (app/src/core/sun.ts). Binary, never a share.
-     * Absent for a course nobody has building data for, and then there is no Sun layer.
+     * a runner gets there: the Shade layer's data (app/src/core/sun.ts). Binary, never a share.
+     * Absent for a course nobody has building data for, and then there is no Shade layer.
      */
     sun?: SunBlock;
     difficulty_model: {

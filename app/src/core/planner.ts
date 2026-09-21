@@ -91,7 +91,7 @@ export interface Planner {
   startInstant: Date;
   at(km: number): Readout;
   /**
-   * Just the moment the runner reaches `km`, without the words that go round it. The Sun layer
+   * Just the moment the runner reaches `km`, without the words that go round it. The Shade layer
    * asks this for every one of four thousand samples whenever the plan changes; `at` would build
    * a time of day and a zone name for each.
    */

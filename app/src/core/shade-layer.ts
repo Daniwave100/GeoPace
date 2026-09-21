@@ -15,10 +15,10 @@
 // and the wide avenues — had a row of its own for a day. The owner had it taken out (09-21: "just
 // one sun chart is fine"): a row that is empty for 38 of Berlin's 42 km asks more of the screen
 // than it gives back. It keeps its place in the sentence, which says it where it is true.
-import type { CourseBundle } from "../bundle/types";
+import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
 import type { Clause, HowMuch, Layer, LineMark, RowBin, RowValue, StripRow } from "./layers";
 import type { Planner } from "./planner";
-import { sunAlong, type SunAt, type SunState } from "./sun";
+import { sunAlong, type SunAt, type SunRun, type SunState } from "./sun";
 import { formatNearby, type Units } from "./units";
 
 /** How deep the warm and the teal are on a binary layer: one step, not a scale. */
@@ -42,6 +42,12 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
   const firstStep = new Date(along.table.firstStepMs);
   const lastStep = new Date(along.table.firstStepMs + (along.table.block.steps - 1) * along.table.stepMs);
 
+  // Where the road's own height was filled in rather than measured (a bridge deck the ground
+  // model leaves out, a gap in a scan), so was the shade: the ray is cast from that height, and
+  // at a 10-degree sun ten metres of height moves a block's reach by nearly sixty. Those
+  // stretches are greyed here exactly as Hills greys them (PLAN.md D45, D47).
+  const gaps = bundle.measured.elevation_not_measured;
+
   const row: StripRow = {
     id: "shade",
     name: "Shade",
@@ -52,20 +58,28 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     scale: () => "when you get there",
     // What every number here rests on, where the numbers are (issue #9: the clear-sky caveat).
     summary: () => "clear sky, no trees",
-    bins: (count) => binned(count).map((bin) => rowBin(bin, dominant(along.states, bin))),
+    bins: (count) => binned(count).map((bin) => rowBin(bin, along.states, gaps)),
     domain: [-1, 1],
     // The middle of this row is not a value: there is no zero between sun and shade.
     baseline: "middle",
     stepped: true,
-    valueAt: (km) => valueAt(along.at(km), floorDeg),
-    howMuch: (count) => binned(count).map((bin) => howMuch(dominant(along.states, bin))),
+    valueAt: (km) => valueAt(along.at(km), floorDeg, filledIn(gaps, km)),
+    howMuch: (count) => binned(count).map((bin) => (rowBin(bin, along.states, gaps).measured ? howMuch(dominant(along.states, bin)) : 0)),
   };
 
   // The sun being down is not a thing to mark: there is no sun on the runner and no building
-  // keeping it off them, and the sentence says so in words.
-  const marks: LineMark[] = along.runs
-    .filter((run) => run.state !== "down")
-    .map((run) => ({ fromKm: run.fromKm, toKm: run.toKm, encoding: run.state === "unknown" ? "not-measured" : "measured", howMuch: howMuch(run.state) || undefined }));
+  // keeping it off them, and the sentence says so in words. What is left is cut around the
+  // stretches whose height is filled in, which are greyed whatever the sun is doing over them.
+  const marks: LineMark[] = [
+    ...along.runs
+      .filter((run) => run.state !== "down")
+      .flatMap((run) =>
+        measuredParts(run, gaps).map(
+          (part): LineMark => ({ fromKm: part.fromKm, toKm: part.toKm, encoding: run.state === "unknown" ? "not-measured" : "measured", howMuch: howMuch(run.state) || undefined }),
+        ),
+      ),
+    ...gaps.map((gap): LineMark => ({ fromKm: gap.km_start, toKm: gap.km_end, encoding: "not-measured" })),
+  ].sort((a, b) => a.fromKm - b.fromKm);
 
   return {
     id: "shade",
@@ -74,7 +88,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],
-    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }),
+    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km)),
   };
 }
 
@@ -85,7 +99,7 @@ interface ModelledHours {
   timezone: string;
 }
 
-function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorDeg: number, carriedOver: boolean, hours: ModelledHours): Clause | null {
+function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorDeg: number, carriedOver: boolean, hours: ModelledHours, gap: NotMeasuredSpan | undefined): Clause | null {
   // The sentence's own last clause already says the sun is down; twice is not clearer.
   if (at.state === "down") return null;
   if (at.state === "unknown") {
@@ -94,7 +108,7 @@ function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorD
       text: tooLow ? "The sun is too low to reach the street." : "Shade isn't worked out for this time of day.",
       encoding: "not-measured",
       note: tooLow
-        ? `Under ${floorDeg}° the sun doesn't reach into a city street, so shade isn't worked out below that. It is ${Math.max(Math.round(at.altitudeDeg), 1)}° up where you are.`
+        ? `Under ${floorDeg}° the sun doesn't reach into a city street, so shade isn't worked out below that. It is ${at.altitudeDeg.toFixed(1)}° up where you are.`
         : `The shade was worked out for race day between ${clock(hours.firstStep, hours.timezone)} and ${clock(hours.lastStep, hours.timezone)}. You reach here outside that.`,
       carriedOver,
     };
@@ -104,6 +118,8 @@ function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorD
   const text = at.alwaysInSun
     ? `No shade${howFar(at.alwaysUntilKm, km, lengthKm, units)}, at any hour.`
     : `In ${at.state === "sun" ? "the sun" : "shade"}${howFar(at.untilKm, km, lengthKm, units)}.`;
+  // The shade was worked out from the road's own height. Where that height is filled in, so is this.
+  if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}`, carriedOver };
   return { text, encoding: "measured", carriedOver };
 }
 
@@ -117,10 +133,29 @@ function howFar(untilKm: number, km: number, lengthKm: number, units: Units): st
   return ahead.startsWith("0 ") ? "" : ` for the next ${ahead}`;
 }
 
+/** The stretch of filled-in height the runner is standing on, if they are standing on one. */
+function filledIn(gaps: NotMeasuredSpan[], km: number): NotMeasuredSpan | undefined {
+  return gaps.find((gap) => km >= gap.km_start && km <= gap.km_end);
+}
+
+/** The parts of a run whose height is measured: the run, with every filled-in stretch cut out. */
+function measuredParts(run: SunRun, gaps: NotMeasuredSpan[]): { fromKm: number; toKm: number }[] {
+  const parts: { fromKm: number; toKm: number }[] = [];
+  let reached = run.fromKm;
+  for (const gap of gaps.filter((candidate) => candidate.km_start < run.toKm && candidate.km_end > run.fromKm)) {
+    if (gap.km_start > reached) parts.push({ fromKm: reached, toKm: gap.km_start });
+    reached = Math.max(reached, Math.min(gap.km_end, run.toKm));
+  }
+  if (reached < run.toKm) parts.push({ fromKm: reached, toKm: run.toKm });
+  return parts;
+}
+
 /** The value under the cursor, and why it is a filled-in one where it is. */
-function valueAt(at: SunAt, floorDeg: number): RowValue {
-  if (at.state === "sun") return { text: "In the sun", notMeasured: null };
-  if (at.state === "shade") return { text: "In shade", notMeasured: null };
+function valueAt(at: SunAt, floorDeg: number, gap: NotMeasuredSpan | undefined): RowValue {
+  if (at.state === "sun" || at.state === "shade") {
+    const text = at.state === "sun" ? "In the sun" : "In shade";
+    return { text, notMeasured: gap ? `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}` : null };
+  }
   if (at.state === "down") return { text: "The sun is down", notMeasured: null };
   return at.altitudeDeg < floorDeg
     ? { text: "No direct sun", notMeasured: `The sun is under ${floorDeg}° here, too low to reach a city street, so shade isn't worked out.` }
@@ -140,8 +175,24 @@ interface ShadeBin {
   to: number;
 }
 
-function rowBin(bin: ShadeBin, state: SunState): RowBin {
-  return { startKm: bin.startKm, midKm: bin.midKm, endKm: bin.endKm, value: state === "sun" ? 1 : -1, measured: state !== "unknown" };
+/**
+ * One slice of the strip. Any part of it that isn't measured makes the whole slice not measured —
+ * the any-overlap rule Hills uses, and the opposite of a majority vote, which would swallow up to
+ * half a slice of filled-in or not-worked-out road into a solid, measured-looking run. A slice
+ * with nothing to say at all — night, or hours outside the table — is a hole, not a value.
+ */
+function rowBin(bin: ShadeBin, states: SunState[], gaps: NotMeasuredSpan[]): RowBin {
+  const inside = states.slice(bin.from, bin.to);
+  const known = inside.filter((state) => state === "sun" || state === "shade");
+  const sunlit = known.filter((state) => state === "sun").length;
+  const filledIn = gaps.some((gap) => gap.km_start < bin.endKm && gap.km_end > bin.startKm);
+  return {
+    startKm: bin.startKm,
+    midKm: bin.midKm,
+    endKm: bin.endKm,
+    value: known.length === 0 ? null : sunlit * 2 >= known.length ? 1 : -1,
+    measured: !filledIn && !inside.some((state) => state === "unknown"),
+  };
 }
 
 /** A bin is drawn as the state most of it is in: the line and the map keep every 10 m of it. */
