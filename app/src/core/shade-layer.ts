@@ -231,16 +231,17 @@ function rowBin(bin: ShadeBin, states: SunState[], gaps: NotMeasuredSpan[]): Row
   const sunlit = known.filter((state) => state === "sun").length;
   const value = known.length === 0 ? null : sunlit * 2 >= known.length ? 1 : -1;
   const filledIn = gaps.some((gap) => gap.km_start < bin.endKm && gap.km_end > bin.startKm);
-  // A shaded slice is drawn as the leaves' if that is where most of its shade comes from: the
-  // condition travels with the claim, and a slice half wall and half leaf is not a leafy one.
-  const leafy = known.filter((state) => state === "leafy").length;
-  const shaded = known.length - sunlit;
+  // The value is what most of the slice is; the claim is the weakest one in it. A ninety-metre
+  // slice that is thirty metres of wall and sixty of leaf is shade — and it is shade that depends
+  // on the leaves, because saying "solid" over it would promise the runner sixty metres of shade
+  // they only get while the leaves are on. Same rule as "not measured if any of it isn't" (D59).
+  const leafy = inside.some((state) => state === "leafy");
   return {
     startKm: bin.startKm,
     midKm: bin.midKm,
     endKm: bin.endKm,
     value,
-    encoding: filledIn || inside.some((state) => state === "unknown") ? "not-measured" : value === -1 && leafy * 2 > shaded ? "depends-on-leaves" : "measured",
+    encoding: filledIn || inside.some((state) => state === "unknown") ? "not-measured" : value === -1 && leafy ? "depends-on-leaves" : "measured",
   };
 }
 
