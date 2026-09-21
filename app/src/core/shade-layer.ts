@@ -76,7 +76,11 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     baseline: "middle",
     stepped: true,
     valueAt: (km) => valueAt(along.at(km), floorDeg, filledIn(gaps, km)),
-    howMuch: (count) => binned(count).map((bin) => (rowBin(bin, along.states, gaps).encoding === "not-measured" ? 0 : howMuch(dominant(along.states, bin)))),
+    // The fill follows the slice's own value, never a second count of its own: with three states
+    // to share out, "the commonest state" and "sun or shade" can disagree — 40 sun, 35 shade, 25
+    // leafy is a shaded slice whose commonest single state is sun — and the row would then be
+    // drawn below the middle in the colour of above it.
+    howMuch: (count) => binned(count).map((bin) => fillOf(rowBin(bin, along.states, gaps))),
   };
 
   // The sun being down is not a thing to mark: there is no sun on the runner and no building
@@ -214,6 +218,12 @@ function howMuch(state: SunState): HowMuch {
   return state === "sun" ? MARK : state === "shade" || state === "leafy" ? -MARK : 0;
 }
 
+/** How a slice of the strip is filled: warm above the line, teal below, nothing where it is filled in. */
+function fillOf(bin: RowBin): HowMuch {
+  if (bin.value === null || bin.encoding === "not-measured") return 0;
+  return bin.value > 0 ? MARK : -MARK;
+}
+
 /** One slice of the course, and which of its samples fall in it. */
 interface ShadeBin {
   startKm: number;
@@ -247,13 +257,6 @@ function rowBin(bin: ShadeBin, states: SunState[], gaps: NotMeasuredSpan[]): Row
     value,
     encoding: filledIn || inside.some((state) => state === "unknown") ? "not-measured" : value === -1 && leafy ? "depends-on-leaves" : "measured",
   };
-}
-
-/** A bin is drawn as the state most of it is in: the line and the map keep every 10 m of it. */
-function dominant(states: SunState[], bin: ShadeBin): SunState {
-  const counts = new Map<SunState, number>();
-  for (let sample = bin.from; sample < bin.to; sample += 1) counts.set(states[sample], (counts.get(states[sample]) ?? 0) + 1);
-  return [...counts].sort((a, b) => b[1] - a[1])[0][0];
 }
 
 /** The strip redraws at the same width far more often than the width changes. */

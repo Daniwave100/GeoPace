@@ -408,6 +408,23 @@ describe("the third state: shade that depends on the leaves", () => {
     expect(() => parseCourseBundle(short, "berlin")).toThrow(/in_leaf_shade is \d+ bytes/);
   });
 
+  it("never fills a slice warm below the line or teal above it", () => {
+    // Three states share out one slice, so "the commonest state" is no longer the same question as
+    // "sun or shade": 40 sun, 35 shade and 25 leafy is a shaded slice whose commonest single state
+    // is sun. The fill follows the slice's own value, so the two can't come apart.
+    for (const bundle of [berlin, nyc]) {
+      const row = layerFor(bundle).rows()[0];
+      const bins = row.bins(400);
+      const fill = row.howMuch!(400);
+      bins.forEach((bin, i) => {
+        if (bin.value === null || fill[i] === 0) return;
+        expect(Math.sign(fill[i]), `${bundle.course_id} slice at km ${bin.startKm.toFixed(2)}`).toBe(Math.sign(bin.value));
+      });
+      expect(fill.some((amount) => amount > 0)).toBe(true);
+      expect(fill.some((amount) => amount < 0)).toBe(true);
+    }
+  });
+
   it("keeps the leaf state one step away, in the key under the strip", () => {
     expect(layerFor(berlin).key).toContain(berlin.course.leaves!.state);
     expect(berlin.course.leaves!.source).toMatch(/^https?:\/\//);
