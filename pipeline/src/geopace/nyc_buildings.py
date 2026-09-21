@@ -57,21 +57,27 @@ def buildings_model(allow_download: bool = True) -> BuildingsModel:
     """New York's buildings. Unlike Berlin's, they come with the ground they stand on."""
     folder = cache_dir() / "nyc" / "buildings"
 
-    def within(south: float, west: float, north: float, east: float) -> list[Building]:
+    def within(south: float, west: float, north: float, east: float, min_height_m: float = 0.0) -> list[Building]:
         box = (south, west, north, east)
-        pages = cached_pages(folder, box, "json", lambda offset: box_url(*box, offset), lambda page: len(json.loads(page)), allow_download)
+        pages = cached_pages(folder, box, "json", lambda offset: box_url(*box, offset, min_height_m), lambda page: len(json.loads(page)), allow_download, min_height_m)
         return parse_buildings(pages)
 
     return BuildingsModel(within=within, source=SOURCE, attribution=ATTRIBUTION)
 
 
-def box_url(south: float, west: float, north: float, east: float, offset: int = 0) -> str:
-    """One page of the buildings whose outline meets a box, as the city's query language asks it."""
+def box_url(south: float, west: float, north: float, east: float, offset: int = 0, min_height_m: float = 0.0) -> str:
+    """One page of the buildings whose outline meets a box, as the city's query language asks it.
+
+    `min_height_m` keeps the city from sending what a wide band doesn't want: out past the
+    corridor, only a building tall enough to reach the course is any use (shade.py). The city
+    publishes its heights in US survey feet, so that is what the query has to be written in.
+    """
     corners = [(west, south), (east, south), (east, north), (west, north), (west, south)]
     box = "POLYGON((" + ",".join(f"{lon:.6f} {lat:.6f}" for lon, lat in corners) + "))"
+    tall_enough = f" AND height_roof > {min_height_m / US_SURVEY_FOOT_M:.2f}" if min_height_m > 0 else ""
     query = [
         ("$select", "the_geom,doitt_id,height_roof,ground_elevation,feature_code"),
-        ("$where", f"intersects(the_geom,'{box}')"),
+        ("$where", f"intersects(the_geom,'{box}'){tall_enough}"),
         ("$limit", str(PAGE)),
         ("$offset", str(offset)),
         # Without an order the city may answer the pages of one box in any order, and repeat rows.

@@ -4,7 +4,9 @@ The Course Bundle is the one contract between this pipeline and the app. Its sha
 by schema/course-bundle.schema.json at the repo root, which the app validates against too.
 """
 
+import base64
 import json
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -122,6 +124,18 @@ def build_course_bundle(
     return bundle
 
 
+def credit(bundle: dict, source: Source, attribution: Attribution | None = None) -> None:
+    """Name a dataset in the bundle, and its credit if it asks for one, without repeating either.
+
+    The buildings are read twice over — once for the blocks the White model draws, once for the
+    wider set shade is worked out from — and a runner should see one entry, not two.
+    """
+    if all(listed["id"] != source.id for listed in bundle["sources"]):
+        bundle["sources"].append(source.to_json())
+    if attribution is not None and all(listed["text"] != attribution.text for listed in bundle["attributions"]):
+        bundle["attributions"].append(attribution.to_json())
+
+
 def check_length(length_m: float, certified_m: float, traced: bool = False) -> None:
     tolerance = TRACED_LENGTH_TOLERANCE if traced else LENGTH_TOLERANCE
     off = (length_m - certified_m) / certified_m
@@ -205,7 +219,7 @@ def validate_bundle(bundle: dict) -> None:
         for error in sorted(validator.iter_errors(bundle), key=lambda e: list(e.absolute_path))
     ]
     if not problems:
-        problems = _column_problems(bundle["measured"]["course_line"])
+        problems = _column_problems(bundle["measured"]["course_line"]) + _sun_problems(bundle["measured"])
     if problems:
         raise BundleInvalid("Course Bundle is invalid:\n  - " + "\n  - ".join(problems))
 
@@ -220,6 +234,26 @@ def _column_problems(line: dict) -> list[str]:
         if km[i] <= km[i - 1]:
             return [f"course_line.km must increase, but km[{i}] = {km[i]} follows {km[i - 1]}"]
     return []
+
+
+def _sun_problems(measured: dict) -> list[str]:
+    """The sun table is a course's worth of bits: it has to line up with the course line itself."""
+    sun = measured.get("sun")
+    if sun is None:
+        return []
+    samples = len(measured["course_line"]["km"])
+    problems = []
+    if sun["samples"] != samples:
+        problems.append(f"sun.samples is {sun['samples']}, but the course line has {samples} samples")
+    for name in ("altitude_deg", "azimuth_deg"):
+        if len(sun[name]) != sun["steps"]:
+            problems.append(f"sun.{name} has {len(sun[name])} values for {sun['steps']} steps")
+    if sun["bytes_per_sample"] != math.ceil(sun["steps"] / 8):
+        problems.append(f"sun.bytes_per_sample is {sun['bytes_per_sample']}, but {sun['steps']} steps need {math.ceil(sun['steps'] / 8)}")
+    bits = len(base64.b64decode(sun["in_sun"]))
+    if bits != sun["samples"] * sun["bytes_per_sample"]:
+        problems.append(f"sun.in_sun is {bits} bytes, but {sun['samples']} samples of {sun['bytes_per_sample']} bytes need {sun['samples'] * sun['bytes_per_sample']}")
+    return problems
 
 
 def _path(parts) -> str:

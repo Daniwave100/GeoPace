@@ -12,6 +12,7 @@ Two things the records don't carry, and where they come from instead:
   - a height for every building: the city says some couldn't be worked out. Those are not drawn.
 """
 
+import urllib.parse
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -54,15 +55,18 @@ ATTRIBUTION = Attribution(
 GML = "http://www.opengis.net/gml/3.2"
 WFS = "http://www.opengis.net/wfs/2.0"
 LAYER = "ua_gebaeudehoehen"
+# What the service calls the outline and the height, for a filter that asks about them.
+GEOMETRY_FIELD = "geom"
+HEIGHT_FIELD = "hoehe"
 
 
 def buildings_model(elevation: ElevationModel, allow_download: bool = True) -> BuildingsModel:
     """Berlin's buildings, standing on the heights of the city's own bare-earth model."""
     folder = cache_dir() / "berlin" / "buildings"
 
-    def within(south: float, west: float, north: float, east: float) -> list[Building]:
+    def within(south: float, west: float, north: float, east: float, min_height_m: float = 0.0) -> list[Building]:
         box = (south, west, north, east)
-        pages = cached_pages(folder, box, "xml", lambda start: box_url(*box, start), lambda page: _count(page, "numberReturned"), allow_download)
+        pages = cached_pages(folder, box, "xml", lambda start: box_url(*box, start, min_height_m), lambda page: _count(page, "numberReturned"), allow_download, min_height_m)
         return stand_on_the_ground(parse_buildings(pages), elevation)
 
     return BuildingsModel(within=within, source=SOURCE, attribution=ATTRIBUTION)
@@ -86,8 +90,13 @@ def stand_on_the_ground(blocks: list[tuple[str, np.ndarray, float]], elevation: 
     ]
 
 
-def box_url(south: float, west: float, north: float, east: float, start: int = 0) -> str:
-    """One page of the buildings in a box. The box goes in the city's own meters (EPSG:25833)."""
+def box_url(south: float, west: float, north: float, east: float, start: int = 0, min_height_m: float = 0.0) -> str:
+    """One page of the buildings in a box. The box goes in the city's own meters (EPSG:25833).
+
+    With a `min_height_m`, the box goes inside a filter instead of in the BBOX parameter — the
+    two are alternatives in WFS, not companions — and the service does the height test itself, so
+    a wide band only sends back the buildings tall enough to reach the course (shade.py).
+    """
     (min_x, max_x), (min_y, max_y) = to_utm33([west, east], [south, north])
     query = [
         ("SERVICE", "WFS"),
@@ -97,9 +106,25 @@ def box_url(south: float, west: float, north: float, east: float, start: int = 0
         ("COUNT", str(PAGE)),
         ("STARTINDEX", str(start)),
         ("SRSNAME", "urn:ogc:def:crs:EPSG::25833"),
-        ("BBOX", f"{min_x:.1f},{min_y:.1f},{max_x:.1f},{max_y:.1f},urn:ogc:def:crs:EPSG::25833"),
     ]
+    if min_height_m > 0:
+        query.append(("FILTER", urllib.parse.quote(_tall_in_the_box(min_x, min_y, max_x, max_y, min_height_m))))
+    else:
+        query.append(("BBOX", f"{min_x:.1f},{min_y:.1f},{max_x:.1f},{max_y:.1f},urn:ogc:def:crs:EPSG::25833"))
     return SERVICE_URL + "?" + "&".join(f"{key}={value}" for key, value in query)
+
+
+def _tall_in_the_box(min_x: float, min_y: float, max_x: float, max_y: float, min_height_m: float) -> str:
+    """The OGC filter for "in this box and at least this tall", as one line of XML."""
+    return (
+        '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0" xmlns:gml="http://www.opengis.net/gml/3.2"><fes:And>'
+        f'<fes:BBOX><fes:ValueReference>{GEOMETRY_FIELD}</fes:ValueReference>'
+        '<gml:Envelope srsName="urn:ogc:def:crs:EPSG::25833">'
+        f"<gml:lowerCorner>{min_x:.1f} {min_y:.1f}</gml:lowerCorner><gml:upperCorner>{max_x:.1f} {max_y:.1f}</gml:upperCorner>"
+        "</gml:Envelope></fes:BBOX>"
+        f"<fes:PropertyIsGreaterThan><fes:ValueReference>{HEIGHT_FIELD}</fes:ValueReference><fes:Literal>{min_height_m:.1f}</fes:Literal></fes:PropertyIsGreaterThan>"
+        "</fes:And></fes:Filter>"
+    )
 
 
 def _count(text: str, attribute: str) -> int:
