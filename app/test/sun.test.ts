@@ -170,22 +170,23 @@ describe("the Shade layer", () => {
 
   it("draws nothing dashed on a course where everything is measured", () => {
     // Berlin has no filled-in heights and no hours outside the table for this plan, so nothing on
-    // its strip may be dashed or grey. The Sun row hangs from the middle of itself rather than
-    // from a value, because a dotted rule across a row reads as "not measured here" (the owner
-    // asked what it was, 09-21).
+    // its strip may be dashed or grey — though a tree's shade is halftone, which is a claim with a
+    // condition on it, not a gap. The Shade row hangs from the middle of itself rather than from a
+    // value, because a dotted rule across a row reads as "not measured here" (the owner asked what
+    // it was, 09-21).
     const [row] = layerFor(berlin).rows();
 
     expect(row.baseline).toBe("middle");
-    expect(row.bins(400).every((bin) => bin.measured && bin.value !== null)).toBe(true);
-    expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding === "measured")).toBe(true);
+    expect(row.bins(400).every((bin) => bin.encoding !== "not-measured" && bin.value !== null)).toBe(true);
+    expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding !== "not-measured")).toBe(true);
   });
 
   it("says what the numbers rest on, where the numbers are", () => {
     const [row] = layerFor(berlin).rows();
 
-    expect(row.summary?.("km")).toBe("clear sky, no trees");
+    expect(row.summary?.("km")).toBe("clear sky, buildings and trees");
     expect(layerFor(berlin).key).toMatch(/clear sky/i);
-    expect(layerFor(berlin).key).toMatch(/trees are not in yet/i);
+    expect(layerFor(berlin).key).toMatch(/while the leaves are on/i);
   });
 
   it("marks the course line in stretches of sun and stretches of shade, and never in percentages", () => {
@@ -207,10 +208,12 @@ describe("the Shade layer", () => {
   it("says one plain thing in the sentence: what the sun is doing, and how long it lasts", () => {
     const layer = layerFor(nyc);
 
-    // The Verrazzano is never in shade at any hour, which is the more useful thing to be told —
-    // and the distance is that stretch's own, not this moment's sunshine.
+    // The Verrazzano's main span is never in shade at any hour, which is the more useful thing to
+    // be told — and the distance is that stretch's own, not this moment's sunshine. (The claim
+    // stops short of the Brooklyn end now that the trees are in it: coming down off the bridge the
+    // deck drops to the height of the trees beside it, and at the lowest sun we model one of them
+    // reaches it. That is the leaves taking a strong claim away, which is what they are for.)
     expect(layer.clause(1.5, "km")?.text).toMatch(/^No shade for the next [\d.]+ (m|km), at any hour\.$/);
-    expect(layer.clause(2.5, "km")?.text).toBe("No shade for the next 300 m, at any hour."); // to the end of the bridge
     expect(layer.clause(27, "km")?.text).toMatch(/^In (the sun|shade) for the next [\d.]+ (m|km)\.$/);
     expect(layer.clause(27, "mi")?.text).toMatch(/(ft|mi)\./);
     // At the very end of a stretch there is no distance worth printing, and none is printed.
@@ -244,9 +247,9 @@ describe("the Shade layer", () => {
     const onTheSpan = (gaps[0].km_start + gaps[0].km_end) / 2;
     expect(layer.rows()[0].valueAt(onTheSpan, "km").notMeasured).toMatch(/filled in, not measured\. Verrazzano/);
     expect(layer.clause(onTheSpan, "km")).toMatchObject({ encoding: "not-measured" });
-    expect(layer.rows()[0].bins(400).filter((bin) => !bin.measured).length).toBeGreaterThan(0);
+    expect(layer.rows()[0].bins(400).filter((bin) => bin.encoding === "not-measured").length).toBeGreaterThan(0);
     // Berlin measures every metre of its course, so nothing there is greyed.
-    expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding === "measured")).toBe(true);
+    expect(layerFor(berlin).lineMarks().every((mark) => mark.encoding !== "not-measured")).toBe(true);
   });
 
   it("leaves a hole in the row where there is nothing to say, rather than calling the dark 'shade'", () => {
@@ -337,3 +340,66 @@ function pack(rows: boolean[][]): string {
   rows.forEach((row, sample) => row.forEach((lit, step) => (bytes[sample * bytesPerSample + (step >> 3)] |= lit ? 128 >> (step & 7) : 0)));
   return btoa(String.fromCharCode(...bytes));
 }
+
+describe("the third state: shade that depends on the leaves", () => {
+  // PLAN.md D60, issue #10. A tree's shade is real and measured, and it is also a claim with a
+  // condition on it — the leaves have to be there. So it is its own state everywhere the layer
+  // speaks: the poster's halftone on the course line and under the strip's fill, and the words
+  // "leafy shade" in the sentence, with what the trees are wearing on race day printed under it.
+  const layerFor = (bundle: CourseBundle) => shadeLayer(bundle, plannerFor(bundle, firstWavePlan(bundle)))!;
+
+  it("is in both courses' tables, and never where a building already has the runner in shade", () => {
+    for (const bundle of [berlin, nyc]) {
+      const table = readSunTable(bundle)!;
+      expect(table.hasTrees, bundle.course_id).toBe(true);
+      const samples = bundle.measured.course_line.km.length;
+      let leafy = 0;
+      for (let sample = 0; sample < samples; sample += 37) {
+        for (let step = 0; step < table.block.steps; step += 7) {
+          if (!table.inLeafShade(sample, step)) continue;
+          leafy += 1;
+          // The stronger claim wins: shade you get whatever the trees do.
+          expect(table.inSun(sample, step), `${bundle.course_id} sample ${sample} step ${step}`).toBe(true);
+        }
+      }
+      expect(leafy, `${bundle.course_id} has leafy shade somewhere`).toBeGreaterThan(0);
+    }
+  });
+
+  it("marks the course line in halftone where a tree casts it, and solid where a wall does", () => {
+    const marks = layerFor(berlin).lineMarks();
+    const leafy = marks.filter((mark) => mark.encoding === "depends-on-leaves");
+
+    expect(leafy.length).toBeGreaterThan(0);
+    // It is shade, so it is the same teal, at the same depth as a building's: what differs is the
+    // claim, not how dark it is.
+    const shade = marks.filter((mark) => mark.encoding === "measured" && (mark.howMuch ?? 0) < 0);
+    expect(new Set(leafy.map((mark) => mark.howMuch))).toEqual(new Set(shade.map((mark) => mark.howMuch)));
+  });
+
+  it("says it in words, with what the trees are wearing on race day under the sentence", () => {
+    const layer = layerFor(berlin);
+    const along = sunAlong(berlin, plannerFor(berlin, firstWavePlan(berlin)))!;
+    const underTrees = berlin.measured.course_line.km[along.states.findIndex((state) => state === "leafy")];
+    const clause = layer.clause(underTrees, "km")!;
+
+    expect(clause.text).toMatch(/^In leafy shade/);
+    expect(clause.encoding).toBe("depends-on-leaves");
+    expect(clause.note).toContain(berlin.course.leaves!.state);
+    expect(clause.note).toContain(berlin.measured.sun!.trees!.leaves_when_surveyed);
+    expect(layer.rows()[0].valueAt(underTrees, "km").text).toBe("In leafy shade");
+  });
+
+  it("counts the leaves in the strongest thing it says: a road under trees is not a road with no shade", () => {
+    const table = readSunTable(berlin)!;
+    const along = sunAlong(berlin, plannerFor(berlin, firstWavePlan(berlin)))!;
+    const underTrees = along.states.findIndex((state) => state === "leafy");
+
+    expect(table.alwaysInSun(underTrees)).toBe(false);
+  });
+
+  it("keeps the leaf state one step away, in the key under the strip", () => {
+    expect(layerFor(berlin).key).toContain(berlin.course.leaves!.state);
+    expect(berlin.course.leaves!.source).toMatch(/^https?:\/\//);
+  });
+});

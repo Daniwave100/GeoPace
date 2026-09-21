@@ -178,17 +178,17 @@ describe("the strip's own row, the height", () => {
   });
 });
 
-describe("the four encodings", () => {
+describe("the five encodings", () => {
   const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
   const all = Object.keys(ENCODINGS) as Encoding[];
 
-  it("are measured, runner report, not measured here, and sample", () => {
-    expect(all).toEqual(["measured", "runner-report", "not-measured", "sample"]);
+  it("are measured, runner report, not measured here, depends on the leaves, and sample", () => {
+    expect(all).toEqual(["measured", "runner-report", "not-measured", "depends-on-leaves", "sample"]);
   });
 
-  it("each look different from the other three on every surface: the map, the strip and text", () => {
-    expect(new Set(all.map((encoding) => ENCODINGS[encoding].cssClass)).size).toBe(4);
-    expect(new Set(all.map((encoding) => ENCODINGS[encoding].mapLine)).size).toBe(4);
+  it("each look different from the other four on every surface: the map, the strip and text", () => {
+    expect(new Set(all.map((encoding) => ENCODINGS[encoding].cssClass)).size).toBe(5);
+    expect(new Set(all.map((encoding) => ENCODINGS[encoding].mapLine)).size).toBe(5);
   });
 
   it("are drawn by one class each, which the stylesheet defines for every surface: words, strip marks and map labels", () => {
@@ -203,6 +203,7 @@ describe("the four encodings", () => {
 
   it("say in words what a reader who can't rely on the look needs to hear", () => {
     expect(ENCODINGS["not-measured"].saidAfter).toBe("Not measured here.");
+    expect(ENCODINGS["depends-on-leaves"].saidAfter).toBe("While the leaves are on.");
     expect(ENCODINGS.sample.saidAfter).toBe("(sample)");
     expect(ENCODINGS.measured.saidAfter).toBe("");
   });

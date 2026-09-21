@@ -1,10 +1,11 @@
 // A strip row drawn the instrument's way (PLAN.md D31): a thin trace with a light fill. This
 // module only works out the shapes, as SVG path strings; strip/strip.ts puts them on the page.
 //
-// Measured stretches are a solid line with a fill hanging from the row's baseline. Stretches that
+// Stretches whose value is measured are a solid line with a fill hanging from the row's baseline. Stretches that
 // are not measured here get a dashed grey line and no fill, joined up to the solid line either
 // side. Where the row has no value at all (a grade outside the effort model), there is no line,
 // only a grey block: nothing is ever drawn through a hole.
+import type { Encoding } from "./encoding";
 import type { HowMuch, RowBin, StripRow } from "./layers";
 import { linearScale, measuredRuns, type Scale } from "./layout";
 
@@ -22,8 +23,8 @@ export interface TracePaths {
   noValue: { x: number; width: number }[];
   /** Where the baseline sits, for rows that hang from a value rather than from the bottom. */
   baselineY: number;
-  /** For a row that says how much as well as where: a block from the baseline to the value, for each marked, measured bin. */
-  howMuchBlocks: { x: number; y: number; width: number; height: number; howMuch: HowMuch }[];
+  /** For a row that says how much as well as where: a block from the baseline to the value, for each marked, measured bin, drawn as the kind of claim that slice makes. */
+  howMuchBlocks: { x: number; y: number; width: number; height: number; howMuch: HowMuch; encoding: Encoding }[];
 }
 
 /** Room left above and below the trace, so a line at the top of its scale isn't cut in half. */
@@ -41,13 +42,13 @@ export function tracePaths(row: Pick<StripRow, "domain" | "baseline" | "stepped"
     if (bin.value === null) paths.noValue.push({ x, width });
     // Only what is measured is marked: a filled-in stretch keeps its dashes and nothing else.
     const amount = howMuch[i] ?? 0;
-    if (bin.value !== null && bin.measured && amount !== 0) {
+    if (bin.value !== null && bin.encoding !== "not-measured" && amount !== 0) {
       const at = y(bin.value);
-      paths.howMuchBlocks.push({ x, width, y: Math.min(at, baselineY), height: Math.abs(at - baselineY), howMuch: amount });
+      paths.howMuchBlocks.push({ x, width, y: Math.min(at, baselineY), height: Math.abs(at - baselineY), howMuch: amount, encoding: bin.encoding });
     }
   });
 
-  for (const run of measuredRuns(bins, { bridgeGaps: true, isMeasured: (bin) => bin.measured })) {
+  for (const run of measuredRuns(bins, { bridgeGaps: true, isMeasured: (bin) => bin.encoding !== "not-measured" })) {
     // A hole in the values ends one piece of line and starts another.
     for (const piece of splitAtHoles(run.bins)) {
       const points = row.stepped

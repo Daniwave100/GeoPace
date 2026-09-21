@@ -19,6 +19,12 @@
 // one tone a road in a photograph may match exactly, so the band never relies on the ground to be
 // seen: it stands between its black hairline and the course's white edge.
 //
+// Shade that depends on the leaves is the poster's halftone (PLAN.md D28): the same teal as a
+// building's shade, with the paper showing through it in dots. Solid is shade you get whatever the
+// trees do; dotted is shade a leaf has to be there for. The dots are knocked out of the colour
+// rather than printed in it, so the stretch still reads as teal — as shade — at any size. It is
+// the dashed mark's own machinery with a shorter dash, which is what turns a dash into a dot.
+//
 // A dashed mark (a sample) carries its own ground (issue #22). Dashes laid straight onto the map
 // are two different pictures: over dark imagery the dark dashes vanish and the paper-coloured gaps
 // stand out as a row of white squares, and over a pale map it is the other way round. So the
@@ -37,6 +43,8 @@ export interface MarkLook {
   edgePx: number;
   /** Dashes, with this between them; null for a solid line. */
   gap: string | null;
+  /** For a dashed mark: how much of one dash-and-gap the dash itself takes. Half is a dash; a third reads as a dot. */
+  dashShare: number;
   /** For a dashed mark: how much of the colour between the dashes runs unbroken along each side of them, inside the edge. */
   rimPx: number;
 }
@@ -53,6 +61,9 @@ const WIDTH_PX = 16;
 /** A dashed mark is wider: the rims take room, and the dashes still have to show either side of the blue line. */
 const DASHED_WIDTH_PX = 20;
 const RIM_PX = 2;
+/** Half of a dash-and-gap is a dash; a third of one is a dot. */
+const DASH_SHARE = 0.5;
+const DOT_SHARE = 0.34;
 
 /** The colour for how much: warm above 0, teal below, pale near 0 and deep at 1, fading between. */
 export function rampColor(howMuch: HowMuch): string {
@@ -75,13 +86,18 @@ export function markLook(encoding: Encoding, howMuch?: HowMuch): MarkLook {
   switch (encoding) {
     case "measured":
       return howMuch === undefined
-        ? { widthPx: WIDTH_PX, color: INK, edge: PAPER, edgePx: 1, gap: null, rimPx: 0 }
-        : { widthPx: WIDTH_PX, color: rampColor(howMuch), edge: INK, edgePx: 1.5, gap: null, rimPx: 0 };
+        ? { widthPx: WIDTH_PX, color: INK, edge: PAPER, edgePx: 1, gap: null, dashShare: DASH_SHARE, rimPx: 0 }
+        : { widthPx: WIDTH_PX, color: rampColor(howMuch), edge: INK, edgePx: 1.5, gap: null, dashShare: DASH_SHARE, rimPx: 0 };
     case "runner-report":
-      return { widthPx: WIDTH_PX, color: PAPER, edge: INK, edgePx: 3, gap: null, rimPx: 0 };
+      return { widthPx: WIDTH_PX, color: PAPER, edge: INK, edgePx: 3, gap: null, dashShare: DASH_SHARE, rimPx: 0 };
     case "not-measured":
-      return { widthPx: WIDTH_PX, color: GREY, edge: INK, edgePx: 1.5, gap: null, rimPx: 0 };
+      return { widthPx: WIDTH_PX, color: GREY, edge: INK, edgePx: 1.5, gap: null, dashShare: DASH_SHARE, rimPx: 0 };
+    case "depends-on-leaves":
+      // The same colour as the shade it is, with the paper dotted through it: `gap` is the band
+      // the dots sit on, so the band is the colour and the dots are the paper. Knocked out rather
+      // than printed on, because what this says is "this is shade, and a leaf has to be there".
+      return { widthPx: DASHED_WIDTH_PX, color: PAPER, edge: INK, edgePx: 1.5, gap: rampColor(howMuch ?? 0), dashShare: DOT_SHARE, rimPx: RIM_PX };
     case "sample":
-      return { widthPx: DASHED_WIDTH_PX, color: INK, edge: INK, edgePx: 1.5, gap: PAPER, rimPx: RIM_PX };
+      return { widthPx: DASHED_WIDTH_PX, color: INK, edge: INK, edgePx: 1.5, gap: PAPER, dashShare: DASH_SHARE, rimPx: RIM_PX };
   }
 }

@@ -1,4 +1,5 @@
-// The White model's own file: the city's real buildings along the course, as blocks. It is
+// The White model's own file: the city's real buildings along the course as blocks, and its trees
+// as crowns — a patch of leaves with a top and an underside, standing off the ground. It is
 // written beside the Course Bundle, which names it, because a marathon's worth of building
 // outlines is many times everything else about a course put together (schema/white-model.schema.json).
 //
@@ -7,7 +8,7 @@
 import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
 import schema from "../../../schema/white-model.schema.json";
 
-export const SUPPORTED_WHITE_MODEL_VERSION = 1;
+export const SUPPORTED_WHITE_MODEL_VERSION = 2;
 const MAX_LISTED_PROBLEMS = 8;
 
 export class WhiteModelError extends Error {
@@ -24,8 +25,18 @@ export interface Blocks {
   ring: number[][];
 }
 
+/** Parallel columns: index i of every column describes the same crown. */
+export interface Crowns {
+  /** Where the leaves start, in metres above the WGS84 ellipsoid. Worked out from the tree's height, never measured. */
+  underside_m: number[];
+  /** Where they end, in metres above the WGS84 ellipsoid. */
+  top_m: number[];
+  /** Each crown seen from above, as lon, lat, lon, lat… in degrees, going round once, the first point not repeated. */
+  ring: number[][];
+}
+
 export interface WhiteModel {
-  schema_version: 1;
+  schema_version: 2;
   course_id: string;
   generated_at: string;
   pipeline_version: string;
@@ -34,6 +45,8 @@ export interface WhiteModel {
   /** How far a point of an outline was allowed to sit from its wall before it was dropped. */
   simplified_m: number;
   buildings: Blocks;
+  /** The crowns along the course. Absent for a course with no tree data. */
+  trees?: Crowns;
   sources: { id: string; title: string; url: string; licence: string; accessed: string; note?: string }[];
   /** Shown whenever the buildings are on screen. The bundle carries these too. */
   attributions: { text: string; url: string }[];
@@ -74,16 +87,21 @@ export function parseWhiteModel(data: unknown, courseId: string): WhiteModel {
   return data as WhiteModel;
 }
 
-/** Things JSON Schema can't express: every column has one value per block, and a roof is over its base. */
+/** Things JSON Schema can't express: every column has one value per shape, and a top is over its bottom. */
 function blockProblems(model: WhiteModel): string[] {
-  const { base_m, roof_m, ring } = model.buildings;
-  if (new Set([base_m.length, roof_m.length, ring.length]).size > 1) {
-    return [`buildings columns have different lengths (base_m=${base_m.length}, roof_m=${roof_m.length}, ring=${ring.length})`];
+  const buildings = columnProblems(model.buildings.base_m, model.buildings.roof_m, model.buildings.ring, "buildings", "base_m", "roof_m");
+  if (buildings.length > 0 || !model.trees) return buildings;
+  return columnProblems(model.trees.underside_m, model.trees.top_m, model.trees.ring, "trees", "underside_m", "top_m");
+}
+
+function columnProblems(below: number[], above: number[], ring: number[][], what: string, under: string, over: string): string[] {
+  if (new Set([below.length, above.length, ring.length]).size > 1) {
+    return [`${what} columns have different lengths (${under}=${below.length}, ${over}=${above.length}, ring=${ring.length})`];
   }
-  const inside_out = roof_m.findIndex((roof, i) => roof < base_m[i]);
-  if (inside_out >= 0) return [`buildings[${inside_out}] has its roof (${roof_m[inside_out]} m) below its base (${base_m[inside_out]} m)`];
+  const insideOut = above.findIndex((top, i) => top < below[i]);
+  if (insideOut >= 0) return [`${what}[${insideOut}] has its ${over} (${above[insideOut]} m) below its ${under} (${below[insideOut]} m)`];
   const odd = ring.findIndex((points) => points.length % 2 !== 0);
-  return odd >= 0 ? [`buildings.ring[${odd}] has ${ring[odd].length} numbers, which is not a whole number of lon/lat pairs`] : [];
+  return odd >= 0 ? [`${what}.ring[${odd}] has ${ring[odd].length} numbers, which is not a whole number of lon/lat pairs`] : [];
 }
 
 function describe(error: ErrorObject): string {

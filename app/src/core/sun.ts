@@ -7,8 +7,11 @@
 // module does is pick the moment: the runner's wave and pace say when they reach each sample, so
 // changing either moves every bit of the course into a different column of the same table.
 //
-// Four answers, not two, because the table only covers the hours worth modelling:
-//   • in the sun, or in shade — the table's own answer, measured;
+// Three states where the table has an answer, and two more where it hasn't (PLAN.md D58, D60):
+//   • in the sun, in shade, or in leafy shade — the table's own answer, measured. Leafy shade is
+//     shade a tree casts: the runner gets it while the leaves are on and not otherwise, which is
+//     the whole reason it is a state of its own and not more teal. A building's shade wins
+//     wherever both apply, because shade you get whatever the trees do is the stronger claim;
 //   • unknown — the moment is outside the table. Almost always because the sun is under the floor
 //     the pipeline works shade out above, where a street is in shadow whatever anyone computes;
 //     it can also be the far side of midnight, if a runner types in a start time late enough.
@@ -20,7 +23,7 @@ import type { Planner } from "./planner";
 import { nearestIndex } from "./series";
 import { sunPosition } from "./solar";
 
-export type SunState = "sun" | "shade" | "unknown" | "down";
+export type SunState = "sun" | "shade" | "leafy" | "unknown" | "down";
 
 /** The table as the bundle carries it, unpacked enough to ask questions of. */
 export interface SunTable {
@@ -31,10 +34,14 @@ export interface SunTable {
   stepMs: number;
   /** The step nearest a moment, or null when it is outside the hours the pipeline modelled. */
   stepAt(ms: number): number | null;
-  /** Whether the sun reaches this sample at this step. */
+  /** Whether the sun reaches this sample at this step, past every building. */
   inSun(sample: number, step: number): boolean;
-  /** Whether it reaches this sample at every step: the bridges and the wide avenues. */
+  /** Whether a tree's crown stops it where the buildings didn't. Always false with no tree data. */
+  inLeafShade(sample: number, step: number): boolean;
+  /** Whether the road here is unshaded at every step: neither wall nor leaf, at any hour we model. */
   alwaysInSun(sample: number): boolean;
+  /** Whether this course has tree data at all. */
+  hasTrees: boolean;
 }
 
 /** What the sun is doing where the runner is. */
@@ -71,11 +78,15 @@ export function readSunTable(bundle: CourseBundle): SunTable | null {
   const block = bundle.measured.sun;
   if (!block) return null;
   const bits = decode(block.in_sun);
+  const leafBits = block.in_leaf_shade === undefined ? null : decode(block.in_leaf_shade);
   const firstStepMs = Date.parse(block.first_step);
   const stepMs = block.step_minutes * 60_000;
-  const inSun = (sample: number, step: number) => (bits[sample * block.bytes_per_sample + (step >> 3)] & (128 >> (step & 7))) !== 0;
+  const bitAt = (from: Uint8Array, sample: number, step: number) => (from[sample * block.bytes_per_sample + (step >> 3)] & (128 >> (step & 7))) !== 0;
+  const inSun = (sample: number, step: number) => bitAt(bits, sample, step);
+  const inLeafShade = (sample: number, step: number) => leafBits !== null && bitAt(leafBits, sample, step);
   return {
     block,
+    hasTrees: leafBits !== null,
     day: block.first_step.slice(0, 10),
     firstStepMs,
     stepMs,
@@ -87,8 +98,11 @@ export function readSunTable(bundle: CourseBundle): SunTable | null {
       return Math.round((ms - firstStepMs) / stepMs);
     },
     inSun,
+    inLeafShade,
     alwaysInSun(sample) {
-      for (let step = 0; step < block.steps; step += 1) if (!inSun(sample, step)) return false;
+      // A road under trees is not a road with no shade: the leaves count in the strongest claim
+      // this layer makes, "no shade here at any hour".
+      for (let step = 0; step < block.steps; step += 1) if (!inSun(sample, step) || inLeafShade(sample, step)) return false;
       return true;
     },
   };
@@ -108,7 +122,7 @@ export function sunAlong(bundle: CourseBundle, planner: Planner): SunAlong | nul
   for (let sample = 0; sample < line.km.length; sample += 1) {
     const ms = planner.instantAtKm(line.km[sample]).getTime();
     const step = table.stepAt(ms);
-    states.push(step === null ? outsideTheHours(ms, line.lat[sample], line.lon[sample]) : table.inSun(sample, step) ? "sun" : "shade");
+    states.push(step === null ? outsideTheHours(ms, line.lat[sample], line.lon[sample]) : stateAt(table, sample, step));
     alwaysInSun.push(table.alwaysInSun(sample));
   }
   const runs = runsOf(states, line.km);
@@ -139,6 +153,12 @@ export function sunAlong(bundle: CourseBundle, planner: Planner): SunAlong | nul
       };
     },
   };
+}
+
+/** Sun, shade or leafy shade at one sample and one moment. A wall beats a leaf. */
+function stateAt(table: SunTable, sample: number, step: number): SunState {
+  if (!table.inSun(sample, step)) return "shade";
+  return table.inLeafShade(sample, step) ? "leafy" : "sun";
 }
 
 /** The moment is outside the table: the sun is under the horizon, or nobody worked this one out. */
