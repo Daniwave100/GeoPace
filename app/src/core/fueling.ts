@@ -13,7 +13,7 @@
 //
 // ⚠️ The three distances below are Claude's, not a runner's and not a physiologist's. They are the
 // only invented numbers in this module and they are the ones worth arguing about (PLAN.md D61).
-import { type AidStation, nearestStation, nextServing, type Serves } from "./aid";
+import { type AidStation, nearestStation, nextServing, type Serves, servedJustBehind } from "./aid";
 import { formatDistance, type Units } from "./units";
 
 /** What a runner puts in the plan. */
@@ -87,7 +87,7 @@ export function checkFueling(items: FuelItem[], stations: AidStation[], lengthKm
 /** A gel or a chew with no water within reach of it, either way. */
 function dryWarning(item: FuelItem, stations: AidStation[], lengthKm: number): FuelWarning | null {
   const ahead = nextServing(stations, item.km, "water");
-  const behind = [...stations].reverse().find((station) => station.km <= item.km && station.km >= item.km - WATER_JUST_BEHIND_KM && station.serves.includes("water"));
+  const behind = servedJustBehind(stations, item.km, "water", WATER_JUST_BEHIND_KM);
   if (behind || (ahead && ahead.km - item.km <= WATER_WITHIN_KM)) return null;
   const suggestedKm = ahead ? Math.max(0, Math.min(ahead.km - JUST_BEFORE_KM, lengthKm)) : null;
   return {

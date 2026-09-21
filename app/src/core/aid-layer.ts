@@ -68,7 +68,7 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
   return {
     id: "aid",
     name: "Aid",
-    key: `Ink on the line is a refreshment point, from ${stations[0].source.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]}'s own list. The chart is how far you still have to run for water.`,
+    key: "Ink on the line is a refreshment point, from the organizer's own list; the label says what it hands out. The chart is how far you still have to run for water.",
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => labels,

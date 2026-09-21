@@ -71,9 +71,9 @@ export function nextServing(stations: AidStation[], km: number, what: Serves): A
   return stations.find((station) => station.km >= km && station.serves.includes(what)) ?? null;
 }
 
-/** The last station at or before `km` that serves this, or null. */
-export function lastServing(stations: AidStation[], km: number, what: Serves): AidStation | null {
-  return [...stations].reverse().find((station) => station.km <= km && station.serves.includes(what)) ?? null;
+/** The last station within `reachKm` behind `km` that serves this, or null. */
+export function servedJustBehind(stations: AidStation[], km: number, what: Serves, reachKm: number): AidStation | null {
+  return [...stations].reverse().find((station) => station.km <= km && station.km >= km - reachKm && station.serves.includes(what)) ?? null;
 }
 
 /** The station nearest `km`, or null where there are none at all. */
