@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from geopace.bundle import BundleInvalid, validate_bundle
 from geopace.provenance import Attribution, Source
 from geopace.shade import REACH_PER_METER, leaf_shaded, shade_table, sunlit
 from geopace.sun import sun_position
@@ -261,6 +262,15 @@ class TestTheCommittedCrowns:
         assert all(source["licence"] and source["url"].startswith("http") for source in sources)
         assert "NonCommercial" not in licences and "BY-NC" not in licences
         assert "zenodo" not in everything.lower()
+
+    def test_a_leafy_column_of_the_wrong_size_is_refused_before_it_is_written(self):
+        """Reading past the end of the bits gives zeros, which read as "no tree"; a mis-strided
+        column would put a tree's shade where there is no tree. The app checks the same thing."""
+        bundle = self.bundle("berlin")
+        bundle["measured"]["sun"]["in_leaf_shade"] = bundle["measured"]["sun"]["in_leaf_shade"][:400]
+
+        with pytest.raises(BundleInvalid, match="in_leaf_shade is"):
+            validate_bundle(bundle)
 
     @pytest.mark.parametrize("course", ["berlin", "nyc"])
     def test_the_crowns_on_screen_cast_the_leafy_shade_the_table_says_they_do(self, course):

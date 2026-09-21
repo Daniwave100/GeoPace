@@ -79,7 +79,7 @@ function columnProblems(bundle: CourseBundle): string[] {
  * The sun table is read by indexing into its bits (core/sun.ts), and an index past the end of a
  * Uint8Array is `undefined`, which reads as 0, which reads as "in shade". So a truncated or
  * mis-strided table would draw a made-up sun and shade over the whole course, as measured fact.
- * These are the same four things the pipeline checks before it writes one (bundle.py).
+ * These are the same things the pipeline checks before it writes one (bundle.py).
  */
 function sunProblems(bundle: CourseBundle, samples: number): string[] {
   const sun = bundle.measured.sun;
@@ -92,9 +92,15 @@ function sunProblems(bundle: CourseBundle, samples: number): string[] {
   if (sun.bytes_per_sample !== Math.ceil(sun.steps / 8)) {
     problems.push(`measured.sun.bytes_per_sample is ${sun.bytes_per_sample}, but ${sun.steps} steps need ${Math.ceil(sun.steps / 8)}`);
   }
-  const bytes = bytesInBase64(sun.in_sun);
-  if (bytes !== sun.samples * sun.bytes_per_sample) {
-    problems.push(`measured.sun.in_sun is ${bytes} bytes, but ${sun.samples} samples of ${sun.bytes_per_sample} bytes need ${sun.samples * sun.bytes_per_sample}`);
+  const wanted = sun.samples * sun.bytes_per_sample;
+  // Both columns of bits are read the same way and are the same size. A short leafy column would
+  // read as "no trees here", which is at least quiet; a mis-strided one would put a tree's shade
+  // where there is no tree, and the runner would be told it while the leaves are on.
+  for (const column of ["in_sun", "in_leaf_shade"] as const) {
+    const packed = sun[column];
+    if (packed === undefined) continue;
+    const bytes = bytesInBase64(packed);
+    if (bytes !== wanted) problems.push(`measured.sun.${column} is ${bytes} bytes, but ${sun.samples} samples of ${sun.bytes_per_sample} bytes need ${wanted}`);
   }
   return problems;
 }

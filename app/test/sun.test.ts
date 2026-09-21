@@ -398,6 +398,16 @@ describe("the third state: shade that depends on the leaves", () => {
     expect(table.alwaysInSun(underTrees)).toBe(false);
   });
 
+  it("refuses a leafy column that is the wrong size, rather than putting a tree's shade where there is no tree", () => {
+    // An index past the end of a Uint8Array reads as 0, which reads as "no tree"; a mis-strided
+    // column is worse, and would tell the runner about shade that isn't there. Same check as
+    // in_sun's, because the two are read the same way (src/bundle/loader.ts).
+    const short = JSON.parse(JSON.stringify(berlin)) as CourseBundle;
+    short.measured.sun!.in_leaf_shade = short.measured.sun!.in_leaf_shade!.slice(0, 400);
+
+    expect(() => parseCourseBundle(short, "berlin")).toThrow(/in_leaf_shade is \d+ bytes/);
+  });
+
   it("keeps the leaf state one step away, in the key under the strip", () => {
     expect(layerFor(berlin).key).toContain(berlin.course.leaves!.state);
     expect(berlin.course.leaves!.source).toMatch(/^https?:\/\//);
