@@ -146,6 +146,12 @@ export interface LineMark {
 
 /** A label on the map for something a layer marks: a hill, later an aid station or a cheer zone. */
 export interface MarkLabel {
+  /**
+   * Drawn as a chip — paper, framed in ink — rather than as the look of its claim: for a label that
+   * names a point on the course instead of stating a value measured of it (D62). An aid station is
+   * a place the organizer names, like the start and the finish, which have a look of their own too.
+   */
+  chip?: boolean;
   /** The kind of claim the label makes. */
   encoding: Encoding;
   /** More, for whoever asks: which part of it is not measured, and why. */

@@ -129,9 +129,17 @@ describe("the Aid layer", () => {
     }
   });
 
+  it("asks for its label to be drawn as a chip: a station is a place the organizer names, not a value measured of the course", () => {
+    // The owner, 09-22: "I prefer white." The look is the chip's, not the measured encoding's, so
+    // a hill's label — which does state a measured value — is untouched (style.css draws both).
+    expect(layerFor(berlin)!.lineLabels().every((label) => label.chip)).toBe(true);
+    expect(hillsLayer(berlin).lineLabels().every((label) => label.chip)).toBeFalsy();
+  });
+
   it("draws each thing in a colour that reads on the light strip, the dark ground and the black chip alike", () => {
     // The owner asked for colour (09-22); pale colour on paper is what "washed out" looks like.
-    const grounds = { paper: "#f4f4f0", dark: "#262624", chip: "#000000" };
+    // Paper is the light strip and the chip on the map; the dark ground is the strip in dark theme.
+    const grounds = { paper: "#f4f4f0", dark: "#262624" };
     for (const [serve, glyph] of Object.entries(SERVE_GLYPH)) {
       for (const [name, ground] of Object.entries(grounds)) expect(contrast(glyph.color, ground), `${serve} on ${name}`).toBeGreaterThanOrEqual(3);
     }

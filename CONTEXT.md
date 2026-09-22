@@ -246,7 +246,7 @@ The dark slot hugging the blue: the road's own edge darkened where it is in shad
 _Avoid_: border, outline, shadow line
 
 **Chip**:
-The small black label on the course line that names a point on it — an aid station, with its glyphs — and is that point's whole mark on the map.
+The small paper label, framed in ink, that names a point on the course line — an aid station, with its glyphs — and is that point's whole mark on the map. A look of its own, beside the encodings: it names a place rather than stating a value measured of the course.
 _Avoid_: pin, badge, marker
 
 **Hill**:

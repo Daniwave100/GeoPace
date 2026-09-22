@@ -8,9 +8,9 @@
 // shading, no gradient, which is still the poster's way with a mark (PLAN.md §6). Two rules kept:
 // **water is aqua, never the course's blue**, because blue means the course and where you are on
 // it and nothing else (D28), and a drop the colour of the line would say it was the line; and every
-// colour reads at 3:1 or better on all three grounds it is drawn on — the light strip's paper, the
-// dark theme's ground, and the black chip on the map — which is why the drop and the bolt are
-// deeper than a first pick would make them (aid.test.ts checks it). These six are Aid's own, the
+// colour reads at 3:1 or better on both grounds it is drawn on — paper (the light strip, and the
+// chip on the map, which is paper too since D62) and the dark theme's ground — which is why the
+// drop and the bolt are deeper than a first pick would make them (aid.test.ts checks it). These six are Aid's own, the
 // one place a layer names a colour (D62): the encodings still come from core/encoding.ts.
 //
 // Every glyph carries the word for it too. An icon on its own is a guess for anybody who hasn't

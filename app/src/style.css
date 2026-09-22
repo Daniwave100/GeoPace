@@ -695,11 +695,15 @@ button.map-label {
   background: #000;
 }
 
-/* What runners say is hollow: paper, with an ink frame. */
+/* What runners say is hollow here as everywhere else (core/encoding.ts: fill none, ink stroke):
+   the map shows through it, and the frame with a paper halo round the letters holds it together.
+   It was paper-filled until 09-22, when the chip took that look and two things would have worn
+   one (D62); nothing draws a runner report on the map yet, so nothing on screen changed. */
 .map-label.enc-runner-report {
   padding: 2px 7px;
   color: #000;
-  background: #f4f4f0;
+  background: transparent;
+  text-shadow: 0 0 3px #f4f4f0, 0 0 2px #f4f4f0, 0 0 2px #f4f4f0;
 }
 
 /* Not measured here: grey, a dashed edge like its stretch of line, and the value struck through. */
@@ -722,6 +726,15 @@ button.map-label {
   padding: 2px 7px;
   color: #000;
   background: repeating-linear-gradient(135deg, #f4f4f0 0 4px, #b9b9b4 4px 8px);
+}
+
+/* A chip names a point on the course rather than stating a value measured of it: an aid station,
+   which is a place the organizer names. Paper, framed in ink, with its marks in their own colours
+   — the owner picked it over the ink block on 09-22 (D62). */
+.map-label-chip {
+  color: #000;
+  background: #f4f4f0;
+  border-color: #000;
 }
 
 /* The start and the finish are the course's own, so they are the course's blue, and can't be

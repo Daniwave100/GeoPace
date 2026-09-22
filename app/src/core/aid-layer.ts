@@ -82,6 +82,8 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     // The chip is all a station has on the map — a hill still has its band — so a chip wins the
     // room from any hill's label (a hill's priority is its gain in metres; none is near a hundred).
     priority: CHIP_FIRST + station.serves.length,
+    // Paper, framed in ink — the owner picked it over the ink block on 09-22 (D62).
+    chip: true,
   }));
 
   return {

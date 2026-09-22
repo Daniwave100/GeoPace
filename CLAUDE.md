@@ -66,7 +66,7 @@ each tagged with the kind of claim it is. Add it to the list in `app/src/main.ts
 or dash patterns for a claim: the encodings come from `core/encoding.ts`, and "how much, and which way" (a number from -1 to 1, like
 how steep a hill is, negative coming down) gets its colour from `core/mark-look.ts`: warm against the runner, teal with
 them, fading from pale to deep. (A colour for a *thing* — water, a gel — is the one exception, Aid's glyphs in
-`core/serve-glyphs.ts`, D62; each must read at 3:1 on paper, on the dark ground and on a black chip, and none is blue.)
+`core/serve-glyphs.ts`, D62; each must read at 3:1 on paper and on the dark ground, and none is blue.)
 Blue means only the course and where you are on it. Any number of layers can be on at once (D62), so a layer paints one
 **slot** of the course line — the wide coloured **band** (hills) or the dark **rim** hugging the blue (shade) — or, for a
 point, only a **chip** (aid). Nothing on the course line is laid over anything else: a mark is

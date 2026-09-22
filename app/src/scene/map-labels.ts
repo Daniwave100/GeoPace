@@ -27,8 +27,12 @@ export interface MapLabel {
   text: string;
   /** Marks drawn before the words: what an aid station hands out (core/serve-glyphs.ts). */
   glyphs?: Glyph[];
-  /** The kind of claim it makes, drawn as everywhere else; or "place" for the start and the finish, which are the course's own. */
-  look: Encoding | "place";
+  /**
+   * The kind of claim it makes, drawn as everywhere else; or one of the two looks that are not
+   * claims at all: "place" for the start and the finish, which are the course's own, and "chip"
+   * for a label that names a point on the course — an aid station (D62).
+   */
+  look: Encoding | "place" | "chip";
   priority: number;
   /** More, for whoever asks: said by a tooltip, and read out with the label. */
   note?: string;
@@ -131,8 +135,9 @@ export function createMapLabels(viewer: Viewer, container: HTMLElement): MapLabe
 }
 
 function labelNode(label: MapLabel): HTMLElement {
-  const look = label.look === "place" ? undefined : ENCODINGS[label.look];
-  const node = html(label.onPick ? "button" : "span", { class: `map-label ${look ? look.cssClass : "map-label-place"}`, title: label.note });
+  const look = label.look === "place" || label.look === "chip" ? undefined : ENCODINGS[label.look];
+  const plain = label.look === "chip" ? "map-label-chip" : "map-label-place";
+  const node = html(label.onPick ? "button" : "span", { class: `map-label ${look ? look.cssClass : plain}`, title: label.note });
   if (node instanceof HTMLButtonElement) node.type = "button";
   // The marks come first and the words after them, so a label still reads without the shapes.
   for (const glyph of label.glyphs ?? []) node.append(glyphNode(glyph, "map-label-glyph"));
