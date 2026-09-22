@@ -301,6 +301,11 @@ describe("a layer's marks on the course line", () => {
     // The hill under it keeps its own colour: the rim adds to the band, it does not replace it.
     const hill = marks.find((mark) => mark.encoding === "measured" && mark.fromKm <= shadedKm && mark.toKm >= shadedKm);
     if (hill) expect(shaded.bandColor.toCssHexString()).toBe(markLook("measured", hill.howMuch).color);
+    // CLAUDE.md's trap: a filled-in height must never look measured, in the rim as in the band.
+    const verrazzano = uniforms(at(1.0));
+    expect(verrazzano.rimColor.toCssHexString()).toBe("#8a8a86");
+    expect(verrazzano.rimDotColor.alpha).toBe(0);
+    expect(verrazzano.rimEndPx).toBeGreaterThan(verrazzano.coreEdgeEndPx);
     // Where the sun is on the runner nothing is in the rim: it has no width, and paints nothing.
     const sunKm = firstKmWithNoRim(shade);
     const sunny = uniforms(at(sunKm));

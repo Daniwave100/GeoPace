@@ -21,6 +21,9 @@ import { glyphsFor, SERVE_GLYPH, SHOWN_AS_GLYPHS } from "./serve-glyphs";
 import type { Planner } from "./planner";
 import { formatDistance, formatNearby, type Units } from "./units";
 
+/** Above every hill label's priority: the label that stays when a chip and a hill collide is the chip. */
+const CHIP_FIRST = 100;
+
 /** Nearer than this and the sentence says the runner is at the station rather than counting down to it. */
 const AT_IT_KM = 0.05;
 /** What a reader who can't see the grey is told instead. Not a start time: a refreshment list. */
@@ -76,7 +79,9 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     text: () => station.label,
     // The full stations first, so that where two crowd each other it is the one with more on it
     // that survives: a runner scanning the map is looking for a drink, not for a water table.
-    priority: station.serves.length,
+    // The chip is all a station has on the map — a hill still has its band — so a chip wins the
+    // room from any hill's label (a hill's priority is its gain in metres; none is near a hundred).
+    priority: CHIP_FIRST + station.serves.length,
   }));
 
   return {

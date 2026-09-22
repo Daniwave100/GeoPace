@@ -3,7 +3,8 @@
 // A layer says which kind of claim a stretch is (core/encoding.ts), which slot of the line it is
 // painted in (core/layers.ts: the band or the rim) and, where it has more to say than "here", how
 // much and which way (`HowMuch`, -1 to 1: for Hills, how steep, negative coming down). This module
-// turns that into a look, so no layer ever picks a colour of its own.
+// turns that into a look, so no layer ever picks a colour for a claim of its own. (Aid's glyphs
+// have colours, but those name things — water, a gel — not claims: core/serve-glyphs.ts, D62.)
 //
 // **The band** is the wide stripe outside the blue, and "how much" is its colour, the owner's
 // picks by eye on 2026-09-18 (PLAN.md D47):

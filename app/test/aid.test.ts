@@ -7,6 +7,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { AidStationFact, CourseBundle } from "../src/bundle/types";
+import { rowsHeightAtSizeOne } from "../src/strip/strip";
+import { SERVE_GLYPH } from "../src/core/serve-glyphs";
+import { hillsLayer } from "../src/core/hills-layer";
 import { aidLayer, furthestWithoutWater } from "../src/core/aid-layer";
 import { type AidStation, aidStations, nextServing, servesInWords } from "../src/core/aid";
 import { checkFueling, type FuelItem, type FuelKind, sanitizeFueling, WATER_WITHIN_KM } from "../src/core/fueling";
@@ -115,6 +118,43 @@ describe("the organizer's stations, as the bundle carries them", () => {
 });
 
 describe("the Aid layer", () => {
+  it("wins the room for its chip from any hill's label: the chip is all a station has on the map", () => {
+    // With Hills on, the two share one declutter pass (scene/map-labels.ts); a hill still has its
+    // band on the line when its label waits, a station would have nothing.
+    for (const bundle of [berlin, nyc]) {
+      const chips = layerFor(bundle)!.lineLabels();
+      const hills = hillsLayer(bundle).lineLabels();
+      expect(chips.length).toBeGreaterThan(0);
+      expect(Math.min(...chips.map((chip) => chip.priority))).toBeGreaterThan(Math.max(...hills.map((hill) => hill.priority)));
+    }
+  });
+
+  it("draws each thing in a colour that reads on the light strip, the dark ground and the black chip alike", () => {
+    // The owner asked for colour (09-22); pale colour on paper is what "washed out" looks like.
+    const grounds = { paper: "#f4f4f0", dark: "#262624", chip: "#000000" };
+    for (const [serve, glyph] of Object.entries(SERVE_GLYPH)) {
+      for (const [name, ground] of Object.entries(grounds)) expect(contrast(glyph.color, ground), `${serve} on ${name}`).toBeGreaterThanOrEqual(3);
+    }
+    // And no glyph is the course's blue, in either theme.
+    for (const glyph of Object.values(SERVE_GLYPH)) expect(["#1546ff", "#5a7dff"]).not.toContain(glyph.color);
+
+    function contrast(a: string, b: string): number {
+      const [dark, light] = [luminance(a), luminance(b)].sort((x, y) => x - y);
+      return (light + 0.05) / (dark + 0.05);
+    }
+    function luminance(hex: string): number {
+      const channel = (at: number) => {
+        const c = parseInt(hex.slice(at, at + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+    }
+  });
+
+  it("adds nothing to what the strip's top edge scales: a row of marks keeps its height", () => {
+    expect(rowsHeightAtSizeOne({ layerRows: layerFor(berlin)!.rows() })).toBe(rowsHeightAtSizeOne({ layerRows: [] }));
+  });
+
   it("puts a chip at every station on the course line, and names what each one has", () => {
     const layer = layerFor(berlin)!;
 

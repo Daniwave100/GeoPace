@@ -2,8 +2,9 @@
 // (PLAN.md principle 3, and the Race poster's encodings in §6). One table drives every surface:
 // the strip's marks and the words in the sentence take `cssClass` (style.css draws it), and the
 // course line on the map is drawn as `mapLine` says (core/mark-look.ts has the colours and the
-// widths, scene/course-line.ts draws them). A layer never picks a
-// colour or a dash pattern of its own; it says which kind of claim it is making.
+// widths, scene/course-line.ts draws them). A layer never picks a colour or a dash pattern for a
+// claim; it says which kind of claim it is making. (The one colour a layer does name is the colour
+// of a thing, not of a claim: Aid's glyphs, core/serve-glyphs.ts, D62.)
 
 export type Encoding = "measured" | "runner-report" | "not-measured" | "sample" | "depends-on-leaves";
 

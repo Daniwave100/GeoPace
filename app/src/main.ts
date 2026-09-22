@@ -443,7 +443,7 @@ function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
   if (screen.layers.length === 0) return [];
   const used = new Set<Encoding>([...screen.rows.map((row) => row.encoding), ...screen.lineMarks.map((mark) => mark.encoding)]);
   if (bundle.measured.elevation_not_measured.length > 0) used.add("not-measured");
-  const marks = screen.layers.filter((layer) => layer.key).map((layer) => ({ name: `${layer.name}.`, meaning: layer.key as string }));
+  const marks = screen.layers.flatMap((layer) => (layer.key ? [{ name: `${layer.name}.`, meaning: layer.key }] : []));
   return [...marks, { name: "The blue line.", meaning: "The course itself; a thin white edge is just the course." }, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
 }
 

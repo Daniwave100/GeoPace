@@ -11,8 +11,9 @@
 //
 // Three states, not two (PLAN.md D60, issue #10): the city's trees cast shade as well, and shade a
 // leaf casts is not shade a wall casts — the runner gets it while the leaves are on and not
-// otherwise. So leafy shade is the same teal in the poster's halftone, on the strip and beside the
-// line alike, and the sentence says it in words: "In leafy shade for the next 300 m." A wall wins
+// otherwise. So leafy shade is the poster's halftone — the same teal, dotted, on the strip; paper
+// dots in the ink of the rim on the map — and the sentence says it in words: "In leafy shade for
+// the next 300 m." A wall wins
 // wherever both apply, because shade you get whatever the trees do is the stronger claim.
 //
 // What it rests on, and says out loud: a clear sky, the road surface rather than a runner's head,

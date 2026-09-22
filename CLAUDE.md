@@ -63,9 +63,13 @@ ask before anything that changes scope or look.
 ## Adding a layer
 A layer is data (`app/src/core/layers.ts`, PLAN.md D47): its strip rows, its marks on the course line and its clause,
 each tagged with the kind of claim it is. Add it to the list in `app/src/main.ts`. Never give a layer its own colours
-or dash patterns: the encodings come from `core/encoding.ts`, and "how much, and which way" (a number from -1 to 1, like
+or dash patterns for a claim: the encodings come from `core/encoding.ts`, and "how much, and which way" (a number from -1 to 1, like
 how steep a hill is, negative coming down) gets its colour from `core/mark-look.ts`: warm against the runner, teal with
-them, fading from pale to deep. Blue means only the course and where you are on it. Nothing on the course line is laid over anything else: a mark is
+them, fading from pale to deep. (A colour for a *thing* — water, a gel — is the one exception, Aid's glyphs in
+`core/serve-glyphs.ts`, D62; each must read at 3:1 on paper, on the dark ground and on a black chip, and none is blue.)
+Blue means only the course and where you are on it. Any number of layers can be on at once (D62), so a layer paints one
+**slot** of the course line — the wide coloured **band** (hills) or the dark **rim** hugging the blue (shade) — or, for a
+point, only a **chip** (aid). Nothing on the course line is laid over anything else: a mark is
 painted beside the blue by the same line (`scene/course-ribbon.ts`, D52), draped on the keyless map and at the road's height in photoreal alike. Every distance, height and pace shown or typed goes
 through `core/units.ts`.
 

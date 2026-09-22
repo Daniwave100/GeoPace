@@ -57,7 +57,8 @@ export interface KeyEntry {
 
 /** How tall the rows that resize are at the designed size: what the strip's top edge needs to turn a drag into a size. */
 export function rowsHeightAtSizeOne(content: Pick<StripContent, "layerRows">): number {
-  return BASE_ROW_HEIGHT + content.layerRows.length * LAYER_ROW_HEIGHT;
+  // A row of marks keeps its height whatever the size (rowHeight), so it is no part of the ratio.
+  return BASE_ROW_HEIGHT + content.layerRows.filter((row) => !row.marks).length * LAYER_ROW_HEIGHT;
 }
 
 export interface Strip {
