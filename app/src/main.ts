@@ -134,7 +134,7 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
 const whiteModelSwitches: WhiteModelSwitches = createWhiteModelSwitches(byId("white-model"), useWhiteModel);
-const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState)));
+const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState, showing?.layers ?? [])));
 const strip = createStrip(byId("strip"), scrubTo, (held) => showing?.ride.hold(held));
 const rideControls = createRideControls(byId("ride"), {
   playPause: () => showing?.ride.playPause(),
@@ -435,17 +435,16 @@ function showStrip(): void {
 
 /**
  * What the marks on screen mean, in a line under the strip. Nothing while no layer is on: the
- * first screen needs no key (PLAN.md principle 8). With a layer on, its marks on the course line
- * come first, since an edge that is black here, white there and dashed somewhere else is a riddle
- * without it; then the encodings that are in use.
+ * first screen needs no key (PLAN.md principle 8). With layers on, each one's marks on the course
+ * line come first, in the layers' order, since an edge that is black here, coloured there and
+ * dotted somewhere else is a riddle without it; then the encodings that are in use.
  */
 function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
-  if (layerState.active === null && !layerState.everything) return [];
+  if (screen.layers.length === 0) return [];
   const used = new Set<Encoding>([...screen.rows.map((row) => row.encoding), ...screen.lineMarks.map((mark) => mark.encoding)]);
   if (bundle.measured.elevation_not_measured.length > 0) used.add("not-measured");
-  const active = showing?.layers.find((layer) => layer.id === layerState.active);
-  const marks = active?.key ? [{ name: `${active.name}.`, meaning: `${active.key} A thin white edge is just the course.` }] : [];
-  return [...marks, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
+  const marks = screen.layers.filter((layer) => layer.key).map((layer) => ({ name: `${layer.name}.`, meaning: layer.key as string }));
+  return [...marks, { name: "The blue line.", meaning: "The course itself; a thin white edge is just the course." }, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
 }
 
 function endLabels(bundle: CourseBundle): MapLabel[] {
@@ -481,7 +480,7 @@ function showWhere(km: number, byHand = false): void {
   const readout = planner.at(km);
   showing.km = readout.km;
   const place = positionAtKm(bundle.measured.course_line, readout.km);
-  const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClause: showing.screen.clause });
+  const sentence = sentenceAt({ bundle, planner, km: readout.km, units, layerClauses: showing.screen.clauses });
 
   // What a screen reader says for the strip. It can't see grey, so a carried-over time says so in words.
   // A Ride that is playing moves the strip quietly: sixty new sentences a second is noise, and the

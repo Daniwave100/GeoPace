@@ -1,7 +1,7 @@
 // The sentence: the one plain line saying what the course is doing where the runner is. It is a
-// list of short clauses, each a complete statement: the clause of the layer that is on (PLAN.md
-// D35), then what is near, then where the sun is. "Climbing 3%. Ed Koch Queensboro Bridge in
-// 600 m. Sun behind you."
+// list of short clauses, each a complete statement: one from each layer that is on, in the
+// layers' order (PLAN.md D35, D62), then what is near, then where the sun is. "Climbing 3%. In
+// shade for the next 200 m. Ed Koch Queensboro Bridge in 600 m. Sun behind you."
 //
 // Landmarks are their own clause rather than worked into the grammar of another ("onto the…",
 // "at the…"): their names are hand-maintained facts, some are phrases ("Leaves the park at Grand
@@ -24,11 +24,11 @@ export interface SentenceInput {
   planner: Planner;
   km: number;
   units: Units;
-  /** The clause of whichever layer is on (`onScreen(...).clause`); returns null when none is. */
-  layerClause(km: number, units: Units): Clause | null;
+  /** The clauses of the layers that are on, in their order (`onScreen(...).clauses`); empty when none is. */
+  layerClauses(km: number, units: Units): Clause[];
 }
 
-export function sentenceAt({ bundle, planner, km, units, layerClause }: SentenceInput): Clause[] {
+export function sentenceAt({ bundle, planner, km, units, layerClauses }: SentenceInput): Clause[] {
   const readout = planner.at(km);
   const place = positionAtKm(bundle.measured.course_line, readout.km);
   const sun: Clause = {
@@ -37,7 +37,7 @@ export function sentenceAt({ bundle, planner, km, units, layerClause }: Sentence
     // The sun is where it is at a time of day, and the time of day rests on the start time.
     carriedOver: planner.carriedOver !== null,
   };
-  return [layerClause(readout.km, units), placeClause(bundle.course.landmarks, readout.km, units), sun].filter((clause) => clause !== null);
+  return [...layerClauses(readout.km, units), placeClause(bundle.course.landmarks, readout.km, units), sun].filter((clause): clause is Clause => clause !== null);
 }
 
 /**

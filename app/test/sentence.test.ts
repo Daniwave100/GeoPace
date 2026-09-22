@@ -28,28 +28,28 @@ describe("the sentence", () => {
     // sun is almost due south (176°): 124° round to the runner's left, which is "on your left"
     // and not yet "behind you" (that starts at 135°).
     const hillsOn = onScreen(pressLayer(NO_LAYERS, "hills"), [hillsLayer(nyc)]);
-    const sentence = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "km", layerClause: hillsOn.clause });
+    const sentence = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "km", layerClauses: hillsOn.clauses });
 
     expect(words(sentence)).toBe("Climbing 4%. Ed Koch Queensboro Bridge in 600 m. Sun on your left.");
   });
 
   it("loses the layer's clause, and nothing else, when the layer is switched off", () => {
     const off = onScreen(NO_LAYERS, [hillsLayer(nyc)]);
-    const sentence = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "km", layerClause: off.clause });
+    const sentence = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "km", layerClauses: off.clauses });
 
     expect(words(sentence)).toBe("Ed Koch Queensboro Bridge in 600 m. Sun on your left.");
   });
 
   it("speaks in miles and feet to a runner who thinks in them", () => {
-    const sentence = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "mi", layerClause: () => null });
+    const sentence = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "mi", layerClauses: () => [] });
 
     expect(words(sentence)).toBe("Ed Koch Queensboro Bridge in 0.4 mi. Sun on your left.");
   });
 
   it("greys what rests on a carried-over start time, and only that", () => {
     // New York's 2026 wave times are copied from 2025: the sun's position rests on them.
-    const carriedOver = sentenceAt({ bundle: nyc, planner: plannerFor(nyc), km: 24.5, units: "km", layerClause: () => null });
-    const own = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "km", layerClause: () => null });
+    const carriedOver = sentenceAt({ bundle: nyc, planner: plannerFor(nyc), km: 24.5, units: "km", layerClauses: () => [] });
+    const own = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 24.5, units: "km", layerClauses: () => [] });
 
     expect(carriedOver.map((clause) => clause.carriedOver ?? false)).toEqual([false, true]);
     expect(own.map((clause) => clause.carriedOver ?? false)).toEqual([false, false]);
@@ -57,7 +57,7 @@ describe("the sentence", () => {
 
   it("carries a not-measured clause through as not measured, with the reason", () => {
     const hillsOn = onScreen(pressLayer(NO_LAYERS, "hills"), [hillsLayer(nyc)]);
-    const [hills] = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 1.0, units: "km", layerClause: hillsOn.clause });
+    const [hills] = sentenceAt({ bundle: nyc, planner: plannerFor(nyc, "09:10"), km: 1.0, units: "km", layerClauses: hillsOn.clauses });
 
     expect(hills.encoding).toBe("not-measured");
     expect(hills.note).toMatch(/Verrazzano.*straight line/);

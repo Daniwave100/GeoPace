@@ -1616,7 +1616,6 @@ button.map-label {
   width: 0.95em;
   height: 0.95em;
   margin-right: 3px;
-  fill: currentColor;
   vertical-align: -0.12em;
 }
 
@@ -1633,7 +1632,7 @@ svg .strip-mark-tick {
   stroke-width: 1.5;
 }
 
+/* Each glyph is filled in its own colour (core/serve-glyphs.ts); only the stroke is ruled here. */
 svg .strip-mark-glyph {
-  fill: var(--ink);
   stroke: none;
 }

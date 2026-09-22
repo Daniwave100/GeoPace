@@ -16,13 +16,11 @@
 // and says so, the way a carried-over wave time is (D38).
 import type { CourseBundle } from "../bundle/types";
 import { type AidStation, aidStations, nextServing, servesInWords } from "./aid";
-import type { Clause, Layer, LineMark, MarkLabel, RowValue, StripRow } from "./layers";
+import type { Clause, Layer, MarkLabel, RowValue, StripRow } from "./layers";
 import { glyphsFor, SERVE_GLYPH, SHOWN_AS_GLYPHS } from "./serve-glyphs";
 import type { Planner } from "./planner";
 import { formatDistance, formatNearby, type Units } from "./units";
 
-/** How much course a station's mark covers, either side: enough to see, short enough to be a point. */
-const MARK_REACH_KM = 0.04;
 /** Nearer than this and the sentence says the runner is at the station rather than counting down to it. */
 const AT_IT_KM = 0.05;
 /** What a reader who can't see the grey is told instead. Not a start time: a refreshment list. */
@@ -67,12 +65,6 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
       })),
   };
 
-  const marks: LineMark[] = stations.map((station) => ({
-    fromKm: Math.max(0, station.km - MARK_REACH_KM),
-    toKm: Math.min(lengthKm, station.km + MARK_REACH_KM),
-    encoding: "measured",
-  }));
-
   // The same note the sentence gives, so picking a station on the map says what standing on it
   // says: the brand, whose bottle can be waiting, and whether this is last year's list.
   const labels: MarkLabel[] = stations.map((station) => ({
@@ -90,9 +82,11 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
   return {
     id: "aid",
     name: "Aid",
-    key: `Ink on the line is a refreshment point, from the organizer's own list. The marks are what it hands out: ${markNames(stations)}.`,
+    key: `A chip on the line is a refreshment point, from the organizer's own list. Its marks are what it hands out: ${markNames(stations)}.`,
     rows: () => [row],
-    lineMarks: () => marks,
+    // A station is a point, and its chip on the map is its mark: it paints nothing on the line,
+    // which leaves the band to the hills and the rim to the shade (D62).
+    lineMarks: () => [],
     lineLabels: () => labels,
     clause: (km, units) => clauseFor(km, stations, units, carriedOver),
   };

@@ -7,7 +7,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import { howSteep } from "../src/core/hills";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
 import { markLook, rampColor } from "../src/core/mark-look";
-import { COURSE_EDGE, COURSE_WIDTH_PX } from "../src/scene/course-ribbon";
+import { COURSE_EDGE } from "../src/scene/course-ribbon";
 
 const bundleFor = (course: string) =>
   parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${course}/course-bundle.json`, import.meta.url), "utf8")), course);
@@ -134,11 +134,11 @@ describe("a dashed mark (a sample), over a pale map and over dark imagery", () =
     if (look.gap === null) throw new Error("expected a dashed mark");
     // The colour between the dashes is a band that also runs unbroken down both sides of them:
     // a dash is never next to the map, whatever the map looks like there.
-    expect(look.rimPx).toBeGreaterThanOrEqual(1.5);
+    expect(look.dashInsetPx).toBeGreaterThanOrEqual(1.5);
     expect(contrast(look.color, look.gap)).toBeGreaterThanOrEqual(3);
-    // Enough of each dash shows either side of the blue course line, which runs down the middle
-    // of the same line. From the middle outwards: the course, the dash, the rim, half the edge.
-    expect(look.widthPx / 2 - look.edgePx / 2 - look.rimPx - COURSE_WIDTH_PX / 2).toBeGreaterThanOrEqual(3);
+    // Enough of each dash shows on each side of the blue course line, which runs down the middle
+    // of the same line. From the middle outwards: the course, the dash, the inset, the edge.
+    expect(look.widthPx - look.dashInsetPx).toBeGreaterThanOrEqual(3);
   });
 
   it("shows its band on any ground: by itself where the ground is dark, by its edge where it is pale", () => {

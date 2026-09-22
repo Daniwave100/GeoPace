@@ -159,6 +159,9 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
 
 /** The rows are what resizes; the Stops' lane and the blue line keep their height, since they are type, not traces. */
 function rowHeight(row: StripRow, content: StripContent): number {
+  // A row of marks is as tall as its tallest stack of them, whatever the strip is dragged to:
+  // marks are type, not a trace, and scaling them would make them unreadable long before small.
+  if (row.marks) return MARK_ROW_PAD * 2 + Math.max(1, ...row.marks().map((mark) => mark.glyphs.length)) * (GLYPH_PX + GLYPH_GAP_PX);
   return Math.round((row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT) * content.size);
 }
 
@@ -303,37 +306,37 @@ function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, heig
   return group;
 }
 
-/** How wide one glyph is drawn on a row of marks, and the room one needs beside its neighbour. */
-const GLYPH_PX = 13;
+/** How big one glyph is drawn on a row of marks, the gap between stacked ones, and the room above and below a stack. */
+const GLYPH_PX = 12;
 const GLYPH_GAP_PX = 2;
+const MARK_ROW_PAD = 9;
 
 /**
- * A row of things at places: one rule down the middle, a tick at each thing, and its marks above.
+ * A row of things at places: one rule along the bottom, a tick at each thing, and its marks
+ * stacked above the tick, in their colours.
  *
  * Not a trace. A chart through fifteen aid stations draws the gaps between them, which is a line
- * about what isn't there; what a runner wants to see is the stations, which are points. Where two
- * crowd each other the marks are thinned to what will fit — the first one is what a station is
- * most likely to be wanted for — and the rest stay in the tooltip and in the hidden text.
+ * about what isn't there; what a runner wants to see is the stations, which are points. The marks
+ * stack rather than sit side by side — the owner, 09-22: side by side "makes it really wide, and
+ * especially in New York where there's a lot of stations, they just look clumped up" — so every
+ * station is one glyph wide however much it hands out, and twenty of them fit on a strip.
  */
 function markGroup(marks: RowMark[], x: Scale, top: number, height: number): SVGGElement {
   const group = svg("g", {});
-  const rule = top + height - 9;
+  const rule = top + height - MARK_ROW_PAD;
   if (marks.length === 0) return group;
   group.append(svg("line", { x1: x(marks[0].km), x2: x(marks[marks.length - 1].km), y1: rule, y2: rule, class: `${ENCODINGS.measured.cssClass} strip-mark-rule` }));
-  marks.forEach((mark, i) => {
+  for (const mark of marks) {
     const at = x(mark.km);
-    const room = Math.min(i === 0 ? Infinity : at - x(marks[i - 1].km), i === marks.length - 1 ? Infinity : x(marks[i + 1].km) - at);
-    const fits = Math.max(1, Math.floor(room / (GLYPH_PX + GLYPH_GAP_PX)));
-    const shown = mark.glyphs.slice(0, fits);
-    const wide = shown.length * GLYPH_PX + (shown.length - 1) * GLYPH_GAP_PX;
     const cell = svg("g", { class: ENCODINGS[mark.encoding].cssClass }, svg("title", { text: mark.label }));
-    cell.append(svg("line", { x1: at, x2: at, y1: rule - 4, y2: rule + 4, class: "strip-mark-tick" }));
-    shown.forEach((glyph, g) => {
-      const left = at - wide / 2 + g * (GLYPH_PX + GLYPH_GAP_PX);
-      cell.append(svg("path", { d: glyph.path, class: "strip-mark-glyph", transform: `translate(${left.toFixed(1)} ${(rule - 8 - GLYPH_PX).toFixed(1)}) scale(${(GLYPH_PX / 16).toFixed(3)})` }));
+    cell.append(svg("line", { x1: at, x2: at, y1: rule - 3, y2: rule + 3, class: "strip-mark-tick" }));
+    // Stacked from the rule up, so the first mark — the drink — is nearest the line the eye follows.
+    mark.glyphs.forEach((glyph, g) => {
+      const bottom = rule - 5 - g * (GLYPH_PX + GLYPH_GAP_PX);
+      cell.append(svg("path", { d: glyph.path, fill: glyph.color, class: "strip-mark-glyph", transform: `translate(${(at - GLYPH_PX / 2).toFixed(1)} ${(bottom - GLYPH_PX).toFixed(1)}) scale(${(GLYPH_PX / 16).toFixed(3)})` }));
     });
     group.append(cell);
-  });
+  }
   return group;
 }
 

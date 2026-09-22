@@ -1,12 +1,13 @@
 // Seam: which layer switches are pressed -> what is on the map, on the strip and in the sentence.
-// PLAN.md D35: a layer marks the course line, adds its row to the strip and its clause to the
-// sentence, all three or none; one layer at a time; "Show everything" opens the full strip.
+// PLAN.md D35, D62: a layer marks the course line, adds its row to the strip and its clause to the
+// sentence, all three or none; any number of layers at once, each a toggle; "Show everything"
+// turns them all on.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { ENCODINGS, type Encoding } from "../src/core/encoding";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
-import { type Layer, NO_LAYERS, onScreen, pressEverything, pressLayer } from "../src/core/layers";
+import { everythingOn, isOn, type Layer, NO_LAYERS, onScreen, pressEverything, pressLayer } from "../src/core/layers";
 import { createPlanner, defaultPlan, plannerCourse } from "../src/core/planner";
 import { shadeLayer } from "../src/core/shade-layer";
 
@@ -22,18 +23,20 @@ const shade = shadeLayer(nyc, createPlanner(plannerCourse(nyc), defaultPlan(plan
 
 describe("the layer switches", () => {
   it("start with nothing on: the first screen shows little", () => {
-    expect(NO_LAYERS).toEqual({ active: null, everything: false });
+    expect(NO_LAYERS).toEqual({ on: [] });
   });
 
   it("turn a layer on, and off again when it is pressed a second time", () => {
     const on = pressLayer(NO_LAYERS, "hills");
-    expect(on.active).toBe("hills");
-    expect(pressLayer(on, "hills").active).toBeNull();
+    expect(isOn(on, "hills")).toBe(true);
+    expect(isOn(pressLayer(on, "hills"), "hills")).toBe(false);
   });
 
-  it("keep one layer on at a time: pressing another swaps it", () => {
-    const swapped = pressLayer(pressLayer(NO_LAYERS, "hills"), "shade");
-    expect(swapped.active).toBe("shade");
+  it("stack: pressing another layer turns it on beside the first, and each goes off on its own", () => {
+    // The owner, 09-22: "if I toggle them, they should appear on the map at the same time."
+    const both = pressLayer(pressLayer(NO_LAYERS, "hills"), "shade");
+    expect(both).toEqual({ on: ["hills", "shade"] });
+    expect(pressLayer(both, "hills")).toEqual({ on: ["shade"] });
   });
 
   it("only exist for layers the course has: no buildings, no Shade switch", () => {
@@ -49,11 +52,17 @@ describe("the layer switches", () => {
     }
   });
 
-  it("leave the layer alone when Show everything is pressed, and the other way round", () => {
-    const both = pressEverything(pressLayer(NO_LAYERS, "hills"));
-    expect(both).toEqual({ active: "hills", everything: true });
-    expect(pressLayer(both, "hills")).toEqual({ active: null, everything: true });
-    expect(pressEverything(both).everything).toBe(false);
+  it("turn every layer the course has on with Show everything, and all of them off when it is pressed again", () => {
+    const layers = [hillsLayer(nyc), shade, wind];
+    const all = pressEverything(pressLayer(NO_LAYERS, "shade"), layers);
+    expect(all).toEqual({ on: ["hills", "shade", "wind"] });
+    expect(everythingOn(all, layers)).toBe(true);
+    // One switched off is no longer everything; pressing Show everything then fills the gap, not empties the rest.
+    const oneOff = pressLayer(all, "wind");
+    expect(everythingOn(oneOff, layers)).toBe(false);
+    expect(pressEverything(oneOff, layers)).toEqual({ on: ["hills", "shade", "wind"] });
+    expect(pressEverything(all, layers)).toEqual(NO_LAYERS);
+    expect(everythingOn(NO_LAYERS, [])).toBe(false);
   });
 });
 
@@ -65,7 +74,8 @@ describe("what a layer puts on screen", () => {
     expect(screen.rows).toEqual([]);
     expect(screen.lineMarks).toEqual([]);
     expect(screen.lineLabels).toEqual([]);
-    expect(screen.clause(24.5, "km")).toBeNull();
+    expect(screen.layers).toEqual([]);
+    expect(screen.clauses(24.5, "km")).toEqual([]);
   });
 
   it("is all three with Hills on: marks on the course line, rows on the strip, a clause in the sentence", () => {
@@ -74,27 +84,39 @@ describe("what a layer puts on screen", () => {
     expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort"]);
     expect(screen.lineMarks.length).toBeGreaterThan(10);
     expect(screen.lineLabels.length).toBeGreaterThan(10);
-    expect(screen.clause(24.5, "km")?.text).toBe("Climbing 4%.");
+    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual(["Climbing 4%."]);
   });
 
   it("is none of the three again once Hills is switched off", () => {
     const off = pressLayer(pressLayer(NO_LAYERS, "hills"), "hills");
     const screen = onScreen(off, layers);
-    expect([screen.rows, screen.lineMarks, screen.lineLabels, screen.clause(24.5, "km")]).toEqual([[], [], [], null]);
+    expect([screen.rows, screen.lineMarks, screen.lineLabels, screen.clauses(24.5, "km")]).toEqual([[], [], [], []]);
   });
 
-  it("shows only the layer that is on", () => {
+  it("shows only the layers that are on", () => {
     const screen = onScreen(pressLayer(NO_LAYERS, "shade"), layers);
     expect(screen.rows.map((row) => row.name)).toEqual(["Shade"]);
-    // What it says is Sun's own business (sun.test.ts); that it says something here is this test's.
-    expect(screen.clause(24.5, "km")?.text).toMatch(/^(In (the sun|shade)|No shade)/);
+    // What it says is Shade's own business (sun.test.ts); that it says something here is this test's.
+    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual([expect.stringMatching(/^(In (the sun|shade)|No shade)/)]);
   });
 
-  it("opens every layer's rows with Show everything, without marking the map or lengthening the sentence", () => {
-    const screen = onScreen(pressEverything(NO_LAYERS), layers);
+  it("shows two layers at once, in the layers' own order whichever was pressed first: both on the map, both on the strip, both in the sentence", () => {
+    const screen = onScreen(pressLayer(pressLayer(NO_LAYERS, "shade"), "hills"), layers);
+
+    expect(screen.layers.map((layer) => layer.id)).toEqual(["hills", "shade"]);
     expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort", "Shade"]);
-    expect(screen.lineMarks).toEqual([]);
-    expect(screen.clause(24.5, "km")).toBeNull();
+    // Hills paint the band and Shade the rim, so the one line carries both (course-placement.test.ts draws it).
+    expect(screen.lineMarks.some((mark) => (mark.slot ?? "band") === "band")).toBe(true);
+    expect(screen.lineMarks.some((mark) => mark.slot === "rim")).toBe(true);
+    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual(["Climbing 4%.", expect.stringMatching(/^(In (the sun|shade)|No shade)/)]);
+  });
+
+  it("puts every layer on with Show everything: all the rows, all the marks, and every clause", () => {
+    const screen = onScreen(pressEverything(NO_LAYERS, layers), layers);
+    expect(screen.rows.map((row) => row.name)).toEqual(["Grade", "Effort", "Shade"]);
+    expect(screen.lineMarks.length).toBeGreaterThan(10);
+    expect(screen.clauses(24.5, "km")).toHaveLength(3);
+    expect(screen.clauses(24.5, "km")[2].text).toBe("Crosswind from your left.");
   });
 });
 

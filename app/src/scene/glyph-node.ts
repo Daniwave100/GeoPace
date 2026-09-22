@@ -11,7 +11,7 @@ import { svg } from "../svg";
 const BOX = 16;
 
 export function glyphNode(glyph: Glyph, className: string): HTMLElement {
-  const drawing = svg("svg", { viewBox: `0 0 ${BOX} ${BOX}`, class: className, "aria-hidden": "true", focusable: "false" }, svg("path", { d: glyph.path }));
+  const drawing = svg("svg", { viewBox: `0 0 ${BOX} ${BOX}`, class: className, "aria-hidden": "true", focusable: "false" }, svg("path", { d: glyph.path, fill: glyph.color }));
   const node = html("span", { class: "glyph", title: glyph.name });
   node.append(drawing, html("span", { class: "visually-hidden", text: `${glyph.name}. ` }));
   return node;

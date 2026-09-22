@@ -1,8 +1,14 @@
-// The layer system (PLAN.md D35). A layer is one kind of information about the course, switched
-// on and off as a whole. When it is on it does three things and when it is off none of them: it
-// marks the course line on the map, it adds its rows to the strip, and it adds its clause to the
-// sentence. One layer is on at a time, which is what keeps the first screen from becoming "a
-// lot" again; "Show everything" opens the full strip for the people who want all of it.
+// The layer system (PLAN.md D35, D62). A layer is one kind of information about the course,
+// switched on and off as a whole. When it is on it does three things and when it is off none of
+// them: it marks the course line on the map, it adds its rows to the strip, and it adds its
+// clause to the sentence. Any number can be on at once — the owner asked to see hills, shade and
+// aid on the map together (09-22) — and the first screen still opens with none, which is what
+// keeps it from being "a lot" (principle 8). "Show everything" turns them all on.
+//
+// Two layers marking the same stretch of the line can't both paint the same band beside it, so
+// the line has two slots (D62): the **band**, wide and coloured, for how much and which way — a
+// hill's steepness — and the **rim**, a dark stripe hugging the blue, for shade. One shader paints
+// both on one line (scene/course-ribbon.ts), so nothing is ever laid over anything (D52).
 //
 // A layer is data, not drawing. It says what its rows, marks and clause are, and which kind of
 // claim each one is (core/encoding.ts); the strip, the map and the sentence decide how that
@@ -120,11 +126,20 @@ export interface RowValue {
   notMeasured: string | null;
 }
 
+/**
+ * Where on the course line a mark is painted. The band is the wide coloured stripe outside the
+ * blue, for how much and which way (a hill); the rim is the dark stripe hugging the blue, for
+ * shade. A layer paints one slot, so two layers can be on the line at once.
+ */
+export type LineSlot = "band" | "rim";
+
 /** A stretch of the course line, marked on the map. */
 export interface LineMark {
   fromKm: number;
   toKm: number;
   encoding: Encoding;
+  /** Which slot it is painted in. Left out, the band. */
+  slot?: LineSlot;
   /** Where the layer has more to say than "here": how steep a hill is, and which way. Never 0 on a mark. */
   howMuch?: HowMuch;
 }
@@ -152,39 +167,50 @@ export interface MarkLabel {
 
 /** Which switches are pressed. */
 export interface LayerState {
-  /** The one layer that is on, or null. */
-  active: LayerId | null;
-  /** "Show everything": the strip shows every layer's rows, whichever layer is on. */
-  everything: boolean;
+  /** The layers that are on, in the order they were pressed. What they put on screen keeps the layers' own order. */
+  on: LayerId[];
 }
 
 /** How the app opens: nothing on. The first screen shows little (PLAN.md principle 8). */
-export const NO_LAYERS: LayerState = { active: null, everything: false };
+export const NO_LAYERS: LayerState = { on: [] };
 
-/** Pressing a layer's switch turns it on in place of whatever was on; pressing it again turns it off. */
+/** Pressing a layer's switch turns it on beside whatever is on; pressing it again turns it off. */
 export function pressLayer(state: LayerState, id: LayerId): LayerState {
-  return { ...state, active: state.active === id ? null : id };
+  return { on: state.on.includes(id) ? state.on.filter((other) => other !== id) : [...state.on, id] };
 }
 
-export function pressEverything(state: LayerState): LayerState {
-  return { ...state, everything: !state.everything };
+/** "Show everything" turns every layer the course has on; pressed with all of them on, it turns them all off. */
+export function pressEverything(state: LayerState, layers: Pick<Layer, "id">[]): LayerState {
+  const all = layers.map((layer) => layer.id);
+  return { on: all.every((id) => state.on.includes(id)) ? [] : all };
+}
+
+export function isOn(state: LayerState, id: LayerId): boolean {
+  return state.on.includes(id);
+}
+
+export function everythingOn(state: LayerState, layers: Pick<Layer, "id">[]): boolean {
+  return layers.length > 0 && layers.every((layer) => state.on.includes(layer.id));
 }
 
 export interface OnScreen {
+  /** The layers that are on, in the layers' own order. */
+  layers: Layer[];
   rows: StripRow[];
   lineMarks: LineMark[];
   lineLabels: MarkLabel[];
-  clause(km: number, units: Units): Clause | null;
+  /** Every on layer's clause where the runner is, in the layers' order, leaving out the ones with nothing to say. */
+  clauses(km: number, units: Units): Clause[];
 }
 
 /** What the layers put on the strip, on the map and in the sentence, for these switches. */
 export function onScreen(state: LayerState, layers: Layer[]): OnScreen {
-  const active = layers.find((layer) => layer.id === state.active);
-  const onStrip = state.everything ? layers : active ? [active] : [];
+  const on = layers.filter((layer) => state.on.includes(layer.id));
   return {
-    rows: onStrip.flatMap((layer) => layer.rows()),
-    lineMarks: active ? active.lineMarks() : [],
-    lineLabels: active ? active.lineLabels() : [],
-    clause: (km, units) => active?.clause(km, units) ?? null,
+    layers: on,
+    rows: on.flatMap((layer) => layer.rows()),
+    lineMarks: on.flatMap((layer) => layer.lineMarks()),
+    lineLabels: on.flatMap((layer) => layer.lineLabels()),
+    clauses: (km, units) => on.map((layer) => layer.clause(km, units)).filter((clause): clause is Clause => clause !== null),
   };
 }

@@ -115,11 +115,13 @@ describe("the organizer's stations, as the bundle carries them", () => {
 });
 
 describe("the Aid layer", () => {
-  it("marks every station on the course line, and names what each one has", () => {
+  it("puts a chip at every station on the course line, and names what each one has", () => {
     const layer = layerFor(berlin)!;
 
-    expect(layer.lineMarks()).toHaveLength(15);
-    expect(layer.lineMarks().every((mark) => mark.encoding === "measured" && mark.toKm > mark.fromKm)).toBe(true);
+    // The chip is the mark: a station is a point, and painting the line under it would take the
+    // band from the hills or the rim from the shade for a few metres (PLAN.md D62).
+    expect(layer.lineMarks()).toEqual([]);
+    expect(layer.lineLabels()).toHaveLength(15);
     // The label is the station's own name and the marks for what it has; the words are in its note
     // and in the sentence, so the map stays legible with fifteen of them on it (owner, 09-21).
     const gel = layer.lineLabels().find((label) => label.text("km") === "27.5 km")!;
