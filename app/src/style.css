@@ -695,11 +695,15 @@ button.map-label {
   background: #000;
 }
 
-/* What runners say is hollow: paper, with an ink frame. */
+/* What runners say is hollow here as everywhere else (core/encoding.ts: fill none, ink stroke):
+   the map shows through it, and the frame with a paper halo round the letters holds it together.
+   It was paper-filled until 09-22, when the chip took that look and two things would have worn
+   one (D62); nothing draws a runner report on the map yet, so nothing on screen changed. */
 .map-label.enc-runner-report {
   padding: 2px 7px;
   color: #000;
-  background: #f4f4f0;
+  background: transparent;
+  text-shadow: 0 0 3px #f4f4f0, 0 0 2px #f4f4f0, 0 0 2px #f4f4f0;
 }
 
 /* Not measured here: grey, a dashed edge like its stretch of line, and the value struck through. */
@@ -722,6 +726,15 @@ button.map-label {
   padding: 2px 7px;
   color: #000;
   background: repeating-linear-gradient(135deg, #f4f4f0 0 4px, #b9b9b4 4px 8px);
+}
+
+/* A chip names a point on the course rather than stating a value measured of it: an aid station,
+   which is a place the organizer names. Paper, framed in ink, with its marks in their own colours
+   — the owner picked it over the ink block on 09-22 (D62). */
+.map-label-chip {
+  color: #000;
+  background: #f4f4f0;
+  border-color: #000;
 }
 
 /* The start and the finish are the course's own, so they are the course's blue, and can't be
@@ -1528,4 +1541,111 @@ button.map-label {
     animation: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── The fueling plan, inside the Race Plan (#12) ────────────────────────────────────────── */
+
+/* One line per item: what, where, and the way to take it off again. The warnings under it are
+   the point of the whole panel, so they are the thing that is set apart, not the list. */
+.fueling {
+  margin-top: 16px;
+  padding: 12px;
+  border: var(--rule) solid var(--ink);
+}
+
+.fuel-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fuel-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.fuel-item .fuel-km {
+  width: 6ch;
+}
+
+.fuel-unit {
+  font-size: 0.85em;
+  color: var(--grey-text);
+}
+
+.fuel-remove {
+  margin-left: auto;
+}
+
+/* The way in: one button, under the list, in the plain button style the panel already uses. */
+.fuel-add {
+  margin-top: 4px;
+}
+
+.fuel-warnings {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A warning is a fact about the organizer's list, not a scolding: plain ink on the paper, with
+   the one button that answers it. Nothing red — a runner carrying their own bottle has already
+   answered every one of these. */
+.fuel-warning {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--ink);
+}
+
+/* The button that answers a warning. It is the whole feature: a warning a runner has to act on by
+   retyping a number is a warning they read once and stop reading. */
+.fuel-move {
+  white-space: nowrap;
+}
+
+.fuel-clear {
+  margin-top: 8px;
+  font-size: 0.9em;
+  color: var(--grey-text);
+}
+
+/* ── What an aid station hands out, as marks (#12) ───────────────────────────────────────── */
+
+/* One shape per thing, flat ink with no colour of its own, drawn the same on a map label and on
+   the strip (core/serve-glyphs.ts). Every one carries its word as well: a shape on its own is a
+   guess for anybody who hasn't learned it, and a screen reader has nothing to say about a path. */
+.glyph {
+  display: inline-flex;
+  align-items: center;
+}
+
+.map-label-glyph {
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 3px;
+  vertical-align: -0.12em;
+}
+
+/* The Stations row: one rule with a tick at each station and its marks above it. Not a trace — a
+   line through fifteen stations draws the gaps between them (owner, 09-21). */
+svg .strip-mark-rule {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+svg .strip-mark-tick {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+/* Each glyph is filled in its own colour (core/serve-glyphs.ts); only the stroke is ruled here. */
+svg .strip-mark-glyph {
+  stroke: none;
 }

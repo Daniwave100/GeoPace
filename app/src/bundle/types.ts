@@ -139,6 +139,31 @@ export interface Edition {
   carried_over?: { from_edition: number; reason: string };
   /** At least one wave has a start time. */
   waves: Wave[];
+  /**
+   * The organizer's refreshment points for this edition, in course order. Absent where nobody has
+   * published this edition's yet — the app then has no Aid layer for the course at all, rather
+   * than an invented one (PLAN.md D47).
+   */
+  aid_stations?: AidStationFact[];
+}
+
+/** One refreshment point, as the organizer lists it. A sourced fact, never a measurement. */
+export interface AidStationFact {
+  /** Where it stands on the course line, the app's one distance scale. */
+  km: number;
+  /** What the organizer published, in km on the certified course: what the road sign says. */
+  km_marked: number;
+  /** What the organizer calls it: "9 km", "Mile 12". */
+  label: string;
+  /** From the pipeline's fixed vocabulary, so the fueling check can reason about it. */
+  serves: string[];
+  /** Copied from an earlier edition's list; the app flags it to the runner. */
+  carried_over: boolean;
+  /** A brand, a sponsor's bottle: shown, never reasoned about. */
+  detail?: string;
+  note?: string;
+  source: string;
+  accessed: string;
 }
 
 /** A group of runners with its own start time. */

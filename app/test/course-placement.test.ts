@@ -10,13 +10,15 @@ import { readFileSync } from "node:fs";
 import { Cartographic, ClassificationType, type Entity, EntityCollection, JulianDate } from "cesium";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
-import { hillsLayer } from "../src/core/hills-layer";
-import { markLook } from "../src/core/mark-look";
 import { courseStretches } from "../src/core/course-stretches";
+import { hillsLayer } from "../src/core/hills-layer";
+import { markLook, rimLook } from "../src/core/mark-look";
+import { createPlanner, defaultPlan, plannerCourse } from "../src/core/planner";
 import { positionAtKm } from "../src/core/scrub";
 import { nearestIndex } from "../src/core/series";
+import { shadeLayer } from "../src/core/shade-layer";
 import { showCourseLine } from "../src/scene/course-line";
-import { COURSE_BLUE } from "../src/scene/course-ribbon";
+import { COURSE_BLUE, ribbonWidthPx } from "../src/scene/course-ribbon";
 import { dotPosition } from "../src/scene/map-dots";
 import { ROAD_LOOK } from "../src/scene/placement";
 
@@ -193,13 +195,34 @@ describe("the course cut into stretches, each drawn as one line", () => {
   });
 
   it("gives every mark its stretch, and leaves the plain course between them", () => {
-    const marked = stretches.filter((stretch) => stretch.mark !== null);
-    expect(marked.map((stretch) => stretch.mark)).toEqual(marks.filter((mark) => nearestIndex(line.km, mark.toKm) > nearestIndex(line.km, mark.fromKm)));
+    const marked = stretches.filter((stretch) => stretch.band !== null);
+    expect(marked.map((stretch) => stretch.band)).toEqual(marks.filter((mark) => nearestIndex(line.km, mark.toKm) > nearestIndex(line.km, mark.fromKm)));
     for (const stretch of marked) {
-      expect(line.km[stretch.first]).toBeCloseTo(stretch.mark!.fromKm, 2);
-      expect(line.km[stretch.last]).toBeCloseTo(stretch.mark!.toKm, 2);
+      expect(line.km[stretch.first]).toBeCloseTo(stretch.band!.fromKm, 2);
+      expect(line.km[stretch.last]).toBeCloseTo(stretch.band!.toKm, 2);
     }
-    expect(stretches.some((stretch) => stretch.mark === null)).toBe(true);
+    expect(stretches.some((stretch) => stretch.band === null)).toBe(true);
+    expect(stretches.every((stretch) => stretch.rim === null)).toBe(true); // Hills alone paint nothing in the rim
+  });
+
+  it("carries a hill's band and the shade's rim on one stretch, and cuts a new stretch wherever either changes", () => {
+    // Two layers on at once (PLAN.md D62): each paints its own slot, and the one line draws both.
+    const shade = shadeLayer(nyc, createPlanner(plannerCourse(nyc), defaultPlan(plannerCourse(nyc))))!.lineMarks();
+    const both = courseStretches(line.km, [...marks, ...shade], nyc.measured.elevation_not_measured);
+
+    expect(shade.every((mark) => mark.slot === "rim")).toBe(true);
+    expect(both.some((stretch) => stretch.band !== null && stretch.rim !== null)).toBe(true);
+    expect(both.some((stretch) => stretch.band !== null && stretch.rim === null)).toBe(true); // a hill in the sun
+    expect(both.length).toBeGreaterThan(stretches.length);
+    both.slice(1).forEach((stretch, i) => {
+      expect(stretch.first).toBe(both[i].last);
+      expect(stretch.band === both[i].band && stretch.rim === both[i].rim && stretch.measured === both[i].measured).toBe(false);
+    });
+    // The band is the hills' own, unchanged by the rim over it: every band stretch is inside its mark.
+    for (const stretch of both.filter((stretch) => stretch.band !== null)) {
+      expect(line.km[stretch.first]).toBeGreaterThanOrEqual(stretch.band!.fromKm - 0.01);
+      expect(line.km[stretch.last]).toBeLessThanOrEqual(stretch.band!.toKm + 0.01);
+    }
   });
 
   it("says where the height is not measured, whether or not a layer has marked it", () => {
@@ -212,13 +235,14 @@ describe("the course cut into stretches, each drawn as one line", () => {
 
   it("is one stretch where nothing is marked and everything is measured", () => {
     const berlin = bundleFor("berlin").measured;
-    expect(courseStretches(berlin.course_line.km, [], berlin.elevation_not_measured)).toEqual([{ first: 0, last: berlin.course_line.km.length - 1, mark: null, measured: true }]);
+    expect(courseStretches(berlin.course_line.km, [], berlin.elevation_not_measured)).toEqual([{ first: 0, last: berlin.course_line.km.length - 1, band: null, rim: null, measured: true }]);
   });
 });
 
 describe("a layer's marks on the course line", () => {
   const marks = hillsLayer(nyc).lineMarks();
-  const uniforms = (entity: Entity) => entity.polyline!.material!.getValue(NOW) as { coreColor: { toCssHexString(): string }; bandColor: { toCssHexString(): string }; dashColor: { alpha: number } };
+  type Rgb = { toCssHexString(): string; alpha: number };
+  const uniforms = (entity: Entity) => entity.polyline!.material!.getValue(NOW) as { coreColor: Rgb; bandColor: Rgb; dashColor: Rgb; rimColor: Rgb; rimDotColor: Rgb; rimEndPx: number; coreEdgeEndPx: number; edgePx: number };
 
   it("are draped with the line on the keyless map, and at the road's height with it in photoreal", () => {
     const [keyless, photoreal] = [scene(), scene()];
@@ -256,6 +280,48 @@ describe("a layer's marks on the course line", () => {
     expect(uniforms(at(1.0)).dashColor.alpha).toBe(0); // no pattern: twice the owner took dashes for a fault in the drawing
     expect(uniforms(at(24.6)).dashColor.alpha).toBe(0); // halfway up the Queensboro: a measured climb
     expect(uniforms(at(24.6)).bandColor.toCssHexString()).toBe(markLook("measured", marks.find((mark) => mark.fromKm <= 24.6 && mark.toKm >= 24.6)!.howMuch).color);
+  });
+
+  it("darken the road's edge where it is in shade, beside the hill's colour, and leave the edge alone in the sun", () => {
+    // Shade is the rim, not a second band (PLAN.md D62): the hills' colour and the shade over it
+    // are both on the line, in different shapes, so neither is taken for the other.
+    const shade = shadeLayer(nyc, createPlanner(plannerCourse(nyc), defaultPlan(plannerCourse(nyc))))!.lineMarks();
+    const map = scene();
+
+    showCourseLine(map, nyc, [...marks, ...shade], "road-height");
+
+    const at = (km: number) => lines(map).find((entity) => heightsAlong(entity).some(([sample]) => sample === nearestIndex(line.km, km)))!;
+    const inShade = shade.find((mark) => mark.encoding === "measured" && mark.toKm - mark.fromKm > 0.05)!;
+    const shadedKm = (inShade.fromKm + inShade.toKm) / 2;
+    const shaded = uniforms(at(shadedKm));
+    expect(shaded.rimColor.toCssHexString()).toBe("#000000");
+    expect(shaded.rimDotColor.alpha).toBe(0);
+    expect(shaded.rimEndPx).toBeGreaterThan(shaded.coreEdgeEndPx);
+    expect(ribbonWidthPx({ band: null, rim: rimLook("measured") })).toBeGreaterThan(ribbonWidthPx(null));
+    // The hill under it keeps its own colour: the rim adds to the band, it does not replace it.
+    const hill = marks.find((mark) => mark.encoding === "measured" && mark.fromKm <= shadedKm && mark.toKm >= shadedKm);
+    if (hill) expect(shaded.bandColor.toCssHexString()).toBe(markLook("measured", hill.howMuch).color);
+    // CLAUDE.md's trap: a filled-in height must never look measured, in the rim as in the band.
+    const verrazzano = uniforms(at(1.0));
+    expect(verrazzano.rimColor.toCssHexString()).toBe("#8a8a86");
+    expect(verrazzano.rimDotColor.alpha).toBe(0);
+    expect(verrazzano.rimEndPx).toBeGreaterThan(verrazzano.coreEdgeEndPx);
+    // Where the sun is on the runner nothing is in the rim: it has no width, and paints nothing.
+    const sunKm = firstKmWithNoRim(shade);
+    const sunny = uniforms(at(sunKm));
+    expect(sunny.rimEndPx).toBe(sunny.coreEdgeEndPx);
+    // Leafy shade is the rim in halftone: paper dots in the ink.
+    const leafy = shade.find((mark) => mark.encoding === "depends-on-leaves");
+    if (leafy) {
+      const dotted = uniforms(at((leafy.fromKm + leafy.toKm) / 2));
+      expect(dotted.rimColor.toCssHexString()).toBe("#000000");
+      expect(dotted.rimDotColor.alpha).toBe(1);
+    }
+
+    function firstKmWithNoRim(rim: typeof shade): number {
+      for (let km = 0.5; km < 42; km += 0.05) if (!rim.some((mark) => mark.fromKm <= km && mark.toKm >= km)) return km;
+      throw new Error("the whole course is in the rim");
+    }
   });
 });
 

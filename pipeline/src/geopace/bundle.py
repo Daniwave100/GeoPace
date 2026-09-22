@@ -15,7 +15,7 @@ import jsonschema
 from geopace import __version__, difficulty
 from geopace.course_facts import CourseFacts
 from geopace.course_line import CourseLine, build_course_line
-from geopace.edition_facts import EditionFacts
+from geopace.edition_facts import AidStation, EditionFacts
 from geopace.elevation import BridgeDeckModel, ElevationModel, GeoidModel
 from geopace.provenance import Attribution, Source
 
@@ -83,7 +83,7 @@ def build_course_bundle(
             "landmarks": [{"name": mark.name, "km": mark.km, "source": mark.source} for mark in facts.landmarks],
             **({"leaves": {"state": facts.leaves.state, "note": facts.leaves.note, "source": facts.leaves.source}} if facts.leaves else {}),
         },
-        "editions": [_edition_json(edition) for edition in editions],
+        "editions": [_edition_json(edition, line.length_m / facts.certified_distance_m) for edition in editions],
         "measured": {
             "course_line": _course_line_json(line),
             "elevation_summary": _elevation_summary(line),
@@ -159,8 +159,14 @@ def check_length(length_m: float, certified_m: float, traced: bool = False) -> N
         )
 
 
-def _edition_json(edition: EditionFacts) -> dict:
-    """An edition's facts as the app reads them. Optional parts are left out rather than null."""
+def _edition_json(edition: EditionFacts, onto_the_line: float) -> dict:
+    """An edition's facts as the app reads them. Optional parts are left out rather than null.
+
+    `onto_the_line` puts the organizer's own kilometres on the course line the app measures
+    everything else along, which is a little longer than the certified course they are marked on
+    (D20, and the same scaling the landmarks in course.yaml already carry). The organizer's own
+    number goes with it, because that is what the sign the runner passes says.
+    """
     date = {
         "day": edition.date.day,
         "confirmed": edition.date.confirmed,
@@ -186,6 +192,24 @@ def _edition_json(edition: EditionFacts) -> dict:
         if wave.note:
             wave_json["note"] = wave.note
         out["waves"].append(wave_json)
+    if edition.aid_stations:
+        out["aid_stations"] = [_aid_station_json(station, onto_the_line) for station in edition.aid_stations]
+    return out
+
+
+def _aid_station_json(station: AidStation, onto_the_line: float) -> dict:
+    out = {
+        "km": round(station.km_marked * onto_the_line, 3),
+        "km_marked": station.km_marked,
+        "label": station.label,
+        "serves": list(station.serves),
+        "carried_over": station.carried_over,
+        "source": station.source,
+        "accessed": station.accessed,
+    }
+    for name, value in (("detail", station.detail), ("note", station.note)):
+        if value:
+            out[name] = value
     return out
 
 
@@ -231,9 +255,25 @@ def validate_bundle(bundle: dict) -> None:
         for error in sorted(validator.iter_errors(bundle), key=lambda e: list(e.absolute_path))
     ]
     if not problems:
-        problems = _column_problems(bundle["measured"]["course_line"]) + _sun_problems(bundle["measured"])
+        problems = _column_problems(bundle["measured"]["course_line"]) + _sun_problems(bundle["measured"]) + _aid_station_problems(bundle)
     if problems:
         raise BundleInvalid("Course Bundle is invalid:\n  - " + "\n  - ".join(problems))
+
+
+def _aid_station_problems(bundle: dict) -> list[str]:
+    """A station has to stand on the course. The editions file is hand-edited and knows nothing
+    about how long this course is; here the course line is at hand, so a typed 300 for 30 is named
+    as the mistake it is rather than drawn three hundred kilometres past the finish."""
+    length_km = bundle["measured"]["course_line"]["length_m"] / 1000
+    problems = []
+    for edition in bundle["editions"]:
+        for station in edition.get("aid_stations", []):
+            if station["km"] > length_km:
+                problems.append(
+                    f"editions[{edition['edition']}].aid_stations ({station['label']}) is at km {station['km_marked']}, "
+                    f"which is {station['km']:.2f} km along a course line of {length_km:.2f} km"
+                )
+    return problems
 
 
 def _column_problems(line: dict) -> list[str]:

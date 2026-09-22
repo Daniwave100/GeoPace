@@ -15,7 +15,7 @@
 // surface, which is for looking at only (PLAN.md D5).
 import { ArcType, Cartesian3, ClassificationType, type PolylineGraphics } from "cesium";
 import type { CourseLine } from "../bundle/types";
-import type { MarkLook } from "../core/mark-look";
+import type { RibbonLook } from "../core/mark-look";
 import type { RoadPosition } from "../core/scrub";
 import { CourseRibbonProperty, ribbonWidthPx } from "./course-ribbon";
 
@@ -55,9 +55,9 @@ export function scenePosition(place: Pick<RoadPosition, "lat" | "lon" | "ellipso
 
 /**
  * What CesiumJS draws for one stretch of the course line: one line, the plain course or, with a
- * `look`, the course with a layer's mark beside it.
+ * `look`, the course with the layers' marks beside it.
  */
-export function stretchGraphics(line: CourseLine, stretch: { first: number; last: number; measured: boolean }, look: MarkLook | null, placement: Placement): PolylineGraphics.ConstructorOptions {
+export function stretchGraphics(line: CourseLine, stretch: { first: number; last: number; measured: boolean }, look: RibbonLook | null, placement: Placement): PolylineGraphics.ConstructorOptions {
   const asItIs = { positions: positionsAlong(line, stretch, placement), width: ribbonWidthPx(look) };
   if (placement === "draped") return { ...asItIs, material: new CourseRibbonProperty(look, null), clampToGround: true, classificationType: ClassificationType.TERRAIN };
   const material = new CourseRibbonProperty(look, STRENGTH_BEHIND[stretch.measured ? ROAD_LOOK.behind : ROAD_LOOK.behindWhereNotMeasured]());

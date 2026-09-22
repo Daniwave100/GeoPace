@@ -22,7 +22,7 @@ const berlin = bundleFor("berlin");
 const nyc = bundleFor("nyc");
 
 const plannerFor = (bundle: CourseBundle, plan: RacePlan) => createPlanner(plannerCourse(bundle), plan);
-const firstWavePlan = (bundle: CourseBundle): RacePlan => ({ courseId: bundle.course_id, edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 } });
+const firstWavePlan = (bundle: CourseBundle): RacePlan => ({ courseId: bundle.course_id, edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 }, fueling: [] });
 
 /** Where a km falls in the course line's samples. */
 function sampleAt(bundle: CourseBundle, km: number): number {
@@ -111,7 +111,7 @@ describe("what the table says about the real courses", () => {
 describe("the moment the runner gets there", () => {
   it("changes with the wave, and with the pace, on the same stretch of road", () => {
     const course = madeUpCourse();
-    const at600m = (waveId: string, goal: Goal) => sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId, ownStartLocal: null, goal }))!.at(0.6).state;
+    const at600m = (waveId: string, goal: Goal) => sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId, ownStartLocal: null, goal, fueling: [] }))!.at(0.6).state;
     const twoHours: Goal = { kind: "finish", seconds: 2 * 3600 };
 
     // The made-up course falls into shade at 10:00 from halfway on. 600 m in, at a two-hour pace
@@ -123,7 +123,7 @@ describe("the moment the runner gets there", () => {
 
   it("says nothing was worked out where the runner arrives outside the hours in the table", () => {
     const course = madeUpCourse();
-    const plan = (ownStartLocal: string): RacePlan => ({ courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal, goal: { kind: "finish", seconds: 2 * 3600 } });
+    const plan = (ownStartLocal: string): RacePlan => ({ courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] });
 
     // The table stops at 11:00. A runner who sets out at 09:30 is still going at 11:30.
     const afterTheTable = sunAlong(course, plannerFor(course, plan("09:30")))!.at(1.0);
@@ -137,7 +137,7 @@ describe("the moment the runner gets there", () => {
     const course = madeUpCourse();
     course.editions[0].date.day = "2026-09-28";
 
-    expect(sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 } }))).toBeNull();
+    expect(sunAlong(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))).toBeNull();
   });
 
   it("reads the bits back exactly as the pipeline packed them", () => {
@@ -189,18 +189,24 @@ describe("the Shade layer", () => {
     expect(layerFor(berlin).key).toMatch(/while the leaves are on/i);
   });
 
-  it("marks the course line in stretches of sun and stretches of shade, and never in percentages", () => {
+  it("marks the course line's rim where there is shade, nothing where there is sun, and never in percentages", () => {
     const layer = layerFor(nyc);
     const marks = layer.lineMarks();
+    const along = sunAlong(nyc, plannerFor(nyc, firstWavePlan(nyc)))!;
 
     expect(marks.length).toBeGreaterThan(20);
-    // Warm where the sun is on the runner, teal where a building has them in shade, and grey with
-    // no colour at all where the road's own height is filled in.
-    expect(new Set(marks.map((mark) => Math.sign(mark.howMuch ?? 0)))).toEqual(new Set([1, 0, -1]));
-    expect(marks.filter((mark) => mark.encoding === "not-measured").every((mark) => mark.howMuch === undefined)).toBe(true);
-    // Warm where the sun is on the runner, teal where a building has them in shade: the layer
-    // says how much and which way, and core/mark-look.ts picks the colour (PLAN.md D47).
-    for (const mark of marks) expect(Math.abs(mark.howMuch ?? 0)).toBeLessThanOrEqual(1);
+    // Shade is the rim (PLAN.md D62): the road's own edge darkened, a different shape from a hill's
+    // band so both can be on the line at once. It carries no "how much": shade is binary (D58).
+    expect(marks.every((mark) => mark.slot === "rim" && mark.howMuch === undefined)).toBe(true);
+    // Only shade is marked — a wall's, a tree's, or greyed where the height is filled in. The sun
+    // is the road's ordinary state: no rim there.
+    expect(new Set(marks.map((mark) => mark.encoding))).toEqual(new Set(["measured", "depends-on-leaves", "not-measured"]));
+    const sunny = along.runs.filter((run) => run.state === "sun");
+    expect(sunny.length).toBeGreaterThan(5);
+    for (const run of sunny) {
+      const midKm = (run.fromKm + run.toKm) / 2;
+      expect(marks.some((mark) => mark.encoding !== "not-measured" && mark.fromKm < midKm && mark.toKm > midKm), `sun at ${midKm.toFixed(2)} km is marked`).toBe(false);
+    }
     expect(marks.every((mark) => mark.toKm > mark.fromKm)).toBe(true);
     for (const km of [1.5, 27, 33, 41.5]) expect(layer.clause(km, "km")?.text ?? "").not.toMatch(/%/);
   });
@@ -218,7 +224,7 @@ describe("the Shade layer", () => {
     expect(layer.clause(27, "mi")?.text).toMatch(/(ft|mi)\./);
     // At the very end of a stretch there is no distance worth printing, and none is printed.
     const course = madeUpCourse();
-    const atTheEdge = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const atTheEdge = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
     expect(atTheEdge.clause(0.49, "km")?.text).toBe("No shade, at any hour.");
     // And nowhere along either real course does it come out as a distance of nothing.
     for (const bundle of [berlin, nyc]) {
@@ -256,7 +262,7 @@ describe("the Shade layer", () => {
     // A runner still out after sunset is not in a building's shade: the layer has no value for
     // them, the map marks nothing, and the sentence's own sun clause says the sun is down.
     const course = madeUpCourse();
-    const atNight = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "20:00", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const atNight = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "20:00", goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
 
     expect(atNight.rows()[0].valueAt(0.5, "km")).toEqual({ text: "The sun is down", notMeasured: null });
     expect(atNight.rows()[0].bins(100).every((bin) => bin.value === null)).toBe(true);
@@ -266,7 +272,7 @@ describe("the Shade layer", () => {
 
   it("greys what it didn't work out, on the strip, on the map and in words", () => {
     const course = madeUpCourse();
-    const layer = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "09:30", goal: { kind: "finish", seconds: 2 * 3600 } }))!;
+    const layer = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "09:30", goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
     const clause = layer.clause(1.0, "km");
 
     expect(clause?.encoding).toBe("not-measured");
@@ -366,15 +372,14 @@ describe("the third state: shade that depends on the leaves", () => {
     }
   });
 
-  it("marks the course line in halftone where a tree casts it, and solid where a wall does", () => {
+  it("marks the course line's rim in halftone where a tree casts it, and solid where a wall does", () => {
     const marks = layerFor(berlin).lineMarks();
     const leafy = marks.filter((mark) => mark.encoding === "depends-on-leaves");
 
     expect(leafy.length).toBeGreaterThan(0);
-    // It is shade, so it is the same teal, at the same depth as a building's: what differs is the
-    // claim, not how dark it is.
-    const shade = marks.filter((mark) => mark.encoding === "measured" && (mark.howMuch ?? 0) < 0);
-    expect(new Set(leafy.map((mark) => mark.howMuch))).toEqual(new Set(shade.map((mark) => mark.howMuch)));
+    // It is shade, so it is in the rim like a wall's: what differs is the claim, not the shape.
+    expect(leafy.every((mark) => mark.slot === "rim" && mark.howMuch === undefined)).toBe(true);
+    expect(marks.some((mark) => mark.encoding === "measured" && mark.slot === "rim")).toBe(true);
   });
 
   it("says it in words, with what the trees are wearing on race day under the sentence", () => {

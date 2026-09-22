@@ -32,9 +32,28 @@ const brokenStorage: PlanStorage = {
 };
 
 describe("Race Plan store", () => {
+  it("remembers the fueling plan across a reload, and throws out what no longer makes sense", () => {
+    // The fueling plan is part of the Race Plan (#12), so it is saved and sanitized with it and
+    // needs no storage of its own. What comes back may be an older version of the app's.
+    const storage = fakeStorage();
+    const plan: RacePlan = {
+      ...defaultPlan(BERLIN),
+      fueling: [
+        { id: "a", km: 15, kind: "gel" },
+        { id: "b", km: 20, kind: "station-water" },
+      ],
+    };
+
+    savePlan(storage, plan);
+
+    expect(loadPlan(storage, BERLIN).fueling).toEqual(plan.fueling);
+    // A plan remembered before fueling existed simply has none.
+    expect(loadPlan(fakeStorage({ "geopace.race-plans": JSON.stringify({ plans: { berlin: { edition: 2026, waveId: "wave-1" } } }) }), BERLIN).fueling).toEqual([]);
+  });
+
   it("remembers the plan across a reload", () => {
     const storage = fakeStorage();
-    const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:02", goal: { kind: "pace", secondsPerKm: 320 } };
+    const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:02", goal: { kind: "pace", secondsPerKm: 320 }, fueling: [] };
 
     savePlan(storage, plan);
 
@@ -43,8 +62,8 @@ describe("Race Plan store", () => {
 
   it("remembers a plan for each course, and which course was planned last", () => {
     const storage = fakeStorage();
-    const berlin: RacePlan = { courseId: "berlin", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal: { kind: "finish", seconds: 12600 } };
-    const nyc: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 } };
+    const berlin: RacePlan = { courseId: "berlin", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal: { kind: "finish", seconds: 12600 }, fueling: [] };
+    const nyc: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 }, fueling: [] };
 
     savePlan(storage, berlin);
     savePlan(storage, nyc);
@@ -61,10 +80,10 @@ describe("Race Plan store", () => {
 
   it("checks a remembered plan against today's edition facts", () => {
     const storage = fakeStorage();
-    savePlan(storage, { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 } });
+    savePlan(storage, { courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 }, fueling: [] });
     const withoutWave3 = course("nyc", [edition("2026-11-01", ["wave-1", "wave-2"])]);
 
-    expect(loadPlan(storage, withoutWave3)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 } });
+    expect(loadPlan(storage, withoutWave3)).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: null, goal: { kind: "finish", seconds: 16200 }, fueling: [] });
   });
 
   it("carries on with the default plan when what is stored is unreadable", () => {
@@ -92,7 +111,7 @@ describe("Race Plan store", () => {
 });
 
 describe("units, remembered beside the plans", () => {
-  const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 } };
+  const plan: RacePlan = { courseId: "nyc", edition: 2026, waveId: "wave-2", ownStartLocal: null, goal: { kind: "finish", seconds: 4 * 3600 }, fueling: [] };
 
   it("opens in kilometres on a first visit", () => {
     expect(loadUnits(fakeStorage())).toBe("km");

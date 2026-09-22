@@ -2,15 +2,18 @@
 // building in the way? (PLAN.md D58, D59, issue #9.)
 //
 // Binary, never a share. On the strip it is one row, a square wave: up and warm where the sun is
-// on the runner, down and teal where a building has them in shade. On the map the same thing
-// marks the course line — and the shade itself is already there, cast by the White model's own
-// blocks from the same buildings and the same clock, which is why the ticket asks that the two
-// agree.
+// on the runner, down and teal where a building has them in shade. On the map it is **the rim**:
+// the road's own edge darkens where it is in shade — solid ink for a wall's shade, paper dots in
+// the ink for a tree's, nothing at all in the sun, which is the road's ordinary state (D62). A
+// different shape from a hill's coloured band, not a different colour, so both can be on the line
+// at once. And the shade itself is already there on the keyless map, cast by the White model's own
+// blocks from the same buildings and the same clock, which is why the ticket asks that the two agree.
 //
 // Three states, not two (PLAN.md D60, issue #10): the city's trees cast shade as well, and shade a
 // leaf casts is not shade a wall casts — the runner gets it while the leaves are on and not
-// otherwise. So leafy shade is the same teal in the poster's halftone, on the strip and beside the
-// line alike, and the sentence says it in words: "In leafy shade for the next 300 m." A wall wins
+// otherwise. So leafy shade is the poster's halftone — the same teal, dotted, on the strip; paper
+// dots in the ink of the rim on the map — and the sentence says it in words: "In leafy shade for
+// the next 300 m." A wall wins
 // wherever both apply, because shade you get whatever the trees do is the stronger claim.
 //
 // What it rests on, and says out loud: a clear sky, the road surface rather than a runner's head,
@@ -83,24 +86,23 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     howMuch: (count) => binned(count).map((bin) => fillOf(rowBin(bin, along.states, gaps))),
   };
 
-  // The sun being down is not a thing to mark: there is no sun on the runner and no building
-  // keeping it off them, and the sentence says so in words. What is left is cut around the
-  // stretches whose height is filled in, which are greyed whatever the sun is doing over them.
+  // Sun marks nothing: it is the road's ordinary state, and a rim everywhere would say nothing.
+  // The sun being down marks nothing either — there is no building keeping it off the runner,
+  // and the sentence says so in words. What is left is shade, in the rim, cut around the stretches
+  // whose height is filled in, which are greyed whatever the sun is doing over them.
   const marks: LineMark[] = [
     ...along.runs
-      .filter((run) => run.state !== "down")
-      .flatMap((run) =>
-        measuredParts(run, gaps).map((part): LineMark => ({ fromKm: part.fromKm, toKm: part.toKm, encoding: encodingOf(run.state), howMuch: howMuch(run.state) || undefined })),
-      ),
-    ...gaps.map((gap): LineMark => ({ fromKm: gap.km_start, toKm: gap.km_end, encoding: "not-measured" })),
+      .filter((run) => run.state !== "down" && run.state !== "sun")
+      .flatMap((run) => measuredParts(run, gaps).map((part): LineMark => ({ fromKm: part.fromKm, toKm: part.toKm, encoding: encodingOf(run.state), slot: "rim" }))),
+    ...gaps.map((gap): LineMark => ({ fromKm: gap.km_start, toKm: gap.km_end, encoding: "not-measured", slot: "rim" })),
   ].sort((a, b) => a.fromKm - b.fromKm);
 
   return {
     id: "shade",
     name: "Shade",
     key: along.table.hasTrees
-      ? ["Warm is the sun on you when you get there; solid teal is a building's shade, and dotted teal a tree's — that one you get while the leaves are on.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
-      : "Warm is the sun on you when you get there; teal is a building's shade. A clear sky is assumed, and trees are not in yet.",
+      ? ["A dark edge on the line is shade when you get there: solid for a building's, dotted for a tree's — that one you get while the leaves are on. No edge is sun.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
+      : "A dark edge on the line is a building's shade when you get there; no edge is sun. A clear sky is assumed, and trees are not in yet.",
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],
@@ -211,11 +213,6 @@ function valueAt(at: SunAt, floorDeg: number, gap: NotMeasuredSpan | undefined):
 /** The words for a state, as they read after "In ": "the sun", "shade", "leafy shade". */
 function whereYouAre(state: SunState): string {
   return state === "sun" ? "the sun" : state === "leafy" ? "leafy shade" : "shade";
-}
-
-/** Leafy shade is the same teal as a wall's: it is shade. What differs is the claim, not the depth. */
-function howMuch(state: SunState): HowMuch {
-  return state === "sun" ? MARK : state === "shade" || state === "leafy" ? -MARK : 0;
 }
 
 /** How a slice of the strip is filled: warm above the line, teal below, nothing where it is filled in. */

@@ -30,7 +30,10 @@ date:
 
 carried_over:
   from_edition: 2025
-  reason: NYRR's 2026 wave times could not be confirmed, so these are the 2025 edition's. When NYRR sends you your start time, type it in as your own.
+  reason: >-
+    NYRR had not published the 2026 details when these were read, so both the wave times and the
+    refreshment list are the 2025 edition's. When NYRR sends you your start time, type it in as
+    your own.
 
 # The 2025 start schedule, from NYRR's 2025 runner guide.
 waves:
@@ -64,3 +67,193 @@ waves:
     carried_over: true
     source: https://webassets.nyrr.org/nyrrwebsiteassets/TCSNYCM25_RunnerGuide_Mobile_M.pdf
     accessed: 2026-09-18
+
+# The organizer's fluid stations, from NYRR's own race-day course page, in their words:
+#   Purified water: official fluid stations every mile from mile 3 to mile 25, except miles 5, 7 and 9
+#   Gatorade Endurance Formula, lemon-lime: the same stations
+#   Maurten Gels at Gel Depots: miles 12 and 18
+#   Bananas: mile 21
+# and one instruction that isn't a thing served: fluids come in compostable cups, from tables on
+# both sides of the course, and the page asks runners to take a cup from a later table and keep
+# moving rather than crowd the first one.
+#
+# Not listed, because this page doesn't say it: the self-serve water refill stations a press
+# release put at miles 8, 14, 17, 20 and 23. No `refill` on any station here, and no
+# `own-bottle` either — NYRR takes no personal refreshments for the course.
+#
+# km_marked is the organizer's own position, in km on the certified 42.195 km course: a mile is
+# 1.609344 km. The pipeline puts each one on the course line, which is 42.688 km.
+#
+# Read off NYRR's own page on 2026-09-21, and it was still the 2025 edition's list — so every
+# station here is `carried_over: true` and the app flags each of them to the runner. nyrr.org sits
+# behind a waiting room our tools don't pass (PLAN.md §10), so a person opened it for us.
+#
+# Medical: the same page says medical aid stations are approximately every mile from mile 3 and at
+# the finish, and that volunteers and supplies are at *all* aid stations — so every station here
+# has it. "Approximately every mile" is not a list of positions, so no medical station of its own
+# is invented; what is claimed is only what the page states about these.
+aid_stations:
+  - km_marked: 4.828
+    label: "Mile 3"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 6.437
+    label: "Mile 4"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 9.656
+    label: "Mile 6"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 12.875
+    label: "Mile 8"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 16.093
+    label: "Mile 10"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 17.703
+    label: "Mile 11"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 19.312
+    label: "Mile 12"
+    serves: [water, sports-drink, gel, medical]
+    detail: >-
+      A Maurten Gel Depot — Gel 100 in black packaging without caffeine, Gel 100 CAF 100 in white with it. The sports drink is Gatorade Endurance Formula, lemon-lime.
+    note: >-
+      NYRR asks runners to carry their own fuel as well. It says the number of gels on the course is limited and not guaranteed, and recommends taking one per depot.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 20.921
+    label: "Mile 13"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 22.531
+    label: "Mile 14"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 24.14
+    label: "Mile 15"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 25.75
+    label: "Mile 16"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 27.359
+    label: "Mile 17"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 28.968
+    label: "Mile 18"
+    serves: [water, sports-drink, gel, medical]
+    detail: >-
+      A Maurten Gel Depot — Gel 100 in black packaging without caffeine, Gel 100 CAF 100 in white with it. The sports drink is Gatorade Endurance Formula, lemon-lime.
+    note: >-
+      NYRR asks runners to carry their own fuel as well. It says the number of gels on the course is limited and not guaranteed, and recommends taking one per depot.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 30.578
+    label: "Mile 19"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 32.187
+    label: "Mile 20"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 33.796
+    label: "Mile 21"
+    serves: [water, sports-drink, fruit, medical]
+    detail: >-
+      Bananas. The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 35.406
+    label: "Mile 22"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 37.015
+    label: "Mile 23"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 38.624
+    label: "Mile 24"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21
+  - km_marked: 40.234
+    label: "Mile 25"
+    serves: [water, sports-drink, medical]
+    detail: >-
+      The sports drink is Gatorade Endurance Formula, lemon-lime.
+    source: https://www.nyrr.org/tcsnycmarathon/race-day/the-course
+    carried_over: true
+    accessed: 2026-09-21

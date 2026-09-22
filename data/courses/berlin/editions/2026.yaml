@@ -65,3 +65,101 @@ waves:
     note: The organizer has published a start time only for the first wave. Yours is on your start card.
     source: https://www.bmw-berlin-marathon.com/en/your-race/race-day-for-runners
     accessed: 2026-09-18
+
+# The organizer's refreshment points, from their own course page. Their two lists, in their words:
+#   Water: 5, 12, 17.5, 22.5, 27.5, 32.5, 34.5, 38 and 40 km
+#   Water, fruit, tea and Maurten DRINK MIX 160: 9, 15, 20, 25, 30 and 36 km
+#   Maurten Gel 100: 27.5 km
+# and two more facts from the same page: own hydration systems can be refilled at every one of
+# them (the last table of the water supply, under a refill sign), and a runner's own container,
+# handed in on the morning, waits at 5, 9, 15, 20, 25, 30, 36 and 40 km.
+#
+# km_marked is the organizer's own kilometre, on the certified 42.195 km course. The pipeline
+# puts each one on the course line, which is 42.285 km, the way the landmarks in course.yaml are.
+#
+# Not listed: the VILSA mineral water the same page says will be waiting at Olivaer Platz just
+# after kilometre 33. It is a partner's paragraph rather than a line in the refreshment list, and
+# it names no station, so putting it on one would be our guess, not the organizer's fact.
+aid_stations:
+  - km_marked: 5
+    label: "5 km"
+    serves: [water, refill, own-bottle]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 9
+    label: "9 km"
+    serves: [water, fruit, tea, sports-drink, refill, own-bottle]
+    detail: Sports drink is Maurten DRINK MIX 160.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 12
+    label: "12 km"
+    serves: [water, refill]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 15
+    label: "15 km"
+    serves: [water, fruit, tea, sports-drink, refill, own-bottle]
+    detail: Sports drink is Maurten DRINK MIX 160.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 17.5
+    label: "17.5 km"
+    serves: [water, refill]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 20
+    label: "20 km"
+    serves: [water, fruit, tea, sports-drink, refill, own-bottle]
+    detail: Sports drink is Maurten DRINK MIX 160.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 22.5
+    label: "22.5 km"
+    serves: [water, refill]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 25
+    label: "25 km"
+    serves: [water, fruit, tea, sports-drink, refill, own-bottle]
+    detail: Sports drink is Maurten DRINK MIX 160.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 27.5
+    label: "27.5 km"
+    serves: [water, gel, refill]
+    detail: The gel is Maurten Gel 100.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 30
+    label: "30 km"
+    serves: [water, fruit, tea, sports-drink, refill, own-bottle]
+    detail: Sports drink is Maurten DRINK MIX 160.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 32.5
+    label: "32.5 km"
+    serves: [water, refill]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 34.5
+    label: "34.5 km"
+    serves: [water, refill]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 36
+    label: "36 km"
+    serves: [water, fruit, tea, sports-drink, refill, own-bottle]
+    detail: Sports drink is Maurten DRINK MIX 160.
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 38
+    label: "38 km"
+    serves: [water, refill]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21
+  - km_marked: 40
+    label: "40 km"
+    serves: [water, refill, own-bottle]
+    source: https://www.bmw-berlin-marathon.com/en/your-race/course/
+    accessed: 2026-09-21

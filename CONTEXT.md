@@ -234,8 +234,20 @@ _Avoid_: crowd, crowding, busyness
 A place where congestion is known to happen.
 
 **Line mark**:
-A stretch of the course line that a layer marks on the map: the line is drawn wider there, with the layer's colour either side of the blue, or flat grey where the layer's value is not measured.
+A stretch of the course line that a layer marks on the map: the line is drawn wider there, in one of its two slots, or flat grey where the layer's value is not measured.
 _Avoid_: highlight, segment, overlay
+
+**Band**:
+The wide, coloured slot of the course line, outside the blue: where a hill is, coloured by how steep. One of the two slots a line mark is painted in.
+_Avoid_: stripe, fill, highlight
+
+**Rim**:
+The dark slot hugging the blue: the road's own edge darkened where it is in shade — solid for a building's, dotted for a tree's, nothing in the sun.
+_Avoid_: border, outline, shadow line
+
+**Chip**:
+The small paper label, framed in ink, that names a point on the course line — an aid station, with its glyphs — and is that point's whole mark on the map. A look of its own, beside the encodings: it names a place rather than stating a value measured of the course.
+_Avoid_: pin, badge, marker
 
 **Hill**:
 A sustained climb or descent that a runner would call one: what the Hills layer marks on the course line.

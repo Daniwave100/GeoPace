@@ -8,6 +8,7 @@
 // time, and which times are carried over from an earlier edition and must be flagged. And the
 // one thing that outranks them: the runner's own start time, read off their start card.
 import type { CourseBundle, Edition, Wave } from "../bundle/types";
+import { type FuelItem, sanitizeFueling } from "./fueling";
 import { raceClock } from "./race-clock";
 import { secondsPerKmFromPace, type Units } from "./units";
 
@@ -20,7 +21,7 @@ export type Goal =
   /** Seconds per kilometre of the certified distance: the pace on a training plan. */
   | { kind: "pace"; secondsPerKm: number };
 
-/** The runner's own choices. (Units and the fueling plan join it in later tickets.) */
+/** The runner's own choices. (Units sit beside the plans, in plan-store.ts: they are the runner's, not a course's.) */
 export interface RacePlan {
   courseId: string;
   /** Which edition: the calendar year it is run in. */
@@ -34,6 +35,11 @@ export interface RacePlan {
    */
   ownStartLocal: string | null;
   goal: Goal;
+  /**
+   * What the runner means to take, and where: items at kilometres along the course line, checked
+   * against the organizer's refreshment points (core/fueling.ts). Empty until they add one.
+   */
+  fueling: FuelItem[];
 }
 
 /** The part of a Course Bundle the Planner needs. */
@@ -204,7 +210,7 @@ export function hasStartTime(wave: Wave): wave is TimedWave {
 /** Where a new runner starts: the latest edition, its first wave with a published time. */
 export function defaultPlan(course: PlannerCourse): RacePlan {
   const edition = latestEdition(course);
-  return { courseId: course.courseId, edition: edition.edition, waveId: firstWaveWithStartTime(edition).id, ownStartLocal: null, goal: DEFAULT_GOAL };
+  return { courseId: course.courseId, edition: edition.edition, waveId: firstWaveWithStartTime(edition).id, ownStartLocal: null, goal: DEFAULT_GOAL, fueling: [] };
 }
 
 /**
@@ -218,7 +224,14 @@ export function sanitizePlan(course: PlannerCourse, candidate: unknown): RacePla
   const ownStartLocal = typeof remembered.ownStartLocal === "string" ? parseStartTime(remembered.ownStartLocal) : null;
   // A wave can be planned with if it has a published start time, or the runner has given their own.
   const wave = edition.waves.find((known) => known.id === remembered.waveId && (hasStartTime(known) || ownStartLocal !== null)) ?? firstWaveWithStartTime(edition);
-  return { courseId: course.courseId, edition: edition.edition, waveId: wave.id, ownStartLocal, goal: sanitizeGoal(remembered.goal, course) };
+  return {
+    courseId: course.courseId,
+    edition: edition.edition,
+    waveId: wave.id,
+    ownStartLocal,
+    goal: sanitizeGoal(remembered.goal, course),
+    fueling: sanitizeFueling(remembered.fueling, course.lineLengthM / 1000),
+  };
 }
 
 /**

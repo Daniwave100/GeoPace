@@ -1,9 +1,10 @@
-// The layer switches, along the top of the strip (PLAN.md D35). One layer on at a time: pressing
-// a switch turns its layer on in place of whatever was on, and pressing it again turns it off.
-// "Show everything" opens the full strip. Only layers that exist get a switch: the switches are
-// made from the list of layers the course on screen has, so nothing advertises a layer that
-// isn't built, and a new layer gets its switch by being added to that one list (main.ts).
-import type { Layer, LayerId, LayerState } from "../core/layers";
+// The layer switches, along the top of the strip (PLAN.md D35, D62). Each is a toggle, and any
+// number can be on: pressing a switch turns its layer on beside whatever is on, and pressing it
+// again turns it off. "Show everything" turns every layer on. Only layers that exist get a
+// switch: the switches are made from the list of layers the course on screen has, so nothing
+// advertises a layer that isn't built, and a new layer gets its switch by being added to that one
+// list (main.ts).
+import { everythingOn, isOn, type Layer, type LayerId, type LayerState } from "../core/layers";
 import { html } from "../dom";
 
 export interface LayerBar {
@@ -34,8 +35,8 @@ export function createLayerBar(container: HTMLElement, onLayer: (id: LayerId) =>
         });
         group.replaceChildren(...switches.map(({ button }) => button));
       }
-      for (const { id, button } of switches) button.setAttribute("aria-pressed", String(state.active === id));
-      everything.setAttribute("aria-pressed", String(state.everything));
+      for (const { id, button } of switches) button.setAttribute("aria-pressed", String(isOn(state, id)));
+      everything.setAttribute("aria-pressed", String(everythingOn(state, layers)));
     },
   };
 }
