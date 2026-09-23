@@ -86,7 +86,7 @@ The mode that carries the runner along the course as a time-lapse, past its Stop
 _Avoid_: flyover, tour, playback, video, walkthrough
 
 **From above** / **On the road**:
-The Ride's two cameras. From above looks down on the runner from the air; On the road follows from a few metres up and behind, the way a lead vehicle films a race.
+The Ride's two cameras. From above looks down on the runner from the air; On the road follows along the road itself, 250 ft up and 150 m behind, looking a little above the runner so the horizon stays in view (D64) — a chase camera, no longer a lead vehicle's.
 _Avoid_: bird's-eye mode, drive cam, runner's-eye, first-person
 
 **Free look**:
