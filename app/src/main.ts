@@ -657,6 +657,12 @@ function coveredLeftPx(): number {
 }
 window.addEventListener("resize", () => (coveredLeft = null));
 
+// The readout block lies over the map and has to fit it. Its giant numeral is sized by the window,
+// and with every layer on the strip takes so much of the window that the block overran the map by
+// a line and scrolled (owner, 09-22: it "shouldn't be a scrollable field"). The map's own height
+// is handed to the stylesheet, which shrinks the numeral only when the map is short (.readout-km).
+new ResizeObserver((entries) => byId("explore").style.setProperty("--map-h", `${Math.round(entries[0].contentRect.height)}px`)).observe(byId("globe"));
+
 /**
  * Photoreal is an extra on top of the scene, made once. Nothing else in the app waits for it or
  * asks it anything, so whatever happens to the imagery, the course, the strip and the plan carry on.

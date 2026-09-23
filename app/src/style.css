@@ -275,8 +275,10 @@ input {
   color: var(--blue);
   font-weight: 900;
   font-stretch: 62%;
-  /* As big as the window allows, in both directions: on a short window the sentence still has to fit under it. */
-  font-size: clamp(64px, min(9.5vw, 12.5vh), 148px);
+  /* As big as the window allows, in both directions, and no bigger than the map it lies over
+     allows (--map-h, set by main.ts from the map's own height): on a short window, or with the
+     strip grown tall, the sentence still has to fit under it without the block scrolling. */
+  font-size: clamp(64px, min(9.5vw, 12.5vh, calc(var(--map-h, 100vh) * 0.24)), 148px);
   line-height: 0.82;
   letter-spacing: -0.025em;
 }
