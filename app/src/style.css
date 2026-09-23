@@ -1263,6 +1263,18 @@ button.map-label {
   font-stretch: 84%;
 }
 
+/* A value in words — Shade's "No shade", "Shade", "Leafy shade" — on its own line under the name,
+   where the owner wants to read it (09-23), with the header's whole width. */
+.strip-head.has-value-below .strip-head-value {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  max-width: none;
+  text-align: left;
+  font-size: 15px;
+  font-stretch: 80%;
+  line-height: 17px;
+}
+
 /* The key of a row's marks, in its header: a mark and its word, two to a line (strip/strip.ts
    sizes the row for it). Water is a drop, medical help a cross — the owner asked to be told (09-22). */
 .strip-head-key {

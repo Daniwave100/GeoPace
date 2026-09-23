@@ -56,7 +56,7 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     encoding: "measured",
     // What the value is: the header's room goes to the key of the marks, and the longest run
     // without water, which the scale used to say, is in "What the marks mean".
-    scale: () => "to the next water",
+    scale: () => "to the next water station",
     // A row of marks is asked for its marks, never for bins (strip/strip.ts).
     bins: () => [],
     domain: [0, 1],

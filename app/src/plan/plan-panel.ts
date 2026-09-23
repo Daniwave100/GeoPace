@@ -1,10 +1,10 @@
-// The Race Plan form: edition, start wave, start time, and a goal as a finish time or a pace.
-// It opens from the banner, so the first screen stays small (PLAN.md principle 8). What it must
-// get right is honesty about the edition facts:
+// The Race Plan form: the start time, and a goal as a finish time or a pace. It opens from the
+// banner, so the first screen stays small (PLAN.md principle 8). No wave is picked: the runner
+// types the start time from their own start card over the organizer's first start (the owner,
+// 09-23: "remove start wave, just keep it start time, and then the user will manually input
+// that; don't worry about waves"). What it must get right is honesty about the edition facts:
 //   - every fact shown links to its source;
 //   - a race date the organizer hasn't confirmed says so, and how it is known;
-//   - a wave whose start time nobody has published has no time until the runner types their own
-//     (it is on their start card), and until they do the panel says whose times are on screen;
 //   - every time of day that rests on a carried-over start time is greyed, with the edition it
 //     came from and the reason; the runner's own start time is theirs, and is never greyed;
 //   - it says that every time assumes an even pace.
@@ -15,7 +15,6 @@
 // plan itself keeps it per km, so switching units never changes the goal.
 // The form is built once and then only refreshed, so typing and pressing Tab never loses the
 // runner's place.
-import type { Edition, Wave } from "../bundle/types";
 import type { FuelItem } from "../core/fueling";
 import { type Goal, goalWrittenAs, hasStartTime, ownStartTimeFor, parseGoal, parseStartTime, type Planner, type PlannerCourse, type RacePlan, sanitizePlan } from "../core/planner";
 import { formatElapsed, formatPace } from "../core/race-clock";
@@ -49,19 +48,16 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   let course: PlannerCourse | undefined;
   let planner: Planner | undefined;
   let units: Units = "km";
-  // A wave the runner has picked that has no published start time, while they type their own.
-  // It isn't their plan yet: a plan always has a start time, so the times on screen never go blank.
-  let awaitingStartTime: Wave | undefined;
 
   const edition = html("select");
+  // Only where a course has more than one edition to plan for: with one, there is nothing to pick.
+  const editionLabel = html("label", {}, "Edition ", edition);
   const raceDay = html("p", { class: "plan-fact" });
-  const wave = html("select");
   const startTime = html("input", { type: "time", "aria-describedby": "start-fact start-error" });
-  const usePublished = html("button", { type: "button" });
+  const useOrganizers = html("button", { type: "button" });
   const startFact = html("p", { class: "plan-fact", id: "start-fact" });
   const startError = html("p", { class: "plan-error", id: "start-error", role: "alert" });
   const carriedOver = html("p", { class: "plan-flag" });
-  const notPublished = html("p", { class: "plan-note" });
 
   const finishKind = html("input", { type: "radio", name: "goal-kind", value: "finish" });
   const paceKind = html("input", { type: "radio", name: "goal-kind", value: "pace" });
@@ -75,14 +71,12 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   const form = html(
     "form",
     { class: "plan", novalidate: true },
-    html("label", {}, "Edition ", edition),
+    editionLabel,
     raceDay,
-    html("label", {}, "Start wave ", wave),
-    html("div", { class: "plan-start" }, html("label", {}, "Start time ", startTime), usePublished),
+    html("div", { class: "plan-start" }, html("label", {}, "Start time ", startTime), useOrganizers),
     startFact,
     startError,
     carriedOver,
-    notPublished,
     html("fieldset", {}, html("legend", { text: "Goal" }), html("label", {}, finishKind, " Finish time"), html("label", {}, paceKind, " ", paceLabel), goal, goalHint, goalProblem),
     summary,
     html("p", { class: "plan-note", text: EVEN_PACE }),
@@ -94,35 +88,25 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
     if (course && planner) onChange(sanitizePlan(course, { ...planner.plan, ...changes }));
   };
   // The fueling plan is one more part of the same plan: it comes back as a whole list and goes
-  // through the same `change`, so it is sanitized and saved exactly like a wave or a goal.
+  // through the same `change`, so it is sanitized and saved exactly like a start time or a goal.
   const fueling = createFuelingPanel(fuelingBox, (items: FuelItem[]) => change({ fueling: items }));
-  // An own start time belongs to the wave it was typed for, so a new edition or wave starts without one.
+  // An own start time belongs to the edition it was typed for, so a new edition starts without one.
   edition.addEventListener("change", () => change({ edition: Number(edition.value), ownStartLocal: null }));
-  wave.addEventListener("change", () => {
-    const picked = planner?.edition.waves.find((candidate) => candidate.id === wave.value);
-    if (!picked) return;
-    if (hasStartTime(picked)) {
-      change({ waveId: picked.id, ownStartLocal: null });
-    } else {
-      awaitingStartTime = picked;
-      showStart();
-      startTime.focus();
-    }
-  });
   startTime.addEventListener("change", () => {
     if (!planner) return;
-    const target = awaitingStartTime ?? planner.wave;
     if (startTime.value.trim() === "") {
-      // Cleared: back to the published time if there is one, else to what it was.
-      if (!awaitingStartTime && hasStartTime(target)) change({ ownStartLocal: null });
+      // Cleared: back to the organizer's time.
+      if (planner.ownStartTime) change({ ownStartLocal: null });
       else showStart();
       return;
     }
     const typed = parseStartTime(startTime.value);
     startError.textContent = typed ? "" : START_TIME_ERROR;
-    if (typed) change({ waveId: target.id, ownStartLocal: ownStartTimeFor(target, typed) });
+    // The plan still names the organizer's first start underneath (core/planner.ts keeps the
+    // clock's edition facts by wave); typing the same time as a confirmed start is not an own time.
+    if (typed) change({ waveId: planner.wave.id, ownStartLocal: ownStartTimeFor(planner.wave, typed) });
   });
-  usePublished.addEventListener("click", () => change({ ownStartLocal: null }));
+  useOrganizers.addEventListener("click", () => change({ ownStartLocal: null }));
 
   for (const kind of [finishKind, paceKind]) {
     // Switching how the goal is written keeps the goal itself: 4:00:00 reads as 5:41 per km.
@@ -148,24 +132,19 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   /** The start time box and the line under it: whose time this is, and where it comes from. */
   function showStart(): void {
     if (!planner) return;
-    const planned = planner.wave;
-    const flag = planner.carriedOver ? ` (carried over from ${planner.carriedOver.fromEdition})` : "";
+    const organizers = planner.wave; // the organizer's first start with a published time (core/planner.ts)
+    const published = hasStartTime(organizers) ? organizers.start_local : null;
+    const flag = planner.carriedOver ? `, carried over from ${planner.carriedOver.fromEdition}` : "";
     startError.textContent = "";
-    startTime.value = awaitingStartTime ? "" : planner.startLocal;
-    startTime.classList.toggle("carried-over", !awaitingStartTime && planner.carriedOver !== null);
-    usePublished.hidden = awaitingStartTime !== undefined || !planner.ownStartTime || !hasStartTime(planned);
-    usePublished.textContent = hasStartTime(planned) ? `Use ${planned.name}'s published time, ${planned.start_local}` : "";
+    startTime.value = planner.startLocal;
+    startTime.classList.toggle("carried-over", planner.carriedOver !== null);
+    useOrganizers.hidden = !planner.ownStartTime || published === null;
+    useOrganizers.textContent = published === null ? "" : `Use the organizer's time, ${published}`;
 
-    if (awaitingStartTime) {
-      startFact.replaceChildren(
-        `${awaitingStartTime.name}'s start time isn't published. Type the one on your start card. Until you do, the times shown still start at ${planner.startLocal}. `,
-        sourceLink(awaitingStartTime),
-      );
-    } else if (planner.ownStartTime) {
-      const published = hasStartTime(planned) ? `${planned.name}'s published time is ${planned.start_local}${planned.carried_over ? ", carried over" : ""}.` : `${planned.name}'s isn't published.`;
-      startFact.replaceChildren(`Your own start time. ${published} `, sourceLink(planned));
+    if (planner.ownStartTime) {
+      startFact.replaceChildren(`Your own start time. The organizer's first start is ${published ?? "not published"}${published ? flag : ""}. `, sourceLink(organizers));
     } else {
-      startFact.replaceChildren(`${planned.name}'s published start time${flag}. `, sourceLink(planned), " If your start card says otherwise, type yours over it.");
+      startFact.replaceChildren(`The organizer's first start${flag}. `, sourceLink(organizers), " Type the time on your start card over it.");
     }
   }
 
@@ -174,13 +153,13 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       course = nextCourse;
       planner = nextPlanner;
       units = nextUnits;
-      awaitingStartTime = undefined;
       fueling.show(nextPlanner, nextUnits);
       const chosen = planner.edition;
-      const whose = planner.carriedOver ? ` (carried over from ${planner.carriedOver.fromEdition})` : planner.ownStartTime ? " (your own start time)" : "";
+      const whose = planner.carriedOver ? ` (${planner.carriedOver.fromEdition}'s start time, carried over)` : planner.ownStartTime ? " (your own start time)" : "";
 
       edition.replaceChildren(...course.editions.map((known) => new Option(String(known.edition), String(known.edition))));
       edition.value = String(chosen.edition);
+      editionLabel.hidden = course.editions.length < 2;
       raceDay.replaceChildren(
         `Race day: ${raceDate(chosen.date.day)}`,
         ...(chosen.date.confirmed ? [] : [html("span", { class: "carried-over", text: " (not yet confirmed)" })]),
@@ -189,17 +168,9 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
         ...(chosen.date.note ? [" ", html("small", { text: chosen.date.note })] : []),
       );
 
-      wave.replaceChildren(...chosen.waves.map((known) => waveOption(known, known.id === nextPlanner.wave.id && nextPlanner.ownStartTime ? nextPlanner.startLocal : null)));
-      wave.value = planner.wave.id;
       showStart();
       carriedOver.hidden = planner.carriedOver === null;
       carriedOver.textContent = planner.carriedOver ? `Carried over from ${planner.carriedOver.fromEdition}. ${planner.carriedOver.reason}` : "";
-      const unpublished = wavesWithoutStartTime(chosen);
-      notPublished.hidden = unpublished.length === 0;
-      notPublished.replaceChildren(
-        ...unpublished.flatMap(({ names, note, source }) => [`${names}: ${note} `, sourceLink(source), html("br")]),
-        "If that is your wave, pick it and type in the start time from your start card.",
-      );
 
       const kind = planner.plan.goal.kind;
       finishKind.checked = kind === "finish";
@@ -220,24 +191,4 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
       );
     },
   };
-}
-
-/** `ownStartLocal` is set for the planned wave when the runner has typed their own start time for it. */
-function waveOption(wave: Wave, ownStartLocal: string | null): HTMLOptionElement {
-  const time = ownStartLocal
-    ? `${ownStartLocal} (your own time)`
-    : hasStartTime(wave)
-      ? `${wave.start_local}${wave.carried_over ? " (carried over)" : ""}`
-      : "start time not published";
-  return new Option(`${wave.name} · ${time}`, wave.id);
-}
-
-/** Waves with no published start time, grouped by their reason, so one shared reason is said once. */
-function wavesWithoutStartTime(edition: Edition): { names: string; note: string; source: Wave }[] {
-  const byNote = new Map<string, Wave[]>();
-  for (const wave of edition.waves.filter((candidate) => !hasStartTime(candidate))) {
-    const note = wave.note ?? "No start time has been published.";
-    byNote.set(note, [...(byNote.get(note) ?? []), wave]);
-  }
-  return [...byNote].map(([note, waves]) => ({ names: waves.map((wave) => wave.name).join(", "), note, source: waves[0] }));
 }

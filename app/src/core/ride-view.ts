@@ -12,22 +12,22 @@ import type { RideCamera, RideCourse } from "./ride";
 import { positionAtKm, type RoadPosition } from "./scrub";
 
 /**
- * On the road: how far above the road the camera rides. The one setting issue #8 asks for. A lead
- * vehicle's camera height: the imagery sets no floor (PLAN.md D33), and it has to fit under the
- * Queensboro's upper deck, which the LiDAR puts 6.4 m above the lower one runners use (D23),
- * its own structure included.
+ * On the road: how far above the road the camera rides. The one setting issue #8 asks for. It was
+ * 3 m, a lead vehicle's camera, and Google's mesh is too soft that close (PLAN.md D53, #27). The
+ * owner read the height they liked off the camera readout and asked for it (09-23): 216 ft.
  */
-export const ON_THE_ROAD_HEIGHT_M = 3;
+export const ON_THE_ROAD_HEIGHT_M = 65.84;
 
 const ON_THE_ROAD = {
   /**
-   * How far behind the runner the camera follows, along the road itself: where a vehicle behind
-   * them would be. On the road, it is never inside a building on a corner. It looks at the runner,
-   * so they are always in the middle of the view, round any corner, hairpin or loop; how fast the
-   * view swings round is kept down by the Ride easing off through the turn (core/ride.ts), the way
-   * a vehicle slows into a corner.
+   * How far behind the runner the camera follows, along the road itself. As far behind as it is
+   * up, so it looks down at the runner at 45°: from the 25 m a vehicle would keep, a camera 216 ft
+   * up would be looking almost straight down (69°), with the road ahead out of shot. It looks at
+   * the runner, so they are always in the middle of the view, round any corner, hairpin or loop;
+   * how fast the view swings round is kept down by the Ride easing off through the turn
+   * (core/ride.ts), the way a vehicle slows into a corner. Claude's number; one line to change.
    */
-  behindM: 25,
+  behindM: 66,
 };
 
 /**

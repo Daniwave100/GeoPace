@@ -369,6 +369,8 @@ function headCell(row: StripRow, top: number, height: number, units: Units, keyC
   node.style.top = `${top}px`;
   node.style.height = `${height}px`;
   node.classList.toggle("is-tight", height < TIGHT_ROW_PX);
+  // A value in words rather than a number is printed under the name, on the header's whole width.
+  node.classList.toggle("has-value-below", row.valueBelow === true);
   return {
     node,
     update(km, shownIn) {
@@ -376,7 +378,7 @@ function headCell(row: StripRow, top: number, height: number, units: Units, keyC
       // Not measured here: grey and struck through, the same as in the sentence, which also prints the reason.
       value.replaceChildren(notMeasured !== null ? html("s", { text }) : text);
       value.title = notMeasured ?? "";
-      value.className = `strip-head-value ${ENCODINGS[notMeasured !== null ? "not-measured" : row.encoding].cssClass}${text.length > 9 ? " is-long" : ""}`;
+      value.className = `strip-head-value ${ENCODINGS[notMeasured !== null ? "not-measured" : row.encoding].cssClass}${text.length > 9 && !row.valueBelow ? " is-long" : ""}`;
     },
   };
 }

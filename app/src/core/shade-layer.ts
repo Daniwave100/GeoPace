@@ -67,13 +67,12 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     id: "shade",
     name: "Shade",
     encoding: "measured",
-    // The row has no numbers to scale, so its header says the thing that sets it apart instead:
-    // this is the sun at the moment *you* pass, not at noon. Which side is which is in "What the
-    // marks mean", where there is room for it. Both lines are kept short enough to fit the
-    // header whole: the owner couldn't read them cut off (09-22).
-    scale: () => "when you get there",
-    // What every number here rests on, where the numbers are (issue #9: the clear-sky caveat).
-    summary: () => (along.table.hasTrees ? "clear sky, buildings, trees" : "clear sky, no trees"),
+    // The row has no numbers to scale, and its header says one thing, under the name: the state
+    // where the runner is — No shade, Shade, Leafy shade (the owner, 09-23: "one of those
+    // three"). That it is the sun at the moment *you* pass, and rests on a clear sky, buildings
+    // and trees, is in "What the marks mean"; it was two lines here, and the owner had them out.
+    scale: () => "",
+    valueBelow: true,
     bins: (count) => binned(count).map((bin) => rowBin(bin, along.states, gaps)),
     domain: [-1, 1],
     // The middle of this row is not a value: there is no zero between sun and shade.
@@ -201,13 +200,14 @@ function measuredParts(run: SunRun, gaps: NotMeasuredSpan[]): { fromKm: number; 
 }
 
 /**
- * The value under the cursor, and why it is a filled-in one where it is. A word or two, not a
- * clause: it shares the header's first line with the row's name, and "In leafy shade" pushed
- * the header's own words off the end (owner, 09-22). The sentence has the clause.
+ * The value under the cursor, and why it is a filled-in one where it is. One of three states in
+ * a word or two, under the row's name (the owner's words, 09-23: "no shade and then shade or
+ * leafy shade"); the sentence has the clause. The three honest others stay: the sun down, too low
+ * to reach the street, and hours nobody worked out.
  */
 function valueAt(at: SunAt, floorDeg: number, gap: NotMeasuredSpan | undefined): RowValue {
   if (at.state === "sun" || at.state === "shade" || at.state === "leafy") {
-    const text = at.state === "sun" ? "Sun" : at.state === "leafy" ? "Leafy shade" : "Shade";
+    const text = at.state === "sun" ? "No shade" : at.state === "leafy" ? "Leafy shade" : "Shade";
     return { text, notMeasured: gap ? `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}` : null };
   }
   if (at.state === "down") return { text: "Sun down", notMeasured: null };

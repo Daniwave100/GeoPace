@@ -26,10 +26,11 @@
 // not dots counted along the line: the draped line's angle is recomputed at every 10 m segment,
 // so a pattern counted along it restarts three times a pixel at the whole-course zoom, which is
 // what fringed the whole course in black static with Shade on (the owner, 09-22: "confusing").
-// The rim was 4 px; at 3 it is a rule, and it is not 2 because a 2 px stripe under a 5 px screen
-// shows no dot at all on one axis-aligned stretch in five, and a tree's shade would then look
-// like a wall's. It stays opaque paint: a translucent stripe double-darkens wherever CesiumJS's
-// line joins overlap at a corner, and vanishes over dark imagery.
+// The rim is a rule of 4 px against the band's 5 (3 read too faint to the owner, 09-23), and it is
+// never 2, because a 2 px stripe under a 5 px screen shows no dot at all on one axis-aligned
+// stretch in five, and a tree's shade would then look like a wall's. It stays opaque paint: a
+// translucent stripe double-darkens wherever CesiumJS's line joins overlap at a corner, and
+// vanishes over dark imagery.
 //
 // Not measured here is either slot with the colour taken out: flat grey, the same width, the same
 // hairline edge, no pattern. (It was grey dashes. Twice the owner took them for a fault in the
@@ -82,8 +83,12 @@ const BAND_PX = 5;
 /** A dashed band is wider: the insets take room, and the dashes still have to show. */
 const DASHED_BAND_PX = 7;
 const DASH_INSET_PX = 2;
-/** The rim, each side: a rule of ink, thinner than the band's 5 px, and never 2 (see the top of the file). */
-export const RIM_PX = 3;
+/**
+ * The rim, each side: a rule of ink, thinner than the band's 5 px, and never 2 (see the top of
+ * the file). 3 px on the first look; the owner (09-23): "it needs to be a bit thicker… it's not
+ * too obvious", so 4, with the screen-fixed dots that made 3 necessary for quiet in the first place.
+ */
+export const RIM_PX = 4;
 /** Every stripe ends in a hairline, so it reads on any ground. */
 const EDGE_PX = 0.75;
 /** Half of a dash-and-gap is a dash; a third of one is a dot. */

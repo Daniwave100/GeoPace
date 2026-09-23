@@ -408,7 +408,7 @@ describe("a station's name follows the runner's units (owner, 09-22)", () => {
     expect(layer.clause(first.km - 0.4, "km")?.text).toMatch(/, at 4\.8 km\.$/);
     // The row's readout is a bare distance; its scale line says what it is a distance to.
     expect(layer.rows()[0].valueAt(first.km - 0.4, "km").text).toBe("400 m");
-    expect(layer.rows()[0].scale("km")).toBe("to the next water");
+    expect(layer.rows()[0].scale("km")).toBe("to the next water station");
   });
 
   it("gives the key of its marks to its row, and only the marks this course uses", () => {

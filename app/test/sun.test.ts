@@ -162,9 +162,10 @@ describe("the Shade layer", () => {
     const rows = layerFor(nyc).rows();
 
     expect(rows.map((row) => row.name)).toEqual(["Shade"]);
-    expect(rows[0].scale("km")).toBe("when you get there");
+    expect(rows[0].scale("km")).toBe(""); // the state is the whole header, under the name (owner, 09-23)
+    expect(rows[0].valueBelow).toBe(true);
     // The Verrazzano, four minutes in for a four-hour runner: open water and an open sky.
-    expect(rows[0].valueAt(1.5, "km")).toEqual({ text: "Sun", notMeasured: null });
+    expect(rows[0].valueAt(1.5, "km")).toEqual({ text: "No shade", notMeasured: null });
     expect(rows[0].valueAt(27, "km").text).toBe("Shade");
   });
 
@@ -184,7 +185,7 @@ describe("the Shade layer", () => {
   it("says what the numbers rest on, where the numbers are", () => {
     const [row] = layerFor(berlin).rows();
 
-    expect(row.summary?.("km")).toBe("clear sky, buildings, trees"); // short enough to fit the header whole (owner, 09-22)
+    expect(row.summary).toBeUndefined(); // the clear-sky caveat is in the layer's key, not the header (owner, 09-23)
     expect(layerFor(berlin).key!("km")).toMatch(/clear sky/i);
     expect(layerFor(berlin).key!("km")).toMatch(/while the leaves are on/i);
   });

@@ -97,6 +97,12 @@ export interface StripRow {
   stepped: boolean;
   /** The value where the runner is, as it is printed in the row's header. */
   valueAt(km: number, units: Units): RowValue;
+  /**
+   * Print the value on its own line under the row's name, instead of beside the name: for a row
+   * whose value is a state in words rather than a number — Shade's "No shade", "Shade", "Leafy
+   * shade" — which the owner wants read under the name (09-23). Such a row has no scale line.
+   */
+  valueBelow?: boolean;
   /** For a row whose fill says how much as well as where: a `HowMuch` for each of `binCount` slices. */
   howMuch?(binCount: number): HowMuch[];
   /**
