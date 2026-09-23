@@ -164,8 +164,8 @@ describe("the Shade layer", () => {
     expect(rows.map((row) => row.name)).toEqual(["Shade"]);
     expect(rows[0].scale("km")).toBe("when you get there");
     // The Verrazzano, four minutes in for a four-hour runner: open water and an open sky.
-    expect(rows[0].valueAt(1.5, "km")).toEqual({ text: "In the sun", notMeasured: null });
-    expect(rows[0].valueAt(27, "km").text).toBe("In shade");
+    expect(rows[0].valueAt(1.5, "km")).toEqual({ text: "Sun", notMeasured: null });
+    expect(rows[0].valueAt(27, "km").text).toBe("Shade");
   });
 
   it("draws nothing dashed on a course where everything is measured", () => {
@@ -184,9 +184,9 @@ describe("the Shade layer", () => {
   it("says what the numbers rest on, where the numbers are", () => {
     const [row] = layerFor(berlin).rows();
 
-    expect(row.summary?.("km")).toBe("clear sky, buildings and trees");
-    expect(layerFor(berlin).key).toMatch(/clear sky/i);
-    expect(layerFor(berlin).key).toMatch(/while the leaves are on/i);
+    expect(row.summary?.("km")).toBe("clear sky, buildings, trees"); // short enough to fit the header whole (owner, 09-22)
+    expect(layerFor(berlin).key!("km")).toMatch(/clear sky/i);
+    expect(layerFor(berlin).key!("km")).toMatch(/while the leaves are on/i);
   });
 
   it("marks the course line's rim where there is shade, nothing where there is sun, and never in percentages", () => {
@@ -264,7 +264,7 @@ describe("the Shade layer", () => {
     const course = madeUpCourse();
     const atNight = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: "20:00", goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
 
-    expect(atNight.rows()[0].valueAt(0.5, "km")).toEqual({ text: "The sun is down", notMeasured: null });
+    expect(atNight.rows()[0].valueAt(0.5, "km")).toEqual({ text: "Sun down", notMeasured: null });
     expect(atNight.rows()[0].bins(100).every((bin) => bin.value === null)).toBe(true);
     expect(atNight.lineMarks()).toEqual([]);
     expect(atNight.clause(0.5, "km")).toBeNull();
@@ -392,7 +392,7 @@ describe("the third state: shade that depends on the leaves", () => {
     expect(clause.encoding).toBe("depends-on-leaves");
     expect(clause.note).toContain(berlin.course.leaves!.state);
     expect(clause.note).toContain(berlin.measured.sun!.trees!.leaves_when_surveyed);
-    expect(layer.rows()[0].valueAt(underTrees, "km").text).toBe("In leafy shade");
+    expect(layer.rows()[0].valueAt(underTrees, "km").text).toBe("Leafy shade");
   });
 
   it("counts the leaves in the strongest thing it says: a road under trees is not a road with no shade", () => {
@@ -430,8 +430,8 @@ describe("the third state: shade that depends on the leaves", () => {
     }
   });
 
-  it("keeps the leaf state one step away, in the key under the strip", () => {
-    expect(layerFor(berlin).key).toContain(berlin.course.leaves!.state);
+  it("keeps the leaf state one step away, in the layer's key (What the marks mean)", () => {
+    expect(layerFor(berlin).key!("km")).toContain(berlin.course.leaves!.state);
     expect(berlin.course.leaves!.source).toMatch(/^https?:\/\//);
   });
 });

@@ -346,21 +346,12 @@ input {
   color: var(--grey-text);
 }
 
-/* Why a value isn't measured here, printed where anyone can read it rather than left to a tooltip. */
-.sentence-note {
-  display: block;
-  margin-top: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  font-stretch: 100%;
-  line-height: 1.35;
-  color: var(--grey-text);
-}
-
+/* The sentence: short clauses, and nothing under them (explore/sentence-view.ts), so the block
+   never has to scroll. A size down from 18px: with every layer on it is six clauses. */
 .sentence {
   padding: 10px 16px 12px;
   border-top: var(--rule) solid var(--ink);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   font-stretch: 88%;
   line-height: 1.25;
@@ -1168,12 +1159,6 @@ button.map-label {
   gap: 6px 10px;
 }
 
-.layer-bar-help {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--grey-text);
-}
-
 /* A layer's switch. Off is an outline; on is a solid block: pressed in, like a key on a machine. */
 .switch {
   padding: 3px 12px;
@@ -1213,6 +1198,8 @@ button.map-label {
   pointer-events: none;
 }
 
+/* The row's name and its value share the first line; every line under it — the scale, the summary,
+   the key of a row's marks — has the header's whole width, so none is cut off beside the value. */
 .strip-head {
   position: absolute;
   left: 0;
@@ -1220,20 +1207,26 @@ button.map-label {
   box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-auto-rows: min-content;
   align-content: center;
+  align-items: baseline;
   gap: 0 8px;
   padding: 0 10px 0 16px;
 }
 
 .strip-head-name {
+  grid-column: 1;
+  grid-row: 1;
   font-weight: 800;
   font-size: 13px;
   font-stretch: 84%;
+  line-height: 20px;
 }
 
 .strip-head-scale {
-  grid-column: 1;
+  grid-column: 1 / -1;
   font-size: 10.5px;
+  line-height: 13px;
   font-stretch: 84%;
   color: var(--grey-text);
   white-space: nowrap;
@@ -1241,27 +1234,64 @@ button.map-label {
   text-overflow: ellipsis;
 }
 
-/* A row squeezed small keeps its name and its value; the scale comes back when there is room. */
-.strip-head.is-tight .strip-head-scale {
+/* A row squeezed small keeps its name and its value; the scale and the key come back when there is room. */
+.strip-head.is-tight .strip-head-scale,
+.strip-head.is-tight .strip-head-key {
   display: none;
 }
 
-/* The value under the cursor, printed in the row's header. */
+/* The value under the cursor, printed in the row's header beside its name. */
 .strip-head-value {
   grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: center;
+  grid-row: 1;
+  min-width: 0;
   max-width: calc(var(--head) * 0.62);
+  overflow: hidden; /* a value that can't fit its header is cut short, never run into the row's name */
+  text-overflow: ellipsis;
   text-align: right;
   font-weight: 800;
   font-stretch: 72%;
   font-size: 17px;
-  line-height: 1.05;
+  line-height: 20px;
+  white-space: nowrap;
 }
 
 .strip-head-value.is-long {
   font-size: 12px;
   font-stretch: 84%;
+}
+
+/* The key of a row's marks, in its header: a mark and its word, two to a line (strip/strip.ts
+   sizes the row for it). Water is a drop, medical help a cross — the owner asked to be told (09-22). */
+.strip-head-key {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 6px;
+  font-size: 10.5px;
+  line-height: 13px;
+  font-stretch: 84%;
+  font-weight: 600;
+}
+
+/* A narrow header (a phone's) sets the marks one under another; strip/strip.ts sizes the row for it. */
+.strip-head-key.is-one-column {
+  grid-template-columns: 1fr;
+}
+
+.strip-head-key-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strip-head-glyph {
+  flex: none;
+  width: 11px;
+  height: 11px;
 }
 
 .strip-rule {
@@ -1318,21 +1348,10 @@ button.map-label {
   fill: var(--on-blue);
 }
 
-.strip-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 24px;
-  padding: 6px 16px;
-  border-top: 1.5px solid var(--ink);
-  font-size: 12px;
-}
+/* ── The footer: one line, and the way to the credits and the sources ─────────────────────── */
 
-.strip-key b {
-  font-weight: 800;
-}
-
-/* ── Credits: always on screen, never restyled away ─────────────────────────────────────── */
-
+/* Who we aren't, and one press to everything the screen rests on. The map's own credit line is
+   on the map itself and never folds; ours are one press away (issue #33, PLAN.md D63). */
 .credits {
   display: flex;
   flex-wrap: wrap;
@@ -1345,13 +1364,40 @@ button.map-label {
   font-size: 12px;
 }
 
-/* Inside the folding credits the list still sits in the footer's own row of things. */
-.credits-more[open] .credits-list {
-  display: flex;
-}
-
 .credits-unofficial {
   font-size: 13px;
+  font-stretch: 88%;
+}
+
+/* A button that reads as a link: for the way to a sheet, so it can't be taken for a switch. */
+.link-button {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 800;
+  font-stretch: 88%;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--blue);
+}
+
+/* The way to "What the marks mean", at the far end of the layer switches. */
+.layer-bar-key {
+  margin-left: auto;
+}
+
+/* ── Inside the sheets: the credits, the sources, and what the marks mean ──────────────────── */
+
+.sheet h3 {
+  margin: 16px 0 4px;
+  font-size: 15px;
+  font-weight: 800;
   font-stretch: 88%;
 }
 
@@ -1359,79 +1405,71 @@ button.map-label {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 14px;
+  margin: 0;
+  padding: 0;
   list-style: none;
-}
-
-/* The credits are always open, and their "Credits" heading hidden, except with the map on the
-   full screen, where they fold to that one word. */
-.credits-more {
-  display: contents;
-}
-
-.credits-more > summary {
-  display: none;
-}
-
-/* "Sources" and the line about moving the map share a row; opened, the sources take the full width. */
-.credits details[open] {
-  flex-basis: 100%;
-}
-
-.credits-help {
-  color: var(--grey-text);
-}
-
-.credits summary {
-  width: fit-content;
-  font-weight: 800;
-  cursor: pointer;
 }
 
 .sources {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 4px 28px;
-  max-height: 30vh;
-  margin-top: 6px;
-  padding-left: 0;
-  overflow: auto;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-.sources small {
+.sources small,
+.key-sheet small {
   color: var(--grey-text);
+}
+
+.key-sheet p,
+.key-sheet li {
+  margin: 4px 0;
+}
+
+.key-section b {
+  font-weight: 800;
+}
+
+/* Each mark beside its word: the drop is water, the cross is medical help. */
+.key-glyphs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.key-glyphs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.key-glyph {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.key-list {
+  padding-left: 18px;
 }
 
 /* ── The map on the full screen ─────────────────────────────────────────────────────────── */
 
 /* The readout, the strip and its edge step aside. The banner stays (it is how you change course
-   and get back), the map keeps its own credits on it, and ours fold to one line with "Credits"
-   and "Sources" one press away: attributions are never out of reach. */
+   and get back), the map keeps its own credits on it, and the one-line footer stays with Sources
+   & credits one press away: attributions are never out of reach. */
 .explore[data-full-map] .where,
 .explore[data-full-map] .strip-edge,
-.explore[data-full-map] .strip-block,
-.explore[data-full-map] .credits-help {
+.explore[data-full-map] .strip-block {
   display: none;
 }
 
 .explore[data-full-map] .credits {
   padding-block: 4px;
-  border-top: var(--rule) solid var(--ink);
-}
-
-.explore[data-full-map] .credits-more {
-  display: block;
-}
-
-.explore[data-full-map] .credits-more > summary {
-  display: list-item;
-  width: fit-content;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.explore[data-full-map] .credits-more[open] {
-  flex-basis: 100%;
 }
 
 /* Too narrow for the player to fold any further beside the photoreal block: that block goes under it. */

@@ -68,11 +68,12 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     name: "Shade",
     encoding: "measured",
     // The row has no numbers to scale, so its header says the thing that sets it apart instead:
-    // this is the sun at the moment *you* pass, not at noon. Which side is which is in the key
-    // under the strip, where there is room for it.
+    // this is the sun at the moment *you* pass, not at noon. Which side is which is in "What the
+    // marks mean", where there is room for it. Both lines are kept short enough to fit the
+    // header whole: the owner couldn't read them cut off (09-22).
     scale: () => "when you get there",
     // What every number here rests on, where the numbers are (issue #9: the clear-sky caveat).
-    summary: () => (along.table.hasTrees ? "clear sky, buildings and trees" : "clear sky, no trees"),
+    summary: () => (along.table.hasTrees ? "clear sky, buildings, trees" : "clear sky, no trees"),
     bins: (count) => binned(count).map((bin) => rowBin(bin, along.states, gaps)),
     domain: [-1, 1],
     // The middle of this row is not a value: there is no zero between sun and shade.
@@ -100,9 +101,10 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
   return {
     id: "shade",
     name: "Shade",
-    key: along.table.hasTrees
-      ? ["A dark edge on the line is shade when you get there: solid for a building's, dotted for a tree's — that one you get while the leaves are on. No edge is sun.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
-      : "A dark edge on the line is a building's shade when you get there; no edge is sun. A clear sky is assumed, and trees are not in yet.",
+    key: () =>
+      along.table.hasTrees
+        ? ["A dark edge on the line is shade when you get there: solid for a building's, dotted for a tree's — that one you get while the leaves are on. No edge is sun.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
+        : "A dark edge on the line is a building's shade when you get there; no edge is sun. A clear sky is assumed, and trees are not in yet.",
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],
@@ -116,7 +118,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
  * means, there is simply nothing more to say about it.
  */
 interface LeafNote {
-  /** One sentence for the key under the strip: what the trees are wearing on race day. */
+  /** One sentence for the layer's key ("What the marks mean"): what the trees are wearing on race day. */
   onRaceDay: string;
   /** The longer reason, printed under the sentence where a clause depends on the leaves. */
   why?: string;
@@ -198,15 +200,19 @@ function measuredParts(run: SunRun, gaps: NotMeasuredSpan[]): { fromKm: number; 
   return parts;
 }
 
-/** The value under the cursor, and why it is a filled-in one where it is. */
+/**
+ * The value under the cursor, and why it is a filled-in one where it is. A word or two, not a
+ * clause: it shares the header's first line with the row's name, and "In leafy shade" pushed
+ * the header's own words off the end (owner, 09-22). The sentence has the clause.
+ */
 function valueAt(at: SunAt, floorDeg: number, gap: NotMeasuredSpan | undefined): RowValue {
   if (at.state === "sun" || at.state === "shade" || at.state === "leafy") {
-    const text = `In ${whereYouAre(at.state)}`;
+    const text = at.state === "sun" ? "Sun" : at.state === "leafy" ? "Leafy shade" : "Shade";
     return { text, notMeasured: gap ? `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}` : null };
   }
-  if (at.state === "down") return { text: "The sun is down", notMeasured: null };
+  if (at.state === "down") return { text: "Sun down", notMeasured: null };
   return at.altitudeDeg < floorDeg
-    ? { text: "No direct sun", notMeasured: `The sun is under ${floorDeg}° here, too low to reach a city street, so shade isn't worked out.` }
+    ? { text: "Low sun", notMeasured: `The sun is under ${floorDeg}° here, too low to reach a city street, so shade isn't worked out.` }
     : { text: "Not worked out", notMeasured: "You reach here outside the hours of race day the shade was worked out for." };
 }
 

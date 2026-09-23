@@ -2,10 +2,10 @@
 //
 // The word is the point. A shape on its own is a guess for anybody who hasn't learned it, and a
 // screen reader has nothing at all to say about a path — so every glyph carries its name in the
-// element's title and in hidden text, and the key under the strip names each one (core/serve-glyphs.ts).
-import type { Glyph } from "../core/serve-glyphs";
-import { html } from "../dom";
-import { svg } from "../svg";
+// element's title and in hidden text, and "What the marks mean" names each one (core/serve-glyphs.ts).
+import type { Glyph } from "./core/serve-glyphs";
+import { html } from "./dom";
+import { svg } from "./svg";
 
 /** The box every glyph is drawn in. */
 const BOX = 16;

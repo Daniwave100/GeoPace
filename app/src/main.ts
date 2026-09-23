@@ -4,7 +4,6 @@ import { browserStorage } from "./browser-storage";
 import { BundleError, loadCourseBundle } from "./bundle/loader";
 import type { CourseBundle } from "./bundle/types";
 import { loadWhiteModel, type WhiteModel, WhiteModelError } from "./bundle/white-model";
-import { type Encoding, ENCODINGS } from "./core/encoding";
 import { aidLayer } from "./core/aid-layer";
 import { heightRow, hillsLayer } from "./core/hills-layer";
 import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
@@ -20,12 +19,13 @@ import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
 import { loadStripSize, saveStripSize } from "./core/strip-size";
 import { shadeLayer } from "./core/shade-layer";
 import { loadThemeChoice, resolveTheme, saveThemeChoice, type ThemeChoice } from "./core/theme";
-import { distanceNumber, formatNearby, type Units, unitName } from "./core/units";
+import { distanceNumber, type Units, unitName } from "./core/units";
 import { loadWhiteModelChoice, saveWhiteModelChoice, type WhiteModelChoice } from "./core/white-model";
 import { COURSES, courseFromUrl, urlForCourse } from "./courses";
 import { html, link } from "./dom";
+import { createKeySheet } from "./explore/key-sheet";
 import { createLayerBar } from "./explore/layer-bar";
-import { createMapControls, MAP_HELP, type MapControls } from "./explore/map-controls";
+import { createMapControls, type MapControls } from "./explore/map-controls";
 import { createPlanSummary } from "./explore/plan-summary";
 import { createReadout } from "./explore/readout";
 import { createSentence, sentenceInWords } from "./explore/sentence-view";
@@ -49,7 +49,7 @@ import type { Placement } from "./scene/placement";
 import { PROVIDER_ATTRIBUTIONS } from "./scene/providers";
 import { createWhiteModel, type WhiteModelInScene } from "./scene/white-model";
 import { type CameraInTheScene, createRideCamera, roadHeightOnTheMap } from "./scene/ride-camera";
-import { createStrip, type KeyEntry, rowsHeightAtSizeOne } from "./strip/strip";
+import { createStrip, rowsHeightAtSizeOne } from "./strip/strip";
 import type { Viewer } from "cesium";
 
 /** What is on screen: one course, one runner's plan for it, where on it the runner is, and its layers. */
@@ -134,7 +134,18 @@ const splitsTable = createSplitsTable(byId("splits"), (km) => {
 });
 const switches = createSwitches(byId("switches"), useUnits, useTheme);
 const whiteModelSwitches: WhiteModelSwitches = createWhiteModelSwitches(byId("white-model"), useWhiteModel);
-const layerBar = createLayerBar(byId("layers"), (id) => useLayers(pressLayer(layerState, id)), () => useLayers(pressEverything(layerState, showing?.layers ?? [])));
+// The two sheets behind the first screen: what the marks mean, and where everything comes from
+// (PLAN.md D63). Like the plan, a Ride doesn't play on behind either.
+const keyDialog = byId("key-dialog") as HTMLDialogElement;
+const keySheet = createKeySheet(byId("key"));
+const sourcesDialog = byId("sources-dialog") as HTMLDialogElement;
+byId("sources-open").addEventListener("click", () => openSheet(sourcesDialog));
+const layerBar = createLayerBar(
+  byId("layers"),
+  (id) => useLayers(pressLayer(layerState, id)),
+  () => useLayers(pressEverything(layerState, showing?.layers ?? [])),
+  () => openSheet(keyDialog),
+);
 const strip = createStrip(byId("strip"), scrubTo, (held) => showing?.ride.hold(held));
 const rideControls = createRideControls(byId("ride"), {
   playPause: () => showing?.ride.playPause(),
@@ -159,6 +170,12 @@ const stripEdge = createStripEdge(byId("strip-edge"), {
 let mapWasUntouched = false;
 const readoutView = createReadout(byId("readout"));
 const sentenceView = createSentence(byId("sentence"));
+
+/** A sheet over the page: whatever is playing under it waits. */
+function openSheet(dialog: HTMLDialogElement): void {
+  showing?.ride.pause();
+  dialog.showModal();
+}
 
 async function start(): Promise<void> {
   showTheme();
@@ -325,10 +342,10 @@ function showWhiteModel(): void {
 }
 
 /**
- * What the block says under its switches: how the buildings are getting on, and — once they are
- * drawn — the two things a runner can't tell by looking. Only the corridor is there, so the rest
- * of the city staying flat is the data, not a fault; and the shadows are worked out for race day,
- * which is the whole reason the keyless look exists (PLAN.md D4).
+ * What the block says under its switches: how the buildings are getting on, while they aren't on
+ * screen. Once they are drawn it says nothing: what the corridor is and that the shadows are race
+ * day's, not a photograph's, are in Sources & credits, and a note on the map for as long as the
+ * buildings showed was one box too many (owner, 09-22).
  */
 function cityInWords(): string {
   const city = showing?.city;
@@ -341,8 +358,7 @@ function cityInWords(): string {
     case "failed":
       return "The city's buildings couldn't be loaded, so this is the plain map. Everything else is untouched.";
     case "drawn":
-      if (whiteModelChoice.buildings === "off") return "";
-      return `Real buildings within ${formatNearby(city.model.corridor_m / 1000, units)} of the course; shadows worked out for race day, not photographed.`;
+      return "";
   }
 }
 
@@ -370,14 +386,12 @@ function useStripSize(size: number): void {
   showStrip(); // only the strip: the marks and labels on the map don't change with its size
 }
 
-/** The map on the full screen: the readout, the strip and all but one line of the credits step aside. */
+/** The map on the full screen: the readout and the strip step aside; the one-line footer and the map's own credits stay. */
 function useFullMap(on: boolean): void {
   const untouched = viewer !== undefined && isStillFramed(viewer);
   fullMap = on;
   coveredLeft = null; // the readout block has stepped aside, or come back
   byId("explore").toggleAttribute("data-full-map", on);
-  // The credits fold to one word, one press away; the map's own credits stay on the map.
-  (byId("credits-more") as HTMLDetailsElement).open = !on;
   mapControls?.showFullMap(on);
   reframeIfUntouched(untouched);
 }
@@ -403,6 +417,7 @@ function showLayers(): void {
   const { bundle, layers } = showing;
   const screen = (showing.screen = onScreen(layerState, layers));
   layerBar.show(layerState, layers);
+  keySheet.show({ bundle, layers, units }); // every layer the course has, on or off, in the runner's units
   showStrip();
   showCourseLine(viewer, bundle, screen.lineMarks, placement);
   mapLabels.show([...endLabels(bundle), ...screen.lineLabels.map((label) => markLabel(bundle, label))], placement);
@@ -425,26 +440,12 @@ function usePlacement(next: Placement): void {
   // and the road it rides over has just changed height with the course.
 }
 
-/** The strip as it should be now: its rows, its key, and the size the runner has made it. */
+/** The strip as it should be now: its rows, and the size the runner has made it. */
 function showStrip(): void {
   if (!showing) return;
-  const { bundle, baseRow, screen, stops } = showing;
-  strip.show({ lengthKm: showing.planner.lengthKm, stops: stops.map((stop) => ({ name: stop.name(units), km: stop.km })), baseRow, layerRows: screen.rows, key: keyFor(bundle, screen), size: stripSize, units });
+  const { baseRow, screen, stops } = showing;
+  strip.show({ lengthKm: showing.planner.lengthKm, stops: stops.map((stop) => ({ name: stop.name(units), km: stop.km })), baseRow, layerRows: screen.rows, size: stripSize, units });
   stripEdge.show(stripSize);
-}
-
-/**
- * What the marks on screen mean, in a line under the strip. Nothing while no layer is on: the
- * first screen needs no key (PLAN.md principle 8). With layers on, each one's marks on the course
- * line come first, in the layers' order, since an edge that is black here, coloured there and
- * dotted somewhere else is a riddle without it; then the encodings that are in use.
- */
-function keyFor(bundle: CourseBundle, screen: OnScreen): KeyEntry[] {
-  if (screen.layers.length === 0) return [];
-  const used = new Set<Encoding>([...screen.rows.map((row) => row.encoding), ...screen.lineMarks.map((mark) => mark.encoding)]);
-  if (bundle.measured.elevation_not_measured.length > 0) used.add("not-measured");
-  const marks = screen.layers.flatMap((layer) => (layer.key ? [{ name: `${layer.name}.`, meaning: layer.key }] : []));
-  return [...marks, { name: "The blue line.", meaning: "The course itself; a thin white edge is just the course." }, ...(Object.keys(ENCODINGS) as Encoding[]).filter((encoding) => used.has(encoding)).map((encoding) => ({ name: `${ENCODINGS[encoding].name}.`, meaning: ENCODINGS[encoding].meaning }))];
 }
 
 function endLabels(bundle: CourseBundle): MapLabel[] {
@@ -681,7 +682,6 @@ function startPhotoreal(globe: Viewer): Photoreal {
 }
 
 function renderAttributions(bundle: CourseBundle): void {
-  byId("map-help").textContent = `The map: ${MAP_HELP}`;
   const list = byId("attributions");
   list.replaceChildren();
   for (const { text, url } of [...bundle.attributions, ...PROVIDER_ATTRIBUTIONS]) {

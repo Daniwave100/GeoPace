@@ -25,8 +25,12 @@ export interface Layer {
   id: LayerId;
   /** The plain name on its switch: "Hills". */
   name: string;
-  /** What its marks on the course line mean, in a sentence, for the key under the strip. */
-  key?: string;
+  /**
+   * What its marks mean, in a sentence or two, for "What the marks mean" (explore/key-sheet.ts):
+   * the one place a runner is told, one press away, what a yellow edge or a dotted rim is. In the
+   * runner's units, because a layer may state a distance there (Aid: the longest run without water).
+   */
+  key?(units: Units): string;
   /** Its rows on the strip, top to bottom. */
   rows(): StripRow[];
   /** How it marks the course line on the map: stretches of the line, each drawn as the kind of claim it is. */
@@ -99,9 +103,17 @@ export interface StripRow {
    * A row that is *things at places* rather than a value all the way along: aid stations, later
    * cheer zones. Where this is given the row draws these on one rule instead of a trace, and
    * `bins` is not asked for. A chart is the wrong shape for a point — a trace through fifteen
-   * stations is a line about the gaps between them, not about the stations.
+   * stations is a line about the gaps between them, not about the stations. In the runner's
+   * units, because a mark's own words name where it is: "3.1 mi: water".
    */
-  marks?(): RowMark[];
+  marks?(units: Units): RowMark[];
+  /**
+   * The marks a row of marks uses, each with its word, for the key drawn in the row's own header:
+   * a drop is water, a cross is medical help. Only the ones this course actually uses, so the
+   * key never teaches a shape the strip doesn't show (owner, 09-22: "I don't know what the
+   * symbols mean… add a key like cross equals first aid").
+   */
+  keyGlyphs?: Glyph[];
 }
 
 /** One thing at one place on a row: what it is, and the marks that say so. */

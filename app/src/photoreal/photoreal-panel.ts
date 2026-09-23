@@ -8,7 +8,8 @@
 //     can't end up in a screenshot or a screen recording. The box is deliberately not a password
 //     box: browsers offer to save those to a password manager, which would be a second place the
 //     key is kept, and one that may sync it to other machines;
-//   - when photoreal is showing, it says the imagery's shadows are illustrative (D4);
+//   - the panel says the imagery's shadows are illustrative (D4), so the runner reads it where they
+//     set photoreal up rather than in a box on every screen;
 //   - when the imagery can't be had, it says why in words a runner can act on, and says it to a
 //     screen reader too.
 import { formatHeight, type Units } from "../core/units";
@@ -80,6 +81,10 @@ export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Pho
       class: "plan-note",
       text: "Your key stays in this browser. It is never put in GeoPace's files, and it is sent only to the map provider it belongs to. “Forget my key” removes it.",
     }),
+    // What the imagery's shadows are and aren't (PLAN.md D4): said here, once, where photoreal is
+    // set up. It was a box on the map for as long as photoreal was on; the owner asked for it to
+    // go (09-22: "it just takes up too much space, and it's confusing").
+    html("p", { class: "plan-note", text: ILLUSTRATIVE_SHADOWS }),
     html("h3", { text: "Getting a key" }),
     keyHelp("cesium-ion"),
     keyHelp("google"),
@@ -142,10 +147,12 @@ export function createPhotorealPanel(container: HTMLElement, photoreal: Pick<Pho
       settings.hidden = key === null; // with no key, the main button opens the panel itself
 
       const trouble = next.problem && key ? problemInWords(next.problem, key.provider) : "";
-      status.textContent = look === "photoreal" ? ILLUSTRATIVE_SHADOWS : trouble;
-      status.classList.toggle("photoreal-trouble", look !== "photoreal" && trouble !== "");
+      // Only trouble is worth a box on the map. The imagery's shadows being illustrative is said
+      // in the panel, where the runner sets photoreal up, not on every screen (owner, 09-22).
+      status.textContent = trouble;
+      status.classList.toggle("photoreal-trouble", trouble !== "");
       cameraHeight.hidden = look !== "photoreal";
-      spoken.textContent = look === "photoreal" ? `Photoreal is on. ${ILLUSTRATIVE_SHADOWS}` : look === "loading" ? "Loading photoreal." : trouble;
+      spoken.textContent = look === "photoreal" ? "Photoreal is on." : look === "loading" ? "Loading photoreal." : trouble;
 
       remembered.hidden = key === null;
       remembered.textContent = key ? `${rememberedInWords(key, next.thisVisitOnly)} Paste another to replace it.` : "";

@@ -9,7 +9,7 @@ import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
 import { type HillBin, hillBins, hillsAt, type HillStretch, hillStretches, howSteep } from "./hills";
 import type { HowMuch, Layer, LineMark, MarkLabel, RowBin, StripRow } from "./layers";
 import { nearestIndex } from "./series";
-import { formatHeight, formatNearby, heightNumber, heightUnit } from "./units";
+import { formatHeight, formatNearby } from "./units";
 
 /** Below this, a runner calls the road flat. Half a percent is 5 m of height in a kilometre. */
 const FLAT_BELOW_PERCENT = 0.5;
@@ -72,7 +72,7 @@ export function hillsLayer(bundle: CourseBundle): Layer {
   return {
     id: "hills",
     name: "Hills",
-    key: "A coloured edge on the blue line is a hill: yellow to red going up, aqua to teal coming down. The paler, the gentler; the darker, the steeper.",
+    key: () => "A coloured edge on the blue line is a hill: yellow to red going up, aqua to teal coming down. The paler, the gentler; the darker, the steeper.",
     rows: () => [gradeRow, effortRow],
     lineMarks: () => marks,
     lineLabels: () => labels,
@@ -85,21 +85,30 @@ export function hillsLayer(bundle: CourseBundle): Layer {
   };
 }
 
+/**
+ * The top of the Height row, the same on every course, with sea level at the bottom. One scale,
+ * so that a flat course reads flat beside a hilly one: drawn to its own range, Berlin's 20 m rose
+ * to the top of the row exactly as New York's 76 m did, and the two looked alike (owner, 09-22:
+ * "they look the same, but Berlin is much more flat"). 100 m holds both courses with the
+ * Verrazzano at three quarters of the row; a course that stood higher would lift its own row's
+ * top, and say so in its scale, rather than run off the strip.
+ */
+export const HEIGHT_CEILING_M = 100;
+
 /** The strip's own base row: the height of the course, there whether or not a layer is on. */
 export function heightRow(bundle: CourseBundle): StripRow {
-  const { min_m, max_m, gain_m, loss_m } = bundle.measured.elevation_summary;
+  const { max_m, gain_m, loss_m } = bundle.measured.elevation_summary;
   const binned = memoBins(bundle);
+  const top = Math.max(HEIGHT_CEILING_M, max_m);
   return {
     id: "height",
     name: "Height",
     encoding: "measured",
-    scale: (units) => `${heightUnit(units)}, ${heightNumber(min_m, units)} to ${heightNumber(max_m, units)}`,
+    scale: (units) => `0 to ${formatHeight(top, units)}${top === HEIGHT_CEILING_M ? " on every course" : ""}`,
     // Every rise and every drop along the course added up: what "a hilly course" means in one number.
     summary: (units) => `up ${formatHeight(gain_m, units)}, down ${formatHeight(loss_m, units)}`,
     bins: (count) => binned(count).map((bin) => rowBin(bin, bin.elevationM)),
-    // Not from sea level: Berlin moves 20 m all day, and drawn from zero it is a slab. The
-    // labelled scale says where the bottom is.
-    domain: [min_m - (max_m - min_m) * 0.12, max_m],
+    domain: [0, top],
     baseline: "bottom",
     stepped: false,
     valueAt(km, units) {

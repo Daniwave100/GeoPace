@@ -15,7 +15,7 @@
 // It is drawn solid for that reason, and a station carried over from last year's list is greyed
 // and says so, the way a carried-over wave time is (D38).
 import type { CourseBundle } from "../bundle/types";
-import { type AidStation, aidStations, nextServing, servesInWords } from "./aid";
+import { type AidStation, aidStations, nextServing, servesInWords, stationName } from "./aid";
 import type { Clause, Layer, MarkLabel, RowValue, StripRow } from "./layers";
 import { glyphsFor, SERVE_GLYPH, SHOWN_AS_GLYPHS } from "./serve-glyphs";
 import type { Planner } from "./planner";
@@ -46,26 +46,33 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
   // of them, which is exactly what New York's will (see its editions file).
   const furthestDryKm = furthestWithoutWater(stations, lengthKm);
 
+  // The marks this course's stations use, each with its word, for the key in the row's header:
+  // a shape nobody has learned is a guess (owner, 09-22).
+  const used = SHOWN_AS_GLYPHS.filter((what) => stations.some((station) => station.serves.includes(what)));
+
   const row: StripRow = {
     id: "aid",
     name: "Stations",
     encoding: "measured",
-    // The header says the thing the marks can't: how far it still is to the next drink.
-    scale: (units) => `the longest run without water is ${formatDistance(furthestDryKm, units, 1)}`,
-    summary: () => `${stations.length} of them, the organizer's own list`,
+    // What the value is: the header's room goes to the key of the marks, and the longest run
+    // without water, which the scale used to say, is in "What the marks mean".
+    scale: () => "to the next water",
     // A row of marks is asked for its marks, never for bins (strip/strip.ts).
     bins: () => [],
     domain: [0, 1],
     baseline: "bottom",
     stepped: false,
     valueAt: (km, units) => valueAt(km, stations, units),
-    marks: () =>
+    marks: (units) =>
       stations.map((station) => ({
         km: station.km,
-        label: `${station.label}: ${servesInWords(station)}`,
+        // Named in the runner's units, and by the organizer's own name too where the two differ:
+        // the sign by the road says "Mile 3" whatever the switch says.
+        label: `${stationName(station, units)}${units === station.markedIn ? "" : ` (${station.label})`}: ${servesInWords(station)}`,
         glyphs: glyphsFor(station.serves),
         encoding: "measured" as const,
       })),
+    keyGlyphs: used.map((what) => SERVE_GLYPH[what]),
   };
 
   // The same note the sentence gives, so picking a station on the map says what standing on it
@@ -76,7 +83,7 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     atKm: station.km,
     startKm: station.km,
     glyphs: glyphsFor(station.serves),
-    text: () => station.label,
+    text: (units) => stationName(station, units),
     // The full stations first, so that where two crowd each other it is the one with more on it
     // that survives: a runner scanning the map is looking for a drink, not for a water table.
     // The chip is all a station has on the map — a hill still has its band — so a chip wins the
@@ -89,7 +96,8 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
   return {
     id: "aid",
     name: "Aid",
-    key: `A chip on the line is a refreshment point, from the organizer's own list. Its marks are what it hands out: ${markNames(stations)}.`,
+    key: (units) =>
+      `A chip on the line is a refreshment point, from the organizer's own list of ${stations.length}. Its marks are what it hands out: ${markNames(stations)}. The longest run without water is ${formatDistance(furthestDryKm, units, 1)}.`,
     rows: () => [row],
     // A station is a point, and its chip on the map is its mark: it paints nothing on the line,
     // which leaves the band to the hills and the rim to the shade (D62).
@@ -106,21 +114,23 @@ export function furthestWithoutWater(stations: AidStation[], lengthKm: number): 
 }
 
 function valueAt(km: number, stations: AidStation[], units: Units): RowValue {
-  // Standing on a station reads "water here" either side of it, where the row's own value has
-  // already jumped to the next one: the chart is a sawtooth and the words are about where you are.
+  // Standing on a station reads "here" either side of it, where the row's own value has already
+  // jumped to the next one: the chart is a sawtooth and the words are about where you are. Short,
+  // because the value shares the header's first line with the row's name, and the scale under it
+  // says what the number is ("to the next water").
   const here = stations.some((station) => Math.abs(station.km - km) <= AT_IT_KM && station.serves.includes("water"));
-  if (here) return { text: "water here", notMeasured: null };
+  if (here) return { text: "here", notMeasured: null };
   const next = nextServing(stations, km, "water");
   // Never struck through: a carried-over station is last year's list, not an unmeasured value, and
   // the clause under the sentence is where the runner is told, with the reason.
-  return { text: next ? formatNearby(next.km - km, units) : "no more water", notMeasured: null };
+  return { text: next ? formatNearby(next.km - km, units) : "none left", notMeasured: null };
 }
 
 function clauseFor(km: number, stations: AidStation[], units: Units, carriedOver: { from_edition: number; reason: string } | undefined): Clause | null {
   const here = stations.find((station) => Math.abs(station.km - km) <= AT_IT_KM);
   if (here) {
     return {
-      text: `${capital(servesInWords(here))} here, at the ${here.label} station.`,
+      text: `${capital(servesInWords(here))} here, at the ${stationName(here, units)} station.`,
       encoding: "measured",
       note: noteFor(here, carriedOver),
       carriedOver: here.carriedOver,
@@ -130,7 +140,7 @@ function clauseFor(km: number, stations: AidStation[], units: Units, carriedOver
   const next = stations.find((station) => station.km > km);
   if (!next) return { text: "No more aid stations.", encoding: "measured" };
   return {
-    text: `${capital(servesInWords(next))} in ${formatNearby(next.km - km, units)}, at ${next.label}.`,
+    text: `${capital(servesInWords(next))} in ${formatNearby(next.km - km, units)}, at ${stationName(next, units)}.`,
     encoding: "measured",
     note: noteFor(next, carriedOver),
     carriedOver: next.carriedOver,
