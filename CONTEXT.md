@@ -135,7 +135,15 @@ The one plain-language line saying what the course is doing where the runner is 
 _Avoid_: caption, subtitle, summary
 
 **Clause**:
-One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's.
+One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's. Anything more it has to say (why a value is filled in, whose list a station is on) is its tooltip, never printed under the sentence (D63).
+
+**What the marks mean**:
+The key, as a sheet one press from the layer switches: the course line, each layer's marks (Aid's drawn beside their words), solid / grey / dotted, where this course's height is filled in and why, and how to move the map and the strip. Nothing of it is on the first screen (D63).
+_Avoid_: legend, help, definitions
+
+**Sources & credits**:
+The sheet one press from the one-line footer: our data credits and every source with its licence and the day it was fetched. The map's own credit line never folds into it: it is on the map.
+_Avoid_: about, attribution page
 
 **Strip's top edge**:
 The rule between the map and the strip, which drags up and down to resize the strip.
@@ -242,7 +250,7 @@ The wide, coloured slot of the course line, outside the blue: where a hill is, c
 _Avoid_: stripe, fill, highlight
 
 **Rim**:
-The dark slot hugging the blue: the road's own edge darkened where it is in shade — solid for a building's, dotted for a tree's, nothing in the sun.
+The thin rule of ink hugging the blue, never as wide as the band: the road's own edge darkened where it is in shade — solid for a building's, dotted for a tree's on the same screen the crowns are printed in, grey where the height is filled in, nothing in the sun (D63).
 _Avoid_: border, outline, shadow line
 
 **Chip**:

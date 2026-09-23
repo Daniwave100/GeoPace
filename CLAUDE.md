@@ -61,8 +61,10 @@ ask before anything that changes scope or look.
   centre lines gets a wider tolerance than an organizer's course file — see D21/D22).
 
 ## Adding a layer
-A layer is data (`app/src/core/layers.ts`, PLAN.md D47): its strip rows, its marks on the course line and its clause,
-each tagged with the kind of claim it is. Add it to the list in `app/src/main.ts`. Never give a layer its own colours
+A layer is data (`app/src/core/layers.ts`, PLAN.md D47): its strip rows, its marks on the course line, its clause,
+each tagged with the kind of claim it is, and its `key(units)`: the sentence "What the marks mean" prints for it (D63; nothing
+is explained on the first screen). A row of marks names its marks in `keyGlyphs`, and the strip draws that key in the
+row's own header. Add it to the list in `app/src/main.ts`. Never give a layer its own colours
 or dash patterns for a claim: the encodings come from `core/encoding.ts`, and "how much, and which way" (a number from -1 to 1, like
 how steep a hill is, negative coming down) gets its colour from `core/mark-look.ts`: warm against the runner, teal with
 them, fading from pale to deep. (A colour for a *thing* — water, a gel — is the one exception, Aid's glyphs in
