@@ -8,7 +8,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import type { CourseLine } from "../src/bundle/types";
 import { relativeBearing } from "../src/core/bearing";
 import { type RideCamera, rideSpeedKmPerS } from "../src/core/ride";
-import { ON_THE_ROAD_HEIGHT_M, rideCourseFor, type RideScene, rideView, runnerInTheScene } from "../src/core/ride-view";
+import { ON_THE_ROAD_HEIGHT_M, ON_THE_ROAD_LOOK_UP_DEG, rideCourseFor, type RideScene, rideView, runnerInTheScene } from "../src/core/ride-view";
 import { M_PER_FOOT } from "../src/core/units";
 import { positionAtKm } from "../src/core/scrub";
 import { stopsFor } from "../src/core/stops";
@@ -119,21 +119,27 @@ function swingAlong(scene: RideScene, camera: RideCamera): Swing {
 }
 
 describe("On the road", () => {
-  it("follows from 216 ft up and as far behind, looking down at the runner at 45 degrees", () => {
-    // The owner's height (09-23); "as far behind as up" is Claude's, so the road ahead stays in shot.
+  it("follows from 250 ft up and 150 m behind, pitched about 15 degrees down, with the horizon in the top of the view", () => {
+    // The owner's height (09-23: 216 ft, then "a bit higher") and their ask to "look up a bit";
+    // the distance behind and the 12° lift are Claude's, so the runner stays in the lower third
+    // of a view that is about 36° top to bottom.
     const scene = cornerCourse();
     const view = rideView(scene, 1, "on-the-road");
     const runner = positionAtKm(scene.line, 1);
 
     const behind = metersFrom(runner, view.eye);
-    expect(behind.north).toBeLessThan(-60); // south of a runner heading north
-    expect(behind.north).toBeGreaterThan(-72);
+    expect(behind.north).toBeLessThan(-140); // south of a runner heading north
+    expect(behind.north).toBeGreaterThan(-160);
     expect(Math.abs(behind.east)).toBeLessThan(0.5);
     expect(view.eye.heightM).toBeCloseTo(100 + ON_THE_ROAD_HEIGHT_M, 6);
-    expect(ON_THE_ROAD_HEIGHT_M / M_PER_FOOT).toBeCloseTo(216, 0);
+    expect(ON_THE_ROAD_HEIGHT_M / M_PER_FOOT).toBeCloseTo(250, 0);
     expect(Math.abs(relativeBearing(0, view.headingDeg))).toBeLessThan(0.5);
-    expect(view.pitchDeg).toBeLessThan(-40);
-    expect(view.pitchDeg).toBeGreaterThan(-50);
+    expect(view.pitchDeg).toBeLessThan(-12);
+    expect(view.pitchDeg).toBeGreaterThan(-18); // the top of a 36° view is above the horizon
+    // The runner is inside the frame, below its middle.
+    const downToRunner = (Math.atan2(100 - view.eye.heightM, -behind.north) * 180) / Math.PI;
+    expect(view.pitchDeg - downToRunner).toBeCloseTo(ON_THE_ROAD_LOOK_UP_DEG, 6);
+    expect(ON_THE_ROAD_LOOK_UP_DEG).toBeLessThan(18);
   });
 
   it("is still behind the runner on the start line and on the finish line, where there is no road behind or ahead to follow", () => {
@@ -177,13 +183,14 @@ describe("On the road", () => {
         const toRunnerDeg = (Math.atan2(toRunner.east, toRunner.north) * 180) / Math.PI;
         // CesiumJS's view is 60° across: more than 30° off the way the camera faces is out of shot.
         expect(Math.abs(relativeBearing(view.headingDeg, toRunnerDeg)), `km ${km.toFixed(2)}`).toBeLessThan(5);
-        // And up and down: where the road doubles back the runner is a few metres from a camera 66 m
-        // up, far below the horizon. The view is some 36° top to bottom; the camera looks at the
-        // road the runner is on. (The bundle's own height: over a filled-in stretch the camera
+        // And up and down: where the road doubles back the runner is a few metres from a camera 76 m
+        // up, far below the horizon. The view is some 36° top to bottom; the camera looks a fixed
+        // few degrees above the road the runner is on, so they sit in the lower part of the frame
+        // and never out of it. (The bundle's own height: over a filled-in stretch the camera
         // allows for a crest the dot isn't drawn on, which is a few degrees.)
         const flatM = Math.hypot(toRunner.north, toRunner.east);
         const downToRunnerDeg = (Math.atan2(positionAtKm(scene.line, km).ellipsoidHeightM - view.eye.heightM, Math.max(flatM, 1)) * 180) / Math.PI;
-        expect(Math.abs(view.pitchDeg - downToRunnerDeg), `km ${km.toFixed(2)}, up and down`).toBeLessThan(12);
+        expect(Math.abs(view.pitchDeg - downToRunnerDeg - ON_THE_ROAD_LOOK_UP_DEG), `km ${km.toFixed(2)}, up and down`).toBeLessThan(6);
       }
     }
   });
@@ -195,17 +202,17 @@ describe("On the road", () => {
       const toRunner = metersFrom(view.eye, positionAtKm(nyc.line, km));
       const flatM = Math.hypot(toRunner.north, toRunner.east);
       const downToRunnerDeg = (Math.atan2(positionAtKm(nyc.line, km).ellipsoidHeightM - view.eye.heightM, Math.max(flatM, 1)) * 180) / Math.PI;
-      expect(Math.abs(view.pitchDeg - downToRunnerDeg), `km ${km}`).toBeLessThan(12);
+      expect(Math.abs(view.pitchDeg - downToRunnerDeg - ON_THE_ROAD_LOOK_UP_DEG), `km ${km}`).toBeLessThan(6);
     }
   });
 
   it("stays on the road itself, so it is never inside a building on a corner", () => {
     for (const scene of [nyc, berlin]) {
       const { line } = scene;
-      // From 70 m in: before that the camera stands on the road's own line carried back past the start.
-      for (let km = 0.07; km <= line.length_m / 1000; km += 0.01) {
+      // From 160 m in: before that the camera stands on the road's own line carried back past the start.
+      for (let km = 0.16; km <= line.length_m / 1000; km += 0.01) {
         const { eye } = rideView(scene, km, "on-the-road");
-        const behind = positionAtKm(line, km - 0.066); // as far behind the runner as the camera is up
+        const behind = positionAtKm(line, km - 0.15); // 150 m behind the runner, on the road
         const off = metersFrom(behind, eye);
         expect(Math.hypot(off.north, off.east), `km ${km.toFixed(2)}`).toBeLessThan(1);
       }
@@ -217,8 +224,8 @@ describe("On the road", () => {
     for (const scene of [nyc, berlin]) {
       const { line } = scene;
       for (let i = 10; i < line.km.length - 10; i += 1) {
-        // A straight long enough that the camera, 66 m behind, is on it too.
-        const around = line.bearing_deg.slice(i - 8, i + 6);
+        // A straight long enough that the camera, 150 m behind, is on it too.
+        const around = line.bearing_deg.slice(i - 16, i + 6);
         if (around.some((bearing) => Math.abs(relativeBearing(line.bearing_deg[i], bearing)) > 1)) continue; // not a straight
         straights += 1;
         const view = rideView(scene, line.km[i], "on-the-road");
@@ -238,8 +245,8 @@ describe("On the road", () => {
 
   it("rides higher where the height is filled in, by as much as a bridge between those two grades would crest over the fill", () => {
     const scene = bridgeCourse();
-    // How high the camera rides over the road at its own place, 66 m behind the runner.
-    const over = (eyeKm: number) => rideView(scene, eyeKm + 0.066, "on-the-road").eye.heightM - positionAtKm(scene.line, eyeKm).ellipsoidHeightM;
+    // How high the camera rides over the road at its own place, 150 m behind the runner.
+    const over = (eyeKm: number) => rideView(scene, eyeKm + 0.15, "on-the-road").eye.heightM - positionAtKm(scene.line, eyeKm).ellipsoidHeightM;
 
     expect(over(0.5)).toBeCloseTo(ON_THE_ROAD_HEIGHT_M, 6); // measured road: the one setting
     expect(over(2.5)).toBeCloseTo(ON_THE_ROAD_HEIGHT_M, 6);
@@ -252,14 +259,14 @@ describe("On the road", () => {
     const scene = bridgeCourse();
     scene.line.grade = scene.line.grade.map((grade) => -grade);
 
-    const over = rideView(scene, 1.566, "on-the-road").eye.heightM - positionAtKm(scene.line, 1.5).ellipsoidHeightM;
+    const over = rideView(scene, 1.65, "on-the-road").eye.heightM - positionAtKm(scene.line, 1.5).ellipsoidHeightM;
 
     expect(over).toBeCloseTo(ON_THE_ROAD_HEIGHT_M, 6);
   });
 
   it("clears the Verrazzano's unscanned main span, which the plan says is a few metres under the real deck", () => {
     const midSpan = 1.065; // the middle of km 0.77 to 1.36
-    const eye = rideView(nyc, midSpan + 0.066, "on-the-road").eye.heightM;
+    const eye = rideView(nyc, midSpan + 0.15, "on-the-road").eye.heightM;
     const filledIn = positionAtKm(nyc.line, midSpan).ellipsoidHeightM;
 
     expect(eye - filledIn).toBeGreaterThan(ON_THE_ROAD_HEIGHT_M + 2.5);
@@ -272,7 +279,7 @@ describe("On the road", () => {
     const onTheBridge = rideView(nyc, 0.6, "on-the-road").eye.heightM;
     const inBerlin = rideView(berlin, 10, "on-the-road").eye.heightM;
 
-    // The deck is tens of metres over the water, and the camera 66 m over the deck: at sea level this would be about 35.
+    // The deck is tens of metres over the water, and the camera 76 m over the deck: at sea level this would be about 45.
     expect(onTheBridge).toBeGreaterThan(20 + ON_THE_ROAD_HEIGHT_M);
     expect(onTheBridge).toBeLessThan(50 + ON_THE_ROAD_HEIGHT_M);
     expect(inBerlin).toBeGreaterThan(70 + ON_THE_ROAD_HEIGHT_M); // streets 30 to 50 m above sea level, plus 39.5, plus the camera
