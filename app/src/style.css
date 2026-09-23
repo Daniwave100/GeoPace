@@ -280,7 +280,7 @@ input {
      strip grown tall, the sentence still has to fit under it. The sentence shrinks with the map
      too (.sentence). At the layout's smallest map (340 px) a seven-line sentence can still
      overrun the block, and then it scrolls rather than clips. */
-  font-size: clamp(64px, min(9.5vw, 12.5vh, calc(var(--map-h, 100vh) * 0.22)), 148px);
+  font-size: clamp(64px, min(9.5vw, 12.5vh, calc(var(--map-h, 100vh) * 0.2)), 148px);
   line-height: 0.82;
   letter-spacing: -0.025em;
 }
@@ -356,7 +356,7 @@ input {
 .sentence {
   padding: 10px 16px 12px;
   border-top: var(--rule) solid var(--ink);
-  font-size: clamp(14px, calc(var(--map-h, 100vh) * 0.045), 17px);
+  font-size: clamp(13.5px, calc(var(--map-h, 100vh) * 0.04), 17px);
   font-weight: 700;
   font-stretch: 88%;
   line-height: 1.25;
