@@ -103,8 +103,8 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     name: "Shade",
     key: () =>
       along.table.hasTrees
-        ? ["A dark edge on the line is shade when you get there: solid for a building's, dotted for a tree's — that one you get while the leaves are on. No edge is sun.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
-        : "A dark edge on the line is a building's shade when you get there; no edge is sun. A clear sky is assumed, and trees are not in yet.",
+        ? ["A thin dark edge on the line is shade when you get there: solid for a building's, dotted for a tree's — that one you get while the leaves are on. No edge is sun; a coloured band beside the line is a hill, not shade.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
+        : "A thin dark edge on the line is a building's shade when you get there; no edge is sun, and a coloured band beside the line is a hill, not shade. A clear sky is assumed, and trees are not in yet.",
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],

@@ -23,7 +23,7 @@
 // It is a CesiumJS material of our own (a "Fabric" material: a few lines of shader), which the
 // browser's graphics card compiles; so it is registered by the map when it starts, never in a test.
 import { Color, Event, type JulianDate, Material, type MaterialProperty } from "cesium";
-import { type MarkLook, PLAIN, type RibbonLook, sameLook } from "../core/mark-look";
+import { HALFTONE_PITCH_PX, type MarkLook, PLAIN, type RibbonLook, rimDotRadius, sameLook } from "../core/mark-look";
 
 /** Two materials from one shader: draped is paint on the ground; at road height the line can be behind things. */
 const TYPE_DRAPED = "GeoPaceCourseRibbon";
@@ -65,7 +65,8 @@ uniform float coreEndPx;
 uniform float coreEdgeEndPx;
 uniform vec4 rimColor;
 uniform vec4 rimDotColor;
-uniform float rimDotShare;
+uniform float rimDotRadius;
+uniform float halftonePitchPx;
 uniform float rimEndPx;
 uniform vec4 rimEdgeColor;
 uniform float rimEdgeEndPx;
@@ -136,11 +137,17 @@ czm_material czm_getMaterial(czm_materialInput materialInput)
     czm_material material = czm_getDefaultMaterial(materialInput);
     float fromMiddlePx = abs(materialInput.st.t - 0.5) * v_width;
 
-    // Dashes and dots are counted along the line on screen, the way CesiumJS's own dashed line does it.
+    // The band's dashes are counted along the line on screen, the way CesiumJS's own dashed line does it.
     vec2 alongLine = rotate(v_polylineAngle) * gl_FragCoord.xy;
     float along = fract(alongLine.x / (dashAndGapPx * czm_pixelRatio));
-    vec4 rimBeside = mix(rimColor, vec4(rimDotColor.rgb, 1.0), step(along, rimDotShare) * rimDotColor.a);
     vec4 beside = mix(bandColor, vec4(dashColor.rgb, 1.0), step(along, dashShare) * dashColor.a);
+    // The rim's halftone is a screen fixed to the paper — the crowns' own (scene/white-model.ts) —
+    // not counted along the line: the draped line's angle is recomputed at every 10 m segment, so
+    // anything counted along it restarts its phase three times a pixel at the whole-course zoom,
+    // which is static (core/mark-look.ts). A solid rim has a radius of 0 and no dots.
+    vec2 inCell = fract(gl_FragCoord.xy / (halftonePitchPx * czm_pixelRatio)) - 0.5;
+    float inDot = (1.0 - smoothstep(rimDotRadius - 0.04, rimDotRadius + 0.04, length(inCell))) * step(0.001, rimDotRadius);
+    vec4 rimBeside = mix(rimColor, vec4(rimDotColor.rgb, 1.0), inDot * rimDotColor.a);
 
     vec4 color = coreColor;
     color = mix(color, coreEdgeColor, smoothstep(coreEndPx - 0.5, coreEndPx + 0.5, fromMiddlePx));
@@ -223,10 +230,10 @@ export class CourseRibbonProperty implements MaterialProperty {
   }
 }
 
-/** A solid stripe is its colour throughout; a dashed one is the colour between the dashes, and the dashes are drawn over it. */
+/** A solid stripe is its colour throughout, with no dashes at all; a dashed one is the colour between the dashes, and the dashes are drawn over it. */
 function stripeColors(look: MarkLook): { fill: Color; dash: Color; dashShare: number } {
   const dashed = look.gap !== null;
-  return { fill: Color.fromCssColorString(look.gap ?? look.color), dash: dashed ? Color.fromCssColorString(look.color) : Color.TRANSPARENT, dashShare: look.dashShare };
+  return { fill: Color.fromCssColorString(look.gap ?? look.color), dash: dashed ? Color.fromCssColorString(look.color) : Color.TRANSPARENT, dashShare: dashed ? look.dashShare : 0 };
 }
 
 function uniformsFor(look: RibbonLook, behindStrength: number | null): Record<string, unknown> {
@@ -234,9 +241,9 @@ function uniformsFor(look: RibbonLook, behindStrength: number | null): Record<st
   const edge = Color.fromCssColorString(COURSE_EDGE);
   // Each stripe that isn't there takes the colour of the next, so it paints nothing where it has
   // no width — and the plain course ends in its own white edge.
-  const band = look.band ? stripeColors(look.band) : { fill: edge, dash: Color.TRANSPARENT, dashShare: 0.5 };
+  const band = look.band ? stripeColors(look.band) : { fill: edge, dash: Color.TRANSPARENT, dashShare: 0 };
   const bandEdge = look.band ? Color.fromCssColorString(look.band.edge) : band.fill;
-  const rim = look.rim ? stripeColors(look.rim) : { fill: band.fill, dash: band.dash, dashShare: band.dashShare };
+  const rim = look.rim ? stripeColors(look.rim) : { fill: band.fill, dash: band.dash, dashShare: 0 };
   const rimEdge = look.rim ? Color.fromCssColorString(look.rim.edge) : band.fill;
   return {
     coreColor: Color.fromCssColorString(COURSE_BLUE),
@@ -245,7 +252,9 @@ function uniformsFor(look: RibbonLook, behindStrength: number | null): Record<st
     coreEdgeEndPx: px.coreEdgeEndPx,
     rimColor: rim.fill,
     rimDotColor: rim.dash,
-    rimDotShare: rim.dashShare,
+    // For the rim, `dashShare` is the paper's share of the area under the halftone screen.
+    rimDotRadius: rim.dashShare > 0 ? rimDotRadius(rim.dashShare) : 0,
+    halftonePitchPx: HALFTONE_PITCH_PX,
     rimEndPx: px.rimEndPx,
     rimEdgeColor: rimEdge,
     rimEdgeEndPx: px.rimEdgeEndPx,
