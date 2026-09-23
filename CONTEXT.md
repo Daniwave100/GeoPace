@@ -44,7 +44,7 @@ _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 ### The runner's plan
 
 **Race Plan**:
-The runner's own choices for one course: edition, wave, own start time if they have typed one, goal time or pace, and fueling plan.
+The runner's own choices for one course: edition, own start time if they have typed one, goal time or pace, and fueling plan. Underneath it still names a wave — the organizer's first start with a published time — but the runner never picks one (D64).
 _Avoid_: settings, profile
 
 **Units**:
@@ -52,11 +52,11 @@ Kilometres or miles, with metres or feet to match: what the runner reads and typ
 _Avoid_: imperial mode, locale
 
 **Wave**:
-A group of runners with its own start time.
+A group of runners with its own start time. An edition fact (D38), not a choice on screen since D64: the plan takes the first wave with a published time as the organizer's start, and the runner types their own over it.
 _Avoid_: corral, start block (those are positions inside a wave)
 
 **Own start time**:
-The start time a runner types in themselves, from their start card. It outranks the wave's published or carried-over time, and is never greyed.
+The start time a runner types in themselves, from their start card, over the organizer's first start. It outranks the published or carried-over time, and is never greyed.
 _Avoid_: custom time, override, manual time
 
 **Race clock**:
