@@ -30,12 +30,13 @@ function classesIn(text: string): string[] {
 const NO_RULE_NEEDED = new Set(["readout-km-whole", "photoreal-camera"]);
 
 /**
- * Classes handed to a helper as an argument, where `classesIn` can't see them: the segmented
- * control's own and the look passed to it (segmented.ts, ride-controls.ts), the player's way back
- * to the map, and its way out of free look. Without these, the banner's switches could lose their
- * rules and nothing would fail.
+ * Classes handed to a helper as an argument, or set with classList or inside a template literal,
+ * where `classesIn` can't see them: the segmented control's own and the look passed to it
+ * (segmented.ts, ride-controls.ts), the player's way back to the map and out of free look, the
+ * glyphs' classes (glyph-node.ts), and the strip header's states (strip/strip.ts). Without these,
+ * the banner's switches could lose their rules and nothing would fail.
  */
-const PASSED_AS_ARGUMENTS = ["segmented", "ride-cameras", "ride-leave", "ride-back-to-cinematic"];
+const PASSED_AS_ARGUMENTS = ["segmented", "ride-cameras", "ride-leave", "ride-back-to-cinematic", "strip-head-glyph", "key-glyph", "map-label-glyph", "strip-head-key", "is-one-column", "has-value-below", "is-tight", "is-long"];
 
 describe("the stylesheet", () => {
   const used = new Set([...appFiles(SRC).flatMap((file) => classesIn(readFileSync(file, "utf8"))), ...classesIn(page), ...PASSED_AS_ARGUMENTS]);

@@ -40,7 +40,7 @@ export function createKeySheet(container: HTMLElement): KeySheet {
           return [
             section(layer.name, [
               html("p", { text: layer.key(units) }),
-              ...(glyphs.length > 0 ? [html("ul", { class: "key-glyphs", "aria-label": `${layer.name}'s marks` }, ...glyphs.map((glyph) => html("li", {}, glyphNode(glyph, "key-glyph"), glyph.name)))] : []),
+              ...(glyphs.length > 0 ? [html("ul", { class: "key-glyphs", "aria-label": `${layer.name}'s marks` }, ...glyphs.map((glyph) => html("li", {}, glyphNode(glyph, "key-glyph", false), glyph.name)))] : []),
             ]),
           ];
         }),

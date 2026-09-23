@@ -238,7 +238,7 @@ describe("shade, as a rule of ink beside the band (PLAN.md D63)", () => {
     expect(contrast(grey.color, COURSE_EDGE)).toBeGreaterThanOrEqual(3);
   });
 
-  it("always shows a tree's dots: at every offset against the screen a 3 px rule meets at least a pixel of a dot, which a 2 px one would not", () => {
+  it("always shows a tree's dots: at every offset against the screen the rule meets at least a pixel of a dot, which a 2 px one would not", () => {
     // The dots are a grid fixed to the screen (scene/course-ribbon.ts), so what a stripe shows
     // depends on where it happens to fall against that grid. A stripe narrower than the paper
     // between two dots can fall wholly on the ink, and a tree's shade would then look like a wall's.

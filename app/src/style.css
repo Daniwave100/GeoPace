@@ -277,8 +277,10 @@ input {
   font-stretch: 62%;
   /* As big as the window allows, in both directions, and no bigger than the map it lies over
      allows (--map-h, set by main.ts from the map's own height): on a short window, or with the
-     strip grown tall, the sentence still has to fit under it without the block scrolling. */
-  font-size: clamp(64px, min(9.5vw, 12.5vh, calc(var(--map-h, 100vh) * 0.24)), 148px);
+     strip grown tall, the sentence still has to fit under it. The sentence shrinks with the map
+     too (.sentence). At the layout's smallest map (340 px) a seven-line sentence can still
+     overrun the block, and then it scrolls rather than clips. */
+  font-size: clamp(64px, min(9.5vw, 12.5vh, calc(var(--map-h, 100vh) * 0.22)), 148px);
   line-height: 0.82;
   letter-spacing: -0.025em;
 }
@@ -349,11 +351,12 @@ input {
 }
 
 /* The sentence: short clauses, and nothing under them (explore/sentence-view.ts), so the block
-   never has to scroll. A size down from 18px: with every layer on it is six clauses. */
+   fits the map it lies over. A size down from 18px, and smaller still as the map gets short
+   (--map-h, as the numeral): with every layer on it is six clauses. */
 .sentence {
   padding: 10px 16px 12px;
   border-top: var(--rule) solid var(--ink);
-  font-size: 17px;
+  font-size: clamp(14px, calc(var(--map-h, 100vh) * 0.045), 17px);
   font-weight: 700;
   font-stretch: 88%;
   line-height: 1.25;
@@ -1273,6 +1276,17 @@ button.map-label {
   font-size: 15px;
   font-stretch: 80%;
   line-height: 17px;
+}
+
+/* A row squeezed too small for two lines puts the value back beside the name, small, like any other tight row. */
+.strip-head.is-tight.has-value-below .strip-head-value {
+  grid-column: 2;
+  grid-row: 1;
+  max-width: calc(var(--head) * 0.62);
+  text-align: right;
+  font-size: 12px;
+  font-stretch: 84%;
+  line-height: 20px;
 }
 
 /* The key of a row's marks, in its header: a mark and its word, two to a line (strip/strip.ts

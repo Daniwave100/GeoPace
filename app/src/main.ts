@@ -223,7 +223,6 @@ async function show(courseId: string): Promise<void> {
   hideError();
   document.title = `${bundle.course.name} · GeoPace`;
   renderAttributions(bundle);
-  renderSources(byId("sources"), bundle);
 
   if (!viewer) {
     viewer = createGlobe(byId("globe"));
@@ -400,6 +399,7 @@ function showPlan(): void {
   if (!showing) return;
   switches.show(units, themeChoice);
   photorealPanel?.showUnits(units);
+  renderSources(byId("sources"), showing.bundle, units); // one line of it states a distance, in the runner's units
   planSummary.show(showing.planner, units);
   planPanel.show(showing.course, showing.planner, units);
   splitsTable.show(showing.planner, units);

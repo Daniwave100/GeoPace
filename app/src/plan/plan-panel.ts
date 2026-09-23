@@ -132,7 +132,10 @@ export function createPlanPanel(container: HTMLElement, onChange: (plan: RacePla
   /** The start time box and the line under it: whose time this is, and where it comes from. */
   function showStart(): void {
     if (!planner) return;
-    const organizers = planner.wave; // the organizer's first start with a published time (core/planner.ts)
+    // The organizer's first start with a published time: what the plan names underneath since no
+    // wave is picked (core/planner.ts sanitizePlan), read from the edition itself rather than the
+    // plan, so that the line under the box is a fact about the edition whatever the plan holds.
+    const organizers = planner.edition.waves.find(hasStartTime) ?? planner.wave;
     const published = hasStartTime(organizers) ? organizers.start_local : null;
     const flag = planner.carriedOver ? `, carried over from ${planner.carriedOver.fromEdition}` : "";
     startError.textContent = "";

@@ -238,10 +238,14 @@ describe("Race Plan", () => {
     }
   });
 
-  it("keeps a remembered own start time, and with it a wave that has no published one", () => {
+  it("keeps a remembered own start time, on the first wave with a published time when the remembered wave has none", () => {
+    // The old wave picker let a runner pick an unpublished wave and type a time for it (D40); since
+    // D64 nobody picks a wave, and such a plan would make the plan sheet call the organizer's first
+    // start "not published". The typed time is theirs and stays; the wave underneath is a timed one.
     const goal = { kind: "finish", seconds: 14400 };
 
-    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal, fueling: [] });
+    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-3", ownStartLocal: "10:20", goal })).toEqual({ courseId: "nyc", edition: 2026, waveId: "wave-1", ownStartLocal: "10:20", goal, fueling: [] });
+    expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", ownStartLocal: "10:20", goal }).waveId).toBe("wave-2"); // a timed wave from an older plan is kept
     // A plan remembered before own start times existed has none.
     expect(sanitizePlan(course, { edition: 2026, waveId: "wave-2", goal }).ownStartLocal).toBeNull();
     // An own start time that isn't a time of day is dropped, and the wave with it if it has no time of its own.

@@ -101,8 +101,8 @@ const DOT_SHARE = 0.34;
 export const HALFTONE_PITCH_PX = 5;
 /**
  * The paper's share of a leafy rim's area. Its radius, sqrt(share / pi) = 0.30 of a cell, is a
- * hair over the crowns' 0.26, so that a 3 px rule always catches at least a pixel of a dot at
- * every offset against the screen (a test sweeps them).
+ * hair over the crowns' 0.26, so that the rule always catches at least a pixel of a dot at
+ * every offset against the screen, at 4 px as at the 3 it was first drawn at (a test sweeps them).
  */
 export const RIM_DOT_SHARE = 0.29;
 

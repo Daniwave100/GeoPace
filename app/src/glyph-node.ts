@@ -10,9 +10,15 @@ import { svg } from "./svg";
 /** The box every glyph is drawn in. */
 const BOX = 16;
 
-export function glyphNode(glyph: Glyph, className: string): HTMLElement {
+/**
+ * `named` is whether the glyph carries its word in hidden text: yes where it stands for the thing
+ * on its own (a chip on the map), no where the word is printed right beside it (the key sheet),
+ * or a screen reader would hear "Water. Water".
+ */
+export function glyphNode(glyph: Glyph, className: string, named = true): HTMLElement {
   const drawing = svg("svg", { viewBox: `0 0 ${BOX} ${BOX}`, class: className, "aria-hidden": "true", focusable: "false" }, svg("path", { d: glyph.path, fill: glyph.color }));
   const node = html("span", { class: "glyph", title: glyph.name });
-  node.append(drawing, html("span", { class: "visually-hidden", text: `${glyph.name}. ` }));
+  node.append(drawing);
+  if (named) node.append(html("span", { class: "visually-hidden", text: `${glyph.name}. ` }));
   return node;
 }

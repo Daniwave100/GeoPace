@@ -121,7 +121,11 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
 
   const redraw = drawToFit(rowsBox, (width) => {
     if (!content) return;
-    const { drawing, headCells, place } = draw(content, width, heads.clientWidth);
+    const { drawing, headCells, place, height } = draw(content, width, heads.clientWidth);
+    // The box and the drawing come from the one measurement: a row of marks is taller when the
+    // header is narrow (its key goes to one column), and the header's width can change without a
+    // show() — the window narrowed past the phone breakpoint, or Full map left and came back.
+    rowsBox.style.height = `${height}px`;
     rowsBox.replaceChildren(drawing);
     heads.replaceChildren(...headCells.map((cell) => cell.node));
     moveCursor = () => {
@@ -187,6 +191,8 @@ interface HeadCell {
 interface Drawing {
   drawing: SVGSVGElement;
   headCells: HeadCell[];
+  /** How tall the drawing is: what the rows' box is set to, so the two never disagree. */
+  height: number;
   place(km: number, units: Units): void;
 }
 
@@ -257,6 +263,7 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   return {
     drawing,
     headCells,
+    height,
     place(km, units) {
       cursor.setAttribute("transform", `translate(${x(km).toFixed(1)} 0)`);
       flagText.textContent = distanceNumber(km, units);

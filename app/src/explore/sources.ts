@@ -3,9 +3,11 @@
 // effort numbers, and the source that locates each landmark. The credits are in the same sheet
 // (index.html, "Sources & credits"); this is the detail behind them.
 import type { CourseBundle } from "../bundle/types";
+import { formatNearby, type Units } from "../core/units";
 import { html, link } from "../dom";
 
-export function renderSources(container: HTMLElement, bundle: CourseBundle): void {
+/** In the runner's units, because one line states a distance: how far from the course the city is drawn. */
+export function renderSources(container: HTMLElement, bundle: CourseBundle, units: Units): void {
   const model = bundle.measured.difficulty_model;
   const items = [
     ...bundle.sources.map((source) => html("li", {}, link(source.url, source.title), " ", html("small", { text: `${source.licence}. Fetched ${source.accessed}.${source.note ? ` ${source.note}` : ""}` }))),
@@ -19,7 +21,7 @@ export function renderSources(container: HTMLElement, bundle: CourseBundle): voi
           html(
             "li",
             {},
-            `The city on the map: ${bundle.measured.white_model.buildings.toLocaleString("en")} real buildings${bundle.measured.white_model.trees ? ` and ${bundle.measured.white_model.trees.toLocaleString("en")} trees` : ""} within ${bundle.measured.white_model.corridor_m} m of the course, drawn as plain blocks. `,
+            `The city on the map: ${bundle.measured.white_model.buildings.toLocaleString("en")} real buildings${bundle.measured.white_model.trees ? ` and ${bundle.measured.white_model.trees.toLocaleString("en")} trees` : ""} within ${formatNearby(bundle.measured.white_model.corridor_m / 1000, units)} of the course, drawn as plain blocks. `,
             html("small", { text: "Their shadows are worked out for race day from where the sun stands, never photographed." }),
           ),
         ]

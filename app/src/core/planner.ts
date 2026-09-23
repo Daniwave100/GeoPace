@@ -222,8 +222,12 @@ export function sanitizePlan(course: PlannerCourse, candidate: unknown): RacePla
   const remembered = (typeof candidate === "object" && candidate !== null ? candidate : {}) as Partial<Record<keyof RacePlan, unknown>>;
   const edition = course.editions.find((known) => known.edition === remembered.edition) ?? latestEdition(course);
   const ownStartLocal = typeof remembered.ownStartLocal === "string" ? parseStartTime(remembered.ownStartLocal) : null;
-  // A wave can be planned with if it has a published start time, or the runner has given their own.
-  const wave = edition.waves.find((known) => known.id === remembered.waveId && (hasStartTime(known) || ownStartLocal !== null)) ?? firstWaveWithStartTime(edition);
+  // The wave underneath a plan is one with a published start time — the first, unless a plan from
+  // before D64 named another that has one. Nobody picks a wave any more: a remembered plan on a
+  // wave with no published time, which the old picker allowed with an own start time typed for
+  // it, moves to the first timed wave and keeps the runner's own time, so that the plan sheet's
+  // line about the organizer's first start is never false.
+  const wave = edition.waves.find((known) => known.id === remembered.waveId && hasStartTime(known)) ?? firstWaveWithStartTime(edition);
   return {
     courseId: course.courseId,
     edition: edition.edition,
