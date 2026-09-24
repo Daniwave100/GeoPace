@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
-import { createRide, type Frames, type Ride, RIDE_CAMERAS, RIDE_SPEEDS, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
+import { createRide, type Frames, type Ride, RIDE_CAMERAS, RIDE_SPEEDS, type RideCourse, cruiseKmPerS } from "../src/core/ride";
 import { rideCourseFor } from "../src/core/ride-view";
 import { stopsFor } from "../src/core/stops";
 
@@ -75,7 +75,7 @@ describe("the Ride's time-lapse", () => {
         secondsUntilItStops();
         const steps = moves.slice(1).map((km, i) => km - moves[i]);
         // Every frame covers the same ground, until the last two seconds, where it comes to rest at the finish.
-        const perFrame = rideSpeedKmPerS(camera) / 60;
+        const perFrame = cruiseKmPerS(camera) / 60;
         const beforeTheFinish = steps.slice(0, -120);
         expect(beforeTheFinish.length, `${camera}, ${course.lengthKm} km`).toBeGreaterThan(80 * 60 - 180);
         beforeTheFinish.forEach((step, i) => expect(step, `${camera}, frame ${i}, km ${moves[i + 1].toFixed(3)}`).toBeCloseTo(perFrame, 9));
@@ -86,14 +86,14 @@ describe("the Ride's time-lapse", () => {
   it("from above, takes the open road at under half a kilometre a second: the owner's pick, a little slower than it was first built", () => {
     // Issue #24, after riding both courses: "slow down how fast it's going. Not too much, but just a
     // little bit." It was 550 m of course a second. Still quick enough that the course is a few minutes.
-    expect(rideSpeedKmPerS("from-above")).toBeLessThan(0.5);
-    expect(rideSpeedKmPerS("from-above")).toBeGreaterThan(0.4);
+    expect(cruiseKmPerS("from-above")).toBeLessThan(0.5);
+    expect(cruiseKmPerS("from-above")).toBeGreaterThan(0.4);
   });
 
   it("on the road, rides at the pace it used to keep only on the open road: 120 m a second, the whole course in about six minutes", () => {
     // The owner, 09-24: "the speed its at can be the basis". It used to take ten to twelve minutes,
     // almost half of it braking into corners and crawling past Stops.
-    expect(rideSpeedKmPerS("on-the-road")).toBeCloseTo(0.12, 9);
+    expect(cruiseKmPerS("on-the-road")).toBeCloseTo(0.12, 9);
     for (const course of [nyc, berlin]) {
       const { ride, secondsUntilItStops } = rideOn(course);
       ride.useCamera("on-the-road");
@@ -466,7 +466,7 @@ describe("with reduced motion asked for", () => {
 
 describe("the Ride's two cameras", () => {
   it("make On the road a gentler time-lapse than From above: several times as long over the whole course", () => {
-    expect(rideSpeedKmPerS("on-the-road")).toBeLessThan(rideSpeedKmPerS("from-above") / 3);
+    expect(cruiseKmPerS("on-the-road")).toBeLessThan(cruiseKmPerS("from-above") / 3);
     for (const course of [nyc, berlin]) {
       const onTheRoad = rideOn(course);
       onTheRoad.ride.useCamera("on-the-road");
@@ -615,7 +615,7 @@ describe("free look", () => {
 
     expect(ride.playing).toBe(true);
     expect(ride.camera).toBe("on-the-road"); // the time-lapse is the one it was entered from
-    expect(ride.km - before).toBeCloseTo(rideSpeedKmPerS("on-the-road"), 2);
+    expect(ride.km - before).toBeCloseTo(cruiseKmPerS("on-the-road"), 2);
   });
 
   it("is given back to the Ride by choosing a camera, the one the Ride is already on included", () => {
@@ -740,7 +740,7 @@ describe("straight down in the Ride", () => {
     run(1);
 
     expect(ride.camera).toBe("on-the-road");
-    expect(ride.km - before).toBeCloseTo(rideSpeedKmPerS("on-the-road"), 6);
+    expect(ride.km - before).toBeCloseTo(cruiseKmPerS("on-the-road"), 6);
   });
 
   it("is left for the tilted view by choosing a camera, the one the Ride is already on included", () => {
@@ -803,7 +803,7 @@ describe("the Ride's speed", () => {
         const before = ride.km;
         run(1);
 
-        expect(ride.km - before, `${camera} at ${times}×`).toBeCloseTo(rideSpeedKmPerS(camera) * times, 6);
+        expect(ride.km - before, `${camera} at ${times}×`).toBeCloseTo(cruiseKmPerS(camera) * times, 6);
       }
     }
   });
@@ -835,12 +835,14 @@ describe("the Ride's speed", () => {
     expect(changes()).toBe(told + 1);
   });
 
-  it("keeps to the speeds the player offers: never slower than ¼×, never faster than 4×", () => {
+  it("keeps to the speeds the player offers, the nearest of them: never slower than ¼×, never faster than 4×", () => {
     const { ride } = rideOn(nyc);
     ride.useSpeed(100);
     expect(ride.speed).toBe(4);
     ride.useSpeed(0);
     expect(ride.speed).toBe(0.25);
+    ride.useSpeed(1.2); // between two steps: the slider has no place to show it
+    expect(ride.speed).toBe(1);
     expect(RIDE_SPEEDS[0]).toBe(0.25);
     expect(RIDE_SPEEDS[RIDE_SPEEDS.length - 1]).toBe(4);
   });

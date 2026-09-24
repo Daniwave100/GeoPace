@@ -112,15 +112,13 @@ async function runStart(): Promise<{ before: string; event: RegExpMatchArray | n
   const command = ([] as string[]).concat(shell.params.message ?? []).join(" && ");
   const pattern = asPinokioReadsIt(shell.params.on![0].event);
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== "NODE_ENV" && !name.startsWith("VITEST")));
-  const child = spawn(command, { cwd: resolve(REPO, shell.params.path ?? "."), env: { ...env, FORCE_COLOR: "1" }, shell: true, detached: process.platform !== "win32" });
+  // In the test run's own process group, so that a run stopped half-way stops this Vite too: left
+  // behind, it would hold 5173 and send the next `npm run dev` to 5174 (PLAN.md D66).
+  const child = spawn(command, { cwd: resolve(REPO, shell.params.path ?? "."), env: { ...env, FORCE_COLOR: "1" }, shell: true });
   const stop = () => {
-    if (child.pid === undefined) return;
-    try {
-      if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
-      else process.kill(-child.pid, "SIGTERM"); // the whole group: npm, and the Vite it started
-    } catch {
-      // already gone
-    }
+    if (child.pid === undefined || child.exitCode !== null) return;
+    if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
+    else child.kill("SIGTERM"); // npm passes it on to the Vite it started
   };
   let output = "";
   let giveUp: ReturnType<typeof setTimeout> | undefined;
@@ -133,6 +131,7 @@ async function runStart(): Promise<{ before: string; event: RegExpMatchArray | n
     child.stdout.on("data", read);
     child.stderr.on("data", read);
     child.on("exit", () => settle(null));
+    child.on("error", () => settle(null)); // no shell, or no npm: the pattern never matches, and the test says what it saw
     giveUp = setTimeout(() => settle(null), 20_000);
   });
   clearTimeout(giveUp);

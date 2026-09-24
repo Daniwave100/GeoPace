@@ -5,7 +5,7 @@
 // focused, keys for the same things. Dragging, scrolling and Ctrl + drag to tilt are CesiumJS's own.
 import type { Viewer } from "cesium";
 import { html } from "../dom";
-import { isLookingStraightDown, panMap, zoomMap } from "../scene/globe";
+import { panMap, zoomMap } from "../scene/globe";
 
 /** Said by a screen reader on the map, and printed in the small print under the strip. */
 export const MAP_HELP =
@@ -22,6 +22,8 @@ export interface MapActions {
   whereIAm(): void;
   /** Straight down, or back to tilted: in the Ride the Ride's own camera, still following the runner (PLAN.md D67); in Explore the map, which gives way first. */
   straightDown(): void;
+  /** Whether it looks straight down now, so the button offers the other way: the one answer both what the button says and what it does are read from. */
+  looksStraightDown(): boolean;
   fullMap(): void;
 }
 
@@ -29,10 +31,10 @@ export interface MapControls {
   /** Whether the map has the full screen, so the button can say how to get back. */
   showFullMap(on: boolean): void;
   /**
-   * Whether the Ride is looking straight down, so the button says the other way: the camera is
-   * still gliding there when it is told, and in a Ride that plays it never stops to be read.
+   * Say again which way the Straight down button goes: in a Ride that plays the camera never stops
+   * moving, so the end of a move, which says it otherwise, never comes.
    */
-  showStraightDown(on: boolean): void;
+  showStraightDown(): void;
 }
 
 export function createMapControls(container: HTMLElement, map: HTMLElement, viewer: Viewer, actions: MapActions): MapControls {
@@ -57,14 +59,13 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
   fullMap.setAttribute("aria-pressed", "false");
   container.replaceChildren(zoomIn, zoomOut, whole, whereIAm, straightDown, fullMap);
 
-  // The runner can tilt the map by hand too, so the button reads the camera rather than remembering.
-  const showStraightDown = (on: boolean) => {
-    const text = on ? "Tilted" : "Straight down";
+  // The runner can tilt the map by hand too, so the button asks rather than remembering.
+  const showStraightDown = () => {
+    const text = actions.looksStraightDown() ? "Tilted" : "Straight down";
     if (straightDown.textContent !== text) straightDown.textContent = text;
   };
-  const showTilt = () => showStraightDown(isLookingStraightDown(viewer));
-  viewer.camera.moveEnd.addEventListener(showTilt);
-  showTilt();
+  viewer.camera.moveEnd.addEventListener(showStraightDown);
+  showStraightDown();
 
   map.tabIndex = 0;
   map.setAttribute("role", "application");

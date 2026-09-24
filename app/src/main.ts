@@ -40,7 +40,7 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isFlying, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isFlying, isLookingStraightDown, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
 import { keepTheMapInTheVicinity } from "./scene/map-bounds";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
@@ -64,7 +64,7 @@ interface Showing {
   screen: OnScreen;
   /** The strip's own row, there whatever the layers are doing. */
   baseRow: StripRow;
-  /** The places the Ride slows down for, which the strip names along its top (core/stops.ts). */
+  /** The places the Ride names, rides to and goes back to, which the strip names along its top (core/stops.ts). */
   stops: Stop[];
   /** What the Ride's camera needs of the course: the course line and the Stops. */
   rideScene: RideScene;
@@ -240,6 +240,7 @@ async function show(courseId: string): Promise<void> {
       wholeCourse: () => frameWholeCourse(flightSeconds()),
       whereIAm: goToRunner,
       straightDown: () => lookStraightDown(map),
+      looksStraightDown: () => looksStraightDown(map),
       fullMap: () => useFullMap(!fullMap),
     });
     whiteModel = createWhiteModel(map);
@@ -561,8 +562,8 @@ function showRideControls(): void {
     canGoBack: around.back !== null,
     canRideOn: around.next !== null,
   });
-  // In the Ride the map's Straight down button says what the Ride's camera does; outside it, what the map's does (map-controls.ts).
-  if (ride.on) mapControls?.showStraightDown(ride.straightDown);
+  // In a Ride that plays the camera never comes to rest, and resting is when the button reads it (map-controls.ts).
+  if (ride.on) mapControls?.showStraightDown();
 }
 
 /**
@@ -595,12 +596,28 @@ function followTheRide(how: HowItMoved): void {
  */
 function lookStraightDown(map: Viewer): void {
   const ride = showing?.ride;
-  if (ride?.on) {
-    ride.lookStraightDown(!ride.straightDown);
+  if (!ride?.on) {
+    takeTheMap();
+    toggleStraightDown(map, flightSeconds());
     return;
   }
-  takeTheMap();
-  toggleStraightDown(map, flightSeconds());
+  const ridesTheCamera = rideCamera?.holdsTheCamera() ?? false;
+  const wasStraightDown = ride.straightDown;
+  ride.lookStraightDown(!looksStraightDown(map));
+  // The map's other buttons had let the camera go, and the Ride already looks the way asked for:
+  // it has nothing new to say, and the camera goes back to following the runner all the same.
+  if (!ridesTheCamera && ride.straightDown === wasStraightDown) followTheRide("jump");
+}
+
+/**
+ * Whether the map looks straight down, as the Straight down button needs it: what it says and what
+ * it does are both read from this. While the Ride has the camera (free look included), the Ride's
+ * own way of looking, since the camera may still be gliding there; once the map's other buttons
+ * have let it go, what is on the screen. Read from two places, the button disagreed with itself.
+ */
+function looksStraightDown(map: Viewer): boolean {
+  const ride = showing?.ride;
+  return ride?.on && rideCamera?.holdsTheCamera() ? ride.straightDown : isLookingStraightDown(map);
 }
 
 /**

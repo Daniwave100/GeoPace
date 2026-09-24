@@ -38,7 +38,7 @@ A named, sourced place on the course.
 _Avoid_: point of interest, marker
 
 **Stop**:
-A place the Ride names as it goes by, and can ride to or go back to: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). On the road the Ride slows down for it, and for a stretch arrives where it begins and stays slow to where it ends; From above it keeps its one pace.
+A place the Ride names as it goes by, and can ride to or go back to: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). The Ride keeps its one pace through it, on either camera (D67).
 _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 
 ### The runner's plan

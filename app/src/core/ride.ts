@@ -64,8 +64,8 @@ const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
   "on-the-road": { cruiseKmPerS: 0.12, brakingKmPerS2: 0.06 },
 };
 
-/** How much course goes by in a second of the Ride on a camera: the same everywhere on the course. */
-export function rideSpeedKmPerS(camera: RideCamera): number {
+/** The camera's cruise (CONTEXT.md): how much course goes by in a second of the Ride on it at 1×, the same everywhere on the course. */
+export function cruiseKmPerS(camera: RideCamera): number {
   return TIME_LAPSE[camera].cruiseKmPerS;
 }
 
@@ -155,7 +155,7 @@ export interface Ride {
   lookStraightDown(straightDown: boolean): void;
   /** Switch cameras, in the middle of the Ride or not, and hand the camera back if it was the runner's, tilted. The time-lapse follows: gentler On the road. */
   useCamera(camera: RideCamera): void;
-  /** Play faster or slower, from ¼× to 4× (`RIDE_SPEEDS`), in the middle of the Ride or not. It doesn't pause the Ride. */
+  /** Play faster or slower: the nearest of `RIDE_SPEEDS`, ¼× to 4×, in the middle of the Ride or not. It doesn't pause the Ride. */
   useSpeed(times: number): void;
   /** Back to Explore: the Ride stops where it is. */
   leave(): void;
@@ -213,7 +213,7 @@ export function createRide(options: RideOptions): Ride {
     const endKm = Math.min(untilKm ?? course.lengthKm, course.lengthKm);
     // At any speed the runner picks, the whole Ride plays that many times faster, the braking to
     // rest included: it brakes over the same last stretch of road, in less time.
-    const kmPerS = speed * Math.min(rideSpeedKmPerS(camera), speedToComeToRestKmPerS(endKm - km, camera));
+    const kmPerS = speed * Math.min(cruiseKmPerS(camera), speedToComeToRestKmPerS(endKm - km, camera));
     if (seconds > 0) moveTo(Math.min(km + kmPerS * seconds, endKm), "riding");
     if (km >= endKm) setPlaying(false);
     else waitingFor = frames.request(onFrame);
@@ -337,7 +337,8 @@ export function createRide(options: RideOptions): Ride {
       options.onChange();
     },
     useSpeed(times) {
-      const next = clamp(times, RIDE_SPEEDS[0], RIDE_SPEEDS[RIDE_SPEEDS.length - 1]);
+      // Always one of the player's own steps: the nearest, so the slider can always show where it is.
+      const next = RIDE_SPEEDS.reduce((nearest, step) => (Math.abs(step - times) < Math.abs(nearest - times) ? step : nearest));
       if (next === speed) return;
       speed = next;
       options.onChange();

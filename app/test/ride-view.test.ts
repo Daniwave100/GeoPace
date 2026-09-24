@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import type { CourseLine } from "../src/bundle/types";
 import { relativeBearing } from "../src/core/bearing";
-import { type RideCamera, rideSpeedKmPerS } from "../src/core/ride";
+import { type RideCamera, cruiseKmPerS } from "../src/core/ride";
 import { FROM_ABOVE_RANGE_M, ON_THE_ROAD_HEIGHT_M, ON_THE_ROAD_LOOK_UP_DEG, type RideScene, rideView, runnerInTheScene, straightDownView } from "../src/core/ride-view";
 import { M_PER_FOOT } from "../src/core/units";
 import { positionAtKm } from "../src/core/scrub";
@@ -83,7 +83,7 @@ function distanceM(runner: { lat: number; lon: number; ellipsoidHeightM: number 
  * of either course is excused: what keeps the view from whipping round is the camera's own facing.
  */
 function fastestSwing(scene: RideScene, camera: RideCamera): { degPerS: number; km: number } {
-  const pace = rideSpeedKmPerS(camera);
+  const pace = cruiseKmPerS(camera);
   let fastest = { degPerS: 0, km: 0 };
   let last = rideView(scene, 0, camera).headingDeg;
   for (let m = 1; m <= scene.line.length_m; m += 1) {
