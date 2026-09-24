@@ -242,6 +242,19 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
 }
 
 /**
+ * Straight down in the Ride (PLAN.md D67): the map's own Straight down, north up like a paper map,
+ * but following the runner. It looks down on them from as far off as From above keeps, whichever
+ * camera the Ride is on: On the road's 250 ft would show a few city blocks at most. With the
+ * camera moved to its own left, which north up is west, the runner is as far right of the middle
+ * as was asked for (the readout block covers the left of the map).
+ */
+export function straightDownView(scene: RideScene, km: number, options: RideViewOptions = {}): RideView {
+  const runner = runnerInTheScene(scene, km, options);
+  const eye = moved(runner, 270, FROM_ABOVE.rangeM * (options.leftOfRunner ?? 0));
+  return { eye: { ...eye, heightM: runner.heightM + FROM_ABOVE.rangeM }, headingDeg: 0, pitchDeg: -90 };
+}
+
+/**
  * The place on the course line at `km`, carried straight on past either end: behind the start
  * line there is no course to stand on, and the camera still has to be behind the runner.
  */

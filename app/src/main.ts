@@ -12,7 +12,7 @@ import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type Ra
 import { formatElapsed } from "./core/race-clock";
 import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera } from "./core/ride";
 import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
-import { rideCourseFor, type RideScene, rideView, runnerInTheScene } from "./core/ride-view";
+import { rideCourseFor, type RideScene, rideView, runnerInTheScene, straightDownView } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
@@ -233,7 +233,7 @@ async function show(courseId: string): Promise<void> {
       takesTheMap: takeTheMap,
       wholeCourse: () => frameWholeCourse(flightSeconds()),
       whereIAm: goToRunner,
-      straightDown: () => toggleStraightDown(map, flightSeconds()),
+      straightDown: () => lookStraightDown(map),
       fullMap: () => useFullMap(!fullMap),
     });
     whiteModel = createWhiteModel(map);
@@ -553,6 +553,8 @@ function showRideControls(): void {
     canGoBack: around.back !== null,
     canRideOn: around.next !== null,
   });
+  // In the Ride the map's Straight down button says what the Ride's camera does; outside it, what the map's does (map-controls.ts).
+  if (ride.on) mapControls?.showStraightDown(ride.straightDown);
 }
 
 /**
@@ -571,7 +573,26 @@ function followTheRide(how: HowItMoved): void {
     rideCamera.lookAround(() => runnerInTheScene(riding.rideScene, riding.km, { heightAt: roadHeight() }));
     return;
   }
-  rideCamera.follow(() => rideView(riding.rideScene, riding.km, riding.ride.camera, { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) }), how);
+  rideCamera.follow(() => {
+    const options = { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) };
+    return riding.ride.straightDown ? straightDownView(riding.rideScene, riding.km, options) : rideView(riding.rideScene, riding.km, riding.ride.camera, options);
+  }, how);
+}
+
+/**
+ * The map's Straight down and Tilted. In the Ride they are a way of following the runner: the
+ * Ride's own camera looks straight down on them, north up, or tilted again, and the Ride plays on
+ * (PLAN.md D67; the owner, 09-24: "When I click straight down, it doesnt follow the person/dot").
+ * In Explore the map is the map: it tips over where it is, and a glide under way gives way first.
+ */
+function lookStraightDown(map: Viewer): void {
+  const ride = showing?.ride;
+  if (ride?.on) {
+    ride.lookStraightDown(!ride.straightDown);
+    return;
+  }
+  takeTheMap();
+  toggleStraightDown(map, flightSeconds());
 }
 
 /**

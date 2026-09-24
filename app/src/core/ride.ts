@@ -108,6 +108,12 @@ export interface Ride {
    * time-lapse the Ride keeps, and the one it goes back to.
    */
   readonly freeLook: boolean;
+  /**
+   * Whether the Ride's camera looks straight down on the runner, north up, like a paper map,
+   * rather than tilted (PLAN.md D67). It follows the runner either way, at the pace of the camera
+   * the Ride is on.
+   */
+  readonly straightDown: boolean;
   /** Play, or pause: what the button and the space bar do. Played, the Ride goes straight through to the finish. */
   playPause(): void;
   /** Pause, if it is playing: what the map's own buttons and keys do, and the plan and the photoreal panel opening over it. */
@@ -128,7 +134,13 @@ export interface Ride {
   lookAround(): void;
   /** Out of free look: the camera is the Ride's own again, the one it already had. What the map's own buttons do before they take it. */
   handTheCameraBack(): void;
-  /** Switch cameras, in the middle of the Ride or not, and hand the camera back if it was the runner's. The time-lapse follows: gentler On the road. */
+  /**
+   * The map's Straight down and Tilted, in the Ride: the camera goes on following the runner, from
+   * straight above or tilted, and the Ride plays on. Out of free look too: it is a way of looking
+   * the runner chose. In Explore it does nothing: there, the button is the map's own.
+   */
+  lookStraightDown(straightDown: boolean): void;
+  /** Switch cameras, in the middle of the Ride or not, and hand the camera back if it was the runner's, tilted. The time-lapse follows: gentler On the road. */
   useCamera(camera: RideCamera): void;
   /** Back to Explore: the Ride stops where it is. */
   leave(): void;
@@ -147,6 +159,7 @@ export function createRide(options: RideOptions): Ride {
   let playing = false;
   let camera: RideCamera = "from-above";
   let freeLook = false;
+  let straightDown = false;
   /** Where a Ride to the next stop ends; null while riding straight through. */
   let untilKm: number | null = null;
   let held = false;
@@ -230,6 +243,9 @@ export function createRide(options: RideOptions): Ride {
     get freeLook() {
       return freeLook;
     },
+    get straightDown() {
+      return straightDown;
+    },
     playPause() {
       // Played at the finish, it is the whole course again: there is nowhere further to ride.
       const fromTheStart = !playing && atTheFinish();
@@ -283,18 +299,26 @@ export function createRide(options: RideOptions): Ride {
       freeLook = false;
       options.onChange();
     },
+    lookStraightDown(next) {
+      if (!on || (straightDown === next && !freeLook)) return;
+      straightDown = next;
+      freeLook = false;
+      options.onChange();
+    },
     useCamera(next) {
-      // Out of free look, the camera the Ride is already on is news even though nothing changes:
-      // the player's own way back is "Go back to cinematic", and this is the same landing.
-      if (camera === next && !freeLook) return;
+      // Out of free look, or straight down, the camera the Ride is already on is news even though
+      // it is the same camera: the player's own way back is "Go back to cinematic", and this is the same landing.
+      if (camera === next && !freeLook && !straightDown) return;
       camera = next;
       freeLook = false;
+      straightDown = false;
       options.onChange();
     },
     leave() {
       if (!on) return;
       on = false;
-      freeLook = false; // the camera is the map's own again, and the next Ride begins on the Ride's
+      freeLook = false; // the camera is the map's own again, and the next Ride begins on the Ride's, tilted
+      straightDown = false;
       if (playing) setPlaying(false);
       else options.onChange();
     },

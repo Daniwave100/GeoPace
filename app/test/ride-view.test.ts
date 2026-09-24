@@ -8,7 +8,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import type { CourseLine } from "../src/bundle/types";
 import { relativeBearing } from "../src/core/bearing";
 import { type RideCamera, rideSpeedKmPerS } from "../src/core/ride";
-import { ON_THE_ROAD_HEIGHT_M, ON_THE_ROAD_LOOK_UP_DEG, type RideScene, rideView, runnerInTheScene } from "../src/core/ride-view";
+import { FROM_ABOVE_RANGE_M, ON_THE_ROAD_HEIGHT_M, ON_THE_ROAD_LOOK_UP_DEG, type RideScene, rideView, runnerInTheScene, straightDownView } from "../src/core/ride-view";
 import { M_PER_FOOT } from "../src/core/units";
 import { positionAtKm } from "../src/core/scrub";
 import { stopsFor } from "../src/core/stops";
@@ -374,6 +374,41 @@ describe("From above", () => {
       const swing = fastestSwing(scene, "from-above");
       expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(21);
     }
+  });
+});
+
+// Straight down in the Ride (PLAN.md D67): the map's own way of looking, following the runner.
+describe("straight down in the Ride", () => {
+  it("looks straight down on the runner, north up, from as far off as From above keeps, wherever they are", () => {
+    for (const scene of [cornerCourse(), nyc, berlin]) {
+      for (const km of [0, 1, 2.5, scene.line.length_m / 2000, scene.line.length_m / 1000]) {
+        const view = straightDownView(scene, km);
+        const runner = positionAtKm(scene.line, km);
+        const off = metersFrom(runner, view.eye);
+
+        expect(Math.hypot(off.north, off.east), `km ${km}`).toBeLessThan(0.5);
+        expect(view.eye.heightM - runnerInTheScene(scene, km).heightM, `km ${km}`).toBeCloseTo(FROM_ABOVE_RANGE_M, 6);
+        expect(view.headingDeg).toBe(0);
+        expect(view.pitchDeg).toBe(-90);
+      }
+    }
+  });
+
+  it("can look to the runner's left, so the runner lands in the part of the map the readout block leaves clear", () => {
+    const scene = cornerCourse();
+    const centred = straightDownView(scene, 1);
+    const shifted = straightDownView(scene, 1, { leftOfRunner: 0.1 });
+
+    // North up, the camera's left is west: it moves a tenth of its height that way, and turns nowhere.
+    const moved = metersFrom(centred.eye, shifted.eye);
+    expect(moved.east).toBeCloseTo(-0.1 * FROM_ABOVE_RANGE_M, 0);
+    expect(Math.abs(moved.north)).toBeLessThan(0.5);
+    expect(shifted.eye.heightM).toBeCloseTo(centred.eye.heightM, 9);
+    expect(shifted.pitchDeg).toBe(-90);
+  });
+
+  it("takes the road's height from whoever is asked for it: on the keyless map, the open terrain", () => {
+    expect(straightDownView(cornerCourse(), 1, { heightAt: () => 12 }).eye.heightM).toBeCloseTo(12 + FROM_ABOVE_RANGE_M, 6);
   });
 });
 

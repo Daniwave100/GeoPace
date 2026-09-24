@@ -693,3 +693,92 @@ describe("free look", () => {
     expect(ride.freeLook).toBe(false);
   });
 });
+
+// The owner, 09-24: "straight down and tilted camera modes are broken. When I click straight down,
+// it doesnt follow the person/dot. It stays in place." The map's Straight down used to take the
+// map from the Ride, like its other buttons: the Ride paused and the camera was let go where it
+// was. In the Ride it is now a way of following the runner, and the Ride plays on (PLAN.md D67).
+describe("straight down in the Ride", () => {
+  it("is off until it is asked for, and asked for in Explore does nothing: there the button is the map's own", () => {
+    const { ride, changes } = rideOn(nyc);
+    expect(ride.straightDown).toBe(false);
+
+    ride.lookStraightDown(true);
+
+    expect(ride.straightDown).toBe(false);
+    expect(changes()).toBe(0);
+  });
+
+  it("comes and goes in the middle of the Ride without pausing it, and tells the controls each time", () => {
+    const { ride, run, changes } = rideOn(nyc);
+    ride.playPause();
+    run(1);
+    const told = changes();
+
+    ride.lookStraightDown(true);
+    run(1);
+    expect(ride.straightDown).toBe(true);
+    expect(ride.playing).toBe(true);
+    expect(changes()).toBe(told + 1);
+    ride.lookStraightDown(true); // pressed again it is already there: nothing new to tell
+    expect(changes()).toBe(told + 1);
+
+    ride.lookStraightDown(false); // Tilted
+    expect(ride.straightDown).toBe(false);
+    expect(ride.playing).toBe(true);
+    expect(changes()).toBe(told + 2);
+  });
+
+  it("keeps the pace of the camera the Ride is on", () => {
+    const { ride, run } = rideOn(nyc);
+    ride.useCamera("on-the-road");
+    ride.scrubbedTo(5);
+    ride.playPause();
+    ride.lookStraightDown(true);
+    run(1);
+    const before = ride.km;
+    run(1);
+
+    expect(ride.camera).toBe("on-the-road");
+    expect(ride.km - before).toBeCloseTo(rideSpeedKmPerS("on-the-road"), 6);
+  });
+
+  it("is left for the tilted view by choosing a camera, the one the Ride is already on included", () => {
+    for (const camera of RIDE_CAMERAS) {
+      const { ride } = rideOn(nyc);
+      ride.playPause();
+      ride.lookStraightDown(true);
+
+      ride.useCamera(camera);
+
+      expect(ride.straightDown).toBe(false);
+      expect(ride.camera).toBe(camera);
+    }
+  });
+
+  it("takes the camera back from free look, and free look entered while straight down goes back to it", () => {
+    const { ride } = rideOn(nyc);
+    ride.playPause();
+    ride.lookAround();
+
+    ride.lookStraightDown(true);
+    expect(ride.freeLook).toBe(false);
+    expect(ride.straightDown).toBe(true);
+
+    ride.lookAround();
+    ride.handTheCameraBack();
+    expect(ride.straightDown).toBe(true);
+  });
+
+  it("is over when the runner leaves the Ride: the next Ride starts tilted", () => {
+    const { ride } = rideOn(nyc);
+    ride.playPause();
+    ride.lookStraightDown(true);
+
+    ride.leave();
+
+    expect(ride.straightDown).toBe(false);
+    ride.playPause();
+    expect(ride.straightDown).toBe(false);
+  });
+});
