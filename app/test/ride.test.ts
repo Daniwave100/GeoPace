@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
-import { createRide, type Frames, type Ride, RIDE_CAMERAS, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
+import { createRide, type Frames, type Ride, RIDE_CAMERAS, RIDE_SPEEDS, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
 import { rideCourseFor } from "../src/core/ride-view";
 import { stopsFor } from "../src/core/stops";
 
@@ -780,5 +780,95 @@ describe("straight down in the Ride", () => {
     expect(ride.straightDown).toBe(false);
     ride.playPause();
     expect(ride.straightDown).toBe(false);
+  });
+});
+
+// The owner, 09-24: "a slider to increase how fast it plays. Right now the speed its at can be the
+// basis but i should be able to slow it down or speed it up." (PLAN.md D67)
+describe("the Ride's speed", () => {
+  it("is the time-lapse's own pace until the runner asks otherwise: 1×", () => {
+    expect(rideOn(nyc).ride.speed).toBe(1);
+    expect(RIDE_SPEEDS).toContain(1);
+  });
+
+  it("covers twice the ground in a second at 2×, and half at ½×, on either camera", () => {
+    for (const camera of RIDE_CAMERAS) {
+      for (const times of [2, 0.5]) {
+        const { ride, run } = rideOn(nyc);
+        ride.useCamera(camera);
+        ride.useSpeed(times);
+        ride.scrubbedTo(5);
+        ride.playPause();
+        run(1);
+        const before = ride.km;
+        run(1);
+
+        expect(ride.km - before, `${camera} at ${times}×`).toBeCloseTo(rideSpeedKmPerS(camera) * times, 6);
+      }
+    }
+  });
+
+  it("rides the whole course in half the time at 2×, and still comes to rest on the finish", () => {
+    const atOne = rideOn(berlin);
+    atOne.ride.playPause();
+    const secondsAtOne = atOne.secondsUntilItStops();
+    const atTwo = rideOn(berlin);
+    atTwo.ride.useSpeed(2);
+    atTwo.ride.playPause();
+    const secondsAtTwo = atTwo.secondsUntilItStops();
+
+    expect(atTwo.ride.km).toBe(berlin.lengthKm);
+    expect(Math.abs(secondsAtTwo - secondsAtOne / 2)).toBeLessThanOrEqual(1);
+  });
+
+  it("changes in the middle of the Ride without pausing it, and tells the controls when it changes", () => {
+    const { ride, run, changes } = rideOn(nyc);
+    ride.playPause();
+    run(1);
+    const told = changes();
+
+    ride.useSpeed(3);
+    expect(ride.speed).toBe(3);
+    expect(ride.playing).toBe(true);
+    expect(changes()).toBe(told + 1);
+    ride.useSpeed(3); // the same again: nothing new to tell
+    expect(changes()).toBe(told + 1);
+  });
+
+  it("keeps to the speeds the player offers: never slower than ¼×, never faster than 4×", () => {
+    const { ride } = rideOn(nyc);
+    ride.useSpeed(100);
+    expect(ride.speed).toBe(4);
+    ride.useSpeed(0);
+    expect(ride.speed).toBe(0.25);
+    expect(RIDE_SPEEDS[0]).toBe(0.25);
+    expect(RIDE_SPEEDS[RIDE_SPEEDS.length - 1]).toBe(4);
+  });
+
+  it("stays through a switch of camera, a pause, Back and leaving the Ride: it is the runner's choice", () => {
+    const { ride } = rideOn(nyc);
+    ride.useSpeed(2);
+    ride.playPause();
+    ride.useCamera("on-the-road");
+    ride.pause();
+    ride.scrubbedTo(20);
+    ride.back();
+    ride.leave();
+    ride.playPause();
+
+    expect(ride.speed).toBe(2);
+  });
+
+  it("with reduced motion, gives each Stop its few seconds divided by the speed", () => {
+    const { ride, moves, run } = rideOn(berlin, { reducedMotion: true });
+    ride.useSpeed(2);
+    ride.playPause();
+    run(0.1); // at once at the first Stop after the start
+    expect(moves).toHaveLength(1);
+
+    run(1.7); // at 1× it stands four seconds at each Stop; at 2×, two
+    expect(moves).toHaveLength(1);
+    run(0.4);
+    expect(moves).toHaveLength(2);
   });
 });

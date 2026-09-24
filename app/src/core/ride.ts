@@ -29,6 +29,14 @@ interface TimeLapse {
   brakingKmPerS2: number;
 }
 
+/**
+ * How many times its own pace the runner may have the time-lapse play (PLAN.md D67). The owner,
+ * 09-24: "a slider to increase how fast it plays. Right now the speed its at can be the basis but
+ * i should be able to slow it down or speed it up." 1 is the pace as built; the rest are the steps
+ * a video player offers, and on to 4×, at which the course on the road is a minute and a half.
+ */
+export const RIDE_SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+
 /** About 5:30 a kilometre: the time-lapse is never slower than the race it is a time-lapse of. */
 const THE_PACE_OF_THE_RUN_KM_PER_S = 0.003;
 
@@ -114,6 +122,11 @@ export interface Ride {
    * the Ride is on.
    */
   readonly straightDown: boolean;
+  /**
+   * How many times its own pace the time-lapse plays, on either camera: 1 until the runner picks
+   * another (`RIDE_SPEEDS`). The runner's choice: it stays through a switch of camera and after the Ride is left.
+   */
+  readonly speed: number;
   /** Play, or pause: what the button and the space bar do. Played, the Ride goes straight through to the finish. */
   playPause(): void;
   /** Pause, if it is playing: what the map's own buttons and keys do, and the plan and the photoreal panel opening over it. */
@@ -142,6 +155,8 @@ export interface Ride {
   lookStraightDown(straightDown: boolean): void;
   /** Switch cameras, in the middle of the Ride or not, and hand the camera back if it was the runner's, tilted. The time-lapse follows: gentler On the road. */
   useCamera(camera: RideCamera): void;
+  /** Play faster or slower, from ¼× to 4× (`RIDE_SPEEDS`), in the middle of the Ride or not. It doesn't pause the Ride. */
+  useSpeed(times: number): void;
   /** Back to Explore: the Ride stops where it is. */
   leave(): void;
 }
@@ -160,6 +175,7 @@ export function createRide(options: RideOptions): Ride {
   let camera: RideCamera = "from-above";
   let freeLook = false;
   let straightDown = false;
+  let speed = 1;
   /** Where a Ride to the next stop ends; null while riding straight through. */
   let untilKm: number | null = null;
   let held = false;
@@ -182,8 +198,9 @@ export function createRide(options: RideOptions): Ride {
     }
     if (options.reducedMotion()) {
       // No continuous movement: the Ride stands at a Stop, then is at the next one. Standing is
-      // timed by the clock, not by capped frames: on a slow machine four seconds are still four.
-      stoodSeconds += sinceLastFrame;
+      // timed by the clock, not by capped frames: on a slow machine four seconds are still four. At
+      // 2× they are two: the speed is the runner's to pick, reduced motion or not.
+      stoodSeconds += sinceLastFrame * speed;
       const arrived = stoodSeconds >= SECONDS_AT_EACH_STOP;
       if (arrived) stepToNextStop();
       // A Ride to the next stop ends at that Stop, however it got there: reduced motion can be
@@ -194,8 +211,10 @@ export function createRide(options: RideOptions): Ride {
     }
     // A finish listed a hair past the end of the course line is still reached.
     const endKm = Math.min(untilKm ?? course.lengthKm, course.lengthKm);
-    const speed = Math.min(rideSpeedKmPerS(camera), speedToComeToRestKmPerS(endKm - km, camera));
-    if (seconds > 0) moveTo(Math.min(km + speed * seconds, endKm), "riding");
+    // At any speed the runner picks, the whole Ride plays that many times faster, the braking to
+    // rest included: it brakes over the same last stretch of road, in less time.
+    const kmPerS = speed * Math.min(rideSpeedKmPerS(camera), speedToComeToRestKmPerS(endKm - km, camera));
+    if (seconds > 0) moveTo(Math.min(km + kmPerS * seconds, endKm), "riding");
     if (km >= endKm) setPlaying(false);
     else waitingFor = frames.request(onFrame);
   };
@@ -245,6 +264,9 @@ export function createRide(options: RideOptions): Ride {
     },
     get straightDown() {
       return straightDown;
+    },
+    get speed() {
+      return speed;
     },
     playPause() {
       // Played at the finish, it is the whole course again: there is nowhere further to ride.
@@ -312,6 +334,12 @@ export function createRide(options: RideOptions): Ride {
       camera = next;
       freeLook = false;
       straightDown = false;
+      options.onChange();
+    },
+    useSpeed(times) {
+      const next = clamp(times, RIDE_SPEEDS[0], RIDE_SPEEDS[RIDE_SPEEDS.length - 1]);
+      if (next === speed) return;
+      speed = next;
       options.onChange();
     },
     leave() {

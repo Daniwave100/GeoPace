@@ -105,6 +105,8 @@ let fullMap = false;
 let placement: Placement = "draped";
 /** The camera the runner last chose for the Ride: kept from one course to the next. */
 let rideCameraChoice: RideCamera = "from-above";
+/** How fast the runner last chose to have the Ride play: kept from one course to the next, like the camera. */
+let rideSpeedChoice = 1;
 /** Whether the screen was in the Ride when its controls were last shown: leaving it gives the whole course back. */
 let wasRiding = false;
 /** Whether the Ride was playing then: a pause is not a jump, and the camera must not be told it is one. */
@@ -155,6 +157,10 @@ const rideControls = createRideControls(byId("ride"), {
     showing?.ride.useCamera(camera); // and out of free look: the camera is the Ride's again
   },
   handTheCameraBack: () => showing?.ride.handTheCameraBack(),
+  useSpeed: (times) => {
+    rideSpeedChoice = times;
+    showing?.ride.useSpeed(times);
+  },
   leave: () => showing?.ride.leave(),
 });
 const stripEdge = createStripEdge(byId("strip-edge"), {
@@ -517,6 +523,7 @@ function startRide(scene: RideScene): Ride {
     onChange: showRide,
   });
   ride.useCamera(rideCameraChoice);
+  ride.useSpeed(rideSpeedChoice);
   return ride;
 }
 
@@ -548,6 +555,7 @@ function showRideControls(): void {
     playing: ride.playing,
     camera: ride.camera,
     freeLook: ride.freeLook,
+    speed: ride.speed,
     stopLine: stopLine(stops, ride.km, units),
     arrivedAt: around.on === null ? null : stopLine(stops, stops[around.on].km, units),
     canGoBack: around.back !== null,
@@ -628,7 +636,7 @@ function watchForAHandOnTheMap(): void {
 /** What has the keyboard's focus, as far as the space bar cares (core/ride-keys.ts). */
 function focusIsOn(target: EventTarget | null): WhereThePressLands["focus"] {
   if (!(target instanceof Element)) return "page";
-  if (target.closest(".ride-play, .ride-start, .ride-cameras")) return "play";
+  if (target.closest(".ride-play, .ride-start, .ride-cameras, .ride-speed")) return "play";
   if (target.closest("button, input, select, textarea, summary, a[href]")) return "control";
   if (target.closest("#globe")) return "map";
   if (target.closest("#strip")) return "strip";

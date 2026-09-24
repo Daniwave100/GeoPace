@@ -523,6 +523,67 @@ input {
   cursor: pointer;
 }
 
+/* How fast the Ride plays (PLAN.md D67): the word, a rule to slide along, the number. The rule is
+   one of the poster's own and the handle a solid square of ink: no track, no rounding, no shadow. */
+.ride-speed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-stretch: 88%;
+  cursor: pointer;
+}
+
+.ride-speed-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  margin: 0;
+  background: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.ride-speed-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--ink);
+}
+
+.ride-speed-slider::-moz-range-track {
+  height: 2px;
+  background: var(--ink);
+}
+
+.ride-speed-slider::-webkit-slider-thumb {
+  width: 12px;
+  height: 20px;
+  margin-top: -9px;
+  background: var(--ink);
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+}
+
+.ride-speed-slider::-moz-range-thumb {
+  width: 12px;
+  height: 20px;
+  background: var(--ink);
+  border: 0;
+  border-radius: 0;
+}
+
+.ride-speed-slider:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ride-speed-value {
+  min-width: 2.8em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Rests on a carried-over start time, or isn't confirmed: greyed, never blended in with the rest. */
 .carried-over {
   color: var(--grey-text);
