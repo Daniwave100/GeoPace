@@ -4,11 +4,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
-import { createRide, cruising, type Frames, type Ride, type RideCourse, rideSpeedKmPerS } from "../src/core/ride";
+import { createRide, type Frames, type Ride, RIDE_CAMERAS, RIDE_SPEEDS, type RideCourse, cruiseKmPerS } from "../src/core/ride";
 import { rideCourseFor } from "../src/core/ride-view";
 import { stopsFor } from "../src/core/stops";
 
-/** The course exactly as the app hands it to the Ride: its Stops, and its turns. */
+/** The course exactly as the app hands it to the Ride: its length and its Stops. */
 const courseFor = (id: string): RideCourse => {
   const bundle = parseCourseBundle(JSON.parse(readFileSync(new URL(`../../data/derived/${id}/course-bundle.json`, import.meta.url), "utf8")), id);
   return rideCourseFor({ line: bundle.measured.course_line, stops: stopsFor(bundle), notMeasured: bundle.measured.elevation_not_measured });
@@ -62,31 +62,23 @@ function rideOn(course: RideCourse, options: { reducedMotion?: boolean } = {}) {
 }
 
 describe("the Ride's time-lapse", () => {
-  it("from above, keeps one pace from the start to the finish: it slows for no Stop, no climb and no turn", () => {
-    // The owner, after riding it (issue #24): "I don't like how it slows down on the turns slash
-    // stops, whatever it is. Just keep one smooth pace throughout." First built slowing to 80 m/s at
-    // every Stop, staying slow up each big climb, and easing off through sharp turns.
-    for (const course of [nyc, berlin]) {
-      const pace = rideSpeedKmPerS(course, 6, "from-above");
-      for (let km = 0; km <= course.lengthKm; km += 0.01) expect(rideSpeedKmPerS(course, km, "from-above"), `km ${km.toFixed(2)}`).toBe(pace);
-      for (const stop of course.stops) expect(rideSpeedKmPerS(course, stop.km, "from-above"), `the Stop at km ${stop.km}`).toBe(pace);
-    }
-  });
-
-  it("on the road, is slower at a Stop than anywhere between Stops, on both courses, every corner included", () => {
-    for (const camera of ["on-the-road"] as const) {
+  it("keeps one pace from the start to the finish on either camera: it slows for no Stop, no climb and no turn", () => {
+    // From above since the owner rode it (issue #24): "I don't like how it slows down on the turns
+    // slash stops… Just keep one smooth pace throughout." On the road since 09-24: "in turns,
+    // especially in new york, it takes forever and slows down which is weird." It used to slow to
+    // 12 m/s at every Stop and to as little as a tenth of its pace through a corner.
+    for (const camera of RIDE_CAMERAS) {
       for (const course of [nyc, berlin]) {
-        const atAStop = Math.max(...course.stops.map((stop) => rideSpeedKmPerS(course, stop.km, camera)));
-        let placesBetweenStops = 0;
-        for (let km = 0; km <= course.lengthKm; km += 0.01) {
-          if (course.stops.some((stop) => km > stop.km - 0.5 && km < (stop.toKm ?? stop.km) + 0.5)) continue; // near a Stop
-          placesBetweenStops += 1;
-          // The Ride eases off through a sharp turn, but never to a Stop's crawl: a street corner is not a Stop.
-          expect(rideSpeedKmPerS(course, km, camera), `${camera}, km ${km.toFixed(2)}`).toBeGreaterThan(atAStop);
-        }
-        expect(placesBetweenStops).toBeGreaterThan(1500); // most of the course is between Stops
-        // And on the open road it is several times as quick: Brooklyn's Fourth Avenue; Berlin between the Victory Column and Strausberger Platz.
-        expect(rideSpeedKmPerS(course, 6, camera)).toBeGreaterThan(atAStop * 3);
+        const { ride, moves, secondsUntilItStops } = rideOn(course);
+        ride.useCamera(camera);
+        ride.playPause();
+        secondsUntilItStops();
+        const steps = moves.slice(1).map((km, i) => km - moves[i]);
+        // Every frame covers the same ground, until the last two seconds, where it comes to rest at the finish.
+        const perFrame = cruiseKmPerS(camera) / 60;
+        const beforeTheFinish = steps.slice(0, -120);
+        expect(beforeTheFinish.length, `${camera}, ${course.lengthKm} km`).toBeGreaterThan(80 * 60 - 180);
+        beforeTheFinish.forEach((step, i) => expect(step, `${camera}, frame ${i}, km ${moves[i + 1].toFixed(3)}`).toBeCloseTo(perFrame, 9));
       }
     }
   });
@@ -94,78 +86,22 @@ describe("the Ride's time-lapse", () => {
   it("from above, takes the open road at under half a kilometre a second: the owner's pick, a little slower than it was first built", () => {
     // Issue #24, after riding both courses: "slow down how fast it's going. Not too much, but just a
     // little bit." It was 550 m of course a second. Still quick enough that the course is a few minutes.
+    expect(cruiseKmPerS("from-above")).toBeLessThan(0.5);
+    expect(cruiseKmPerS("from-above")).toBeGreaterThan(0.4);
+  });
+
+  it("on the road, rides at the pace it used to keep only on the open road: 120 m a second, the whole course in about six minutes", () => {
+    // The owner, 09-24: "the speed its at can be the basis". It used to take ten to twelve minutes,
+    // almost half of it braking into corners and crawling past Stops.
+    expect(cruiseKmPerS("on-the-road")).toBeCloseTo(0.12, 9);
     for (const course of [nyc, berlin]) {
-      const onTheOpenRoad = rideSpeedKmPerS(course, 6, "from-above");
-      expect(onTheOpenRoad).toBeLessThan(0.5);
-      expect(onTheOpenRoad).toBeGreaterThan(0.4);
+      const { ride, secondsUntilItStops } = rideOn(course);
+      ride.useCamera("on-the-road");
+      ride.playPause();
+      const seconds = secondsUntilItStops();
+      expect(seconds).toBeGreaterThan(5 * 60);
+      expect(seconds).toBeLessThan(7 * 60);
     }
-  });
-
-  it("never changes pace in a step: from one metre of either course to the next, how far into its cruise the Ride is barely moves", () => {
-    // The trap: a rule that holds the Ride back through a climb and lets go of it all at once at the
-    // top. When From above still took its height from the same number, the camera jumped 900 m in one frame.
-    for (const camera of ["from-above", "on-the-road"] as const) {
-      for (const course of [nyc, berlin]) {
-        let last = cruising(course, 0, camera);
-        for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
-          const now = cruising(course, m / 1000, camera);
-          expect(Math.abs(now - last), `${camera}, km ${(m / 1000).toFixed(3)}`).toBeLessThan(0.02);
-          last = now;
-        }
-      }
-    }
-  });
-
-  it("slows into a corner the way a vehicle does, and picks up again the same way: never a hard brake from one frame to the next", () => {
-    // The trap: a speed that is simply "what this place allows" drops from 120 to 25 m/s in a sixth
-    // of a second at every street corner. The Ride sees the corner coming.
-    for (const camera of ["from-above", "on-the-road"] as const) {
-      for (const course of [nyc, berlin]) {
-        let km = 0;
-        let worst = { ratio: 1, km: 0 };
-        while (km < course.lengthKm) {
-          const now = rideSpeedKmPerS(course, km, camera);
-          const next = Math.min(km + now / 60, course.lengthKm); // a frame later, sixty to the second
-          const ratio = Math.max(rideSpeedKmPerS(course, next, camera) / now, now / rideSpeedKmPerS(course, next, camera));
-          if (ratio > worst.ratio) worst = { ratio, km };
-          km = next === km ? course.lengthKm : next;
-        }
-        expect(worst.ratio, `${camera}, km ${worst.km.toFixed(3)}`).toBeLessThan(1.25);
-      }
-    }
-  });
-
-  it("on the road, stays slow through the whole of a stretch that is a Stop: up the Queensboro Bridge's climb, not only at its foot", () => {
-    const climb = nyc.stops.find((stop) => Math.abs(stop.km - 23.53) < 0.01);
-    expect(climb?.toKm).toBeCloseTo(24.81, 2);
-    for (const camera of ["on-the-road"] as const) {
-      const openRoad = rideSpeedKmPerS({ lengthKm: nyc.lengthKm, stops: nyc.stops }, 6, camera);
-      for (const km of [23.9, 24.2, 24.6]) {
-        const upTheClimb = rideSpeedKmPerS({ lengthKm: nyc.lengthKm, stops: nyc.stops }, km, camera);
-        expect(upTheClimb, `${camera}, km ${km}`).toBeLessThan(openRoad / 2);
-        expect(upTheClimb, `${camera}, km ${km}`).toBeGreaterThan(rideSpeedKmPerS(nyc, 23.53, camera)); // slow, not the crawl of arriving
-      }
-    }
-  });
-});
-
-describe("the Ride through a sharp turn", () => {
-  it("eases off so the view never whips round, and however sharp the turn keeps moving", () => {
-    const openRoad = { lengthKm: 40, stops: [{ km: 0 }, { km: 40 }] };
-    // A right-angled corner swings the On the road view a quarter turn in 50 m of road: 1800 degrees for every km.
-    const throughTheCorners = { ...openRoad, swingDegPerKm: () => 1800 };
-    const round = { ...openRoad, swingDegPerKm: () => 1_000_000 };
-
-    const cruise = rideSpeedKmPerS(openRoad, 20, "on-the-road");
-    const eased = rideSpeedKmPerS(throughTheCorners, 20, "on-the-road");
-
-    expect(eased).toBeLessThan(cruise / 2);
-    expect(eased * 1800).toBeLessThanOrEqual(60.001); // degrees a second: a quarter turn in a second and a half
-    // However sharp, between Stops it keeps moving quicker than it does at a Stop: a street corner is not a Stop.
-    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeGreaterThan(rideSpeedKmPerS(openRoad, 0, "on-the-road"));
-    expect(rideSpeedKmPerS(round, 20, "on-the-road")).toBeLessThan(eased);
-    // Right at a Stop it may slow as far as the pace of the run itself, and no further.
-    expect(rideSpeedKmPerS(round, 0, "on-the-road")).toBeCloseTo(0.003, 6);
   });
 });
 
@@ -529,14 +465,9 @@ describe("with reduced motion asked for", () => {
 });
 
 describe("the Ride's two cameras", () => {
-  it("make On the road a gentler time-lapse than From above: slower at every Stop and on every open road, and several times as long over the whole course", () => {
+  it("make On the road a gentler time-lapse than From above: several times as long over the whole course", () => {
+    expect(cruiseKmPerS("on-the-road")).toBeLessThan(cruiseKmPerS("from-above") / 3);
     for (const course of [nyc, berlin]) {
-      // The pace itself, turns aside: through a sharp turn each camera eases off by its own amount.
-      const turnsAside = { lengthKm: course.lengthKm, stops: course.stops };
-      for (let km = 0; km <= course.lengthKm; km += 0.05) {
-        expect(rideSpeedKmPerS(turnsAside, km, "on-the-road"), `km ${km.toFixed(2)}`).toBeLessThan(rideSpeedKmPerS(turnsAside, km, "from-above"));
-      }
-
       const onTheRoad = rideOn(course);
       onTheRoad.ride.useCamera("on-the-road");
       onTheRoad.ride.playPause();
@@ -684,7 +615,7 @@ describe("free look", () => {
 
     expect(ride.playing).toBe(true);
     expect(ride.camera).toBe("on-the-road"); // the time-lapse is the one it was entered from
-    expect(ride.km - before).toBeCloseTo(rideSpeedKmPerS(nyc, before, "on-the-road"), 2);
+    expect(ride.km - before).toBeCloseTo(cruiseKmPerS("on-the-road"), 2);
   });
 
   it("is given back to the Ride by choosing a camera, the one the Ride is already on included", () => {
@@ -760,5 +691,186 @@ describe("free look", () => {
     expect(ride.freeLook).toBe(false);
     ride.playPause();
     expect(ride.freeLook).toBe(false);
+  });
+});
+
+// The owner, 09-24: "straight down and tilted camera modes are broken. When I click straight down,
+// it doesnt follow the person/dot. It stays in place." The map's Straight down used to take the
+// map from the Ride, like its other buttons: the Ride paused and the camera was let go where it
+// was. In the Ride it is now a way of following the runner, and the Ride plays on (PLAN.md D67).
+describe("straight down in the Ride", () => {
+  it("is off until it is asked for, and asked for in Explore does nothing: there the button is the map's own", () => {
+    const { ride, changes } = rideOn(nyc);
+    expect(ride.straightDown).toBe(false);
+
+    ride.lookStraightDown(true);
+
+    expect(ride.straightDown).toBe(false);
+    expect(changes()).toBe(0);
+  });
+
+  it("comes and goes in the middle of the Ride without pausing it, and tells the controls each time", () => {
+    const { ride, run, changes } = rideOn(nyc);
+    ride.playPause();
+    run(1);
+    const told = changes();
+
+    ride.lookStraightDown(true);
+    run(1);
+    expect(ride.straightDown).toBe(true);
+    expect(ride.playing).toBe(true);
+    expect(changes()).toBe(told + 1);
+    ride.lookStraightDown(true); // pressed again it is already there: nothing new to tell
+    expect(changes()).toBe(told + 1);
+
+    ride.lookStraightDown(false); // Tilted
+    expect(ride.straightDown).toBe(false);
+    expect(ride.playing).toBe(true);
+    expect(changes()).toBe(told + 2);
+  });
+
+  it("keeps the pace of the camera the Ride is on", () => {
+    const { ride, run } = rideOn(nyc);
+    ride.useCamera("on-the-road");
+    ride.scrubbedTo(5);
+    ride.playPause();
+    ride.lookStraightDown(true);
+    run(1);
+    const before = ride.km;
+    run(1);
+
+    expect(ride.camera).toBe("on-the-road");
+    expect(ride.km - before).toBeCloseTo(cruiseKmPerS("on-the-road"), 6);
+  });
+
+  it("is left for the tilted view by choosing a camera, the one the Ride is already on included", () => {
+    for (const camera of RIDE_CAMERAS) {
+      const { ride } = rideOn(nyc);
+      ride.playPause();
+      ride.lookStraightDown(true);
+
+      ride.useCamera(camera);
+
+      expect(ride.straightDown).toBe(false);
+      expect(ride.camera).toBe(camera);
+    }
+  });
+
+  it("takes the camera back from free look, and free look entered while straight down goes back to it", () => {
+    const { ride } = rideOn(nyc);
+    ride.playPause();
+    ride.lookAround();
+
+    ride.lookStraightDown(true);
+    expect(ride.freeLook).toBe(false);
+    expect(ride.straightDown).toBe(true);
+
+    ride.lookAround();
+    ride.handTheCameraBack();
+    expect(ride.straightDown).toBe(true);
+  });
+
+  it("is over when the runner leaves the Ride: the next Ride starts tilted", () => {
+    const { ride } = rideOn(nyc);
+    ride.playPause();
+    ride.lookStraightDown(true);
+
+    ride.leave();
+
+    expect(ride.straightDown).toBe(false);
+    ride.playPause();
+    expect(ride.straightDown).toBe(false);
+  });
+});
+
+// The owner, 09-24: "a slider to increase how fast it plays. Right now the speed its at can be the
+// basis but i should be able to slow it down or speed it up." (PLAN.md D67)
+describe("the Ride's speed", () => {
+  it("is the time-lapse's own pace until the runner asks otherwise: 1×", () => {
+    expect(rideOn(nyc).ride.speed).toBe(1);
+    expect(RIDE_SPEEDS).toContain(1);
+  });
+
+  it("covers twice the ground in a second at 2×, and half at ½×, on either camera", () => {
+    for (const camera of RIDE_CAMERAS) {
+      for (const times of [2, 0.5]) {
+        const { ride, run } = rideOn(nyc);
+        ride.useCamera(camera);
+        ride.useSpeed(times);
+        ride.scrubbedTo(5);
+        ride.playPause();
+        run(1);
+        const before = ride.km;
+        run(1);
+
+        expect(ride.km - before, `${camera} at ${times}×`).toBeCloseTo(cruiseKmPerS(camera) * times, 6);
+      }
+    }
+  });
+
+  it("rides the whole course in half the time at 2×, and still comes to rest on the finish", () => {
+    const atOne = rideOn(berlin);
+    atOne.ride.playPause();
+    const secondsAtOne = atOne.secondsUntilItStops();
+    const atTwo = rideOn(berlin);
+    atTwo.ride.useSpeed(2);
+    atTwo.ride.playPause();
+    const secondsAtTwo = atTwo.secondsUntilItStops();
+
+    expect(atTwo.ride.km).toBe(berlin.lengthKm);
+    expect(Math.abs(secondsAtTwo - secondsAtOne / 2)).toBeLessThanOrEqual(1);
+  });
+
+  it("changes in the middle of the Ride without pausing it, and tells the controls when it changes", () => {
+    const { ride, run, changes } = rideOn(nyc);
+    ride.playPause();
+    run(1);
+    const told = changes();
+
+    ride.useSpeed(3);
+    expect(ride.speed).toBe(3);
+    expect(ride.playing).toBe(true);
+    expect(changes()).toBe(told + 1);
+    ride.useSpeed(3); // the same again: nothing new to tell
+    expect(changes()).toBe(told + 1);
+  });
+
+  it("keeps to the speeds the player offers, the nearest of them: never slower than ¼×, never faster than 4×", () => {
+    const { ride } = rideOn(nyc);
+    ride.useSpeed(100);
+    expect(ride.speed).toBe(4);
+    ride.useSpeed(0);
+    expect(ride.speed).toBe(0.25);
+    ride.useSpeed(1.2); // between two steps: the slider has no place to show it
+    expect(ride.speed).toBe(1);
+    expect(RIDE_SPEEDS[0]).toBe(0.25);
+    expect(RIDE_SPEEDS[RIDE_SPEEDS.length - 1]).toBe(4);
+  });
+
+  it("stays through a switch of camera, a pause, Back and leaving the Ride: it is the runner's choice", () => {
+    const { ride } = rideOn(nyc);
+    ride.useSpeed(2);
+    ride.playPause();
+    ride.useCamera("on-the-road");
+    ride.pause();
+    ride.scrubbedTo(20);
+    ride.back();
+    ride.leave();
+    ride.playPause();
+
+    expect(ride.speed).toBe(2);
+  });
+
+  it("with reduced motion, gives each Stop its few seconds divided by the speed", () => {
+    const { ride, moves, run } = rideOn(berlin, { reducedMotion: true });
+    ride.useSpeed(2);
+    ride.playPause();
+    run(0.1); // at once at the first Stop after the start
+    expect(moves).toHaveLength(1);
+
+    run(1.7); // at 1× it stands four seconds at each Stop; at 2×, two
+    expect(moves).toHaveLength(1);
+    run(0.4);
+    expect(moves).toHaveLength(2);
   });
 });

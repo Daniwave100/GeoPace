@@ -16,3 +16,8 @@ app/dist/
 # Keys never belong in the repo. Photoreal takes the runner's own key in the browser (PLAN.md D3).
 .env
 .env.*
+
+# What Pinokio writes beside its launcher: its settings file, its run logs and its caches (PLAN.md D66).
+/ENVIRONMENT
+/logs/
+/cache/

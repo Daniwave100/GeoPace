@@ -10,9 +10,9 @@ import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type 
 import { type Vicinity, vicinityOf } from "./core/map-bounds";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
-import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera, rideSpeedKmPerS } from "./core/ride";
+import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera } from "./core/ride";
 import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
-import { rideCourseFor, type RideScene, rideView, runnerInTheScene } from "./core/ride-view";
+import { rideCourseFor, type RideScene, rideView, runnerInTheScene, straightDownView } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
 import { sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
@@ -40,7 +40,7 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isFlying, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isFlying, isLookingStraightDown, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
 import { keepTheMapInTheVicinity } from "./scene/map-bounds";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
@@ -64,7 +64,7 @@ interface Showing {
   screen: OnScreen;
   /** The strip's own row, there whatever the layers are doing. */
   baseRow: StripRow;
-  /** The places the Ride slows down for, which the strip names along its top (core/stops.ts). */
+  /** The places the Ride names, rides to and goes back to, which the strip names along its top (core/stops.ts). */
   stops: Stop[];
   /** What the Ride's camera needs of the course: the course line and the Stops. */
   rideScene: RideScene;
@@ -105,6 +105,8 @@ let fullMap = false;
 let placement: Placement = "draped";
 /** The camera the runner last chose for the Ride: kept from one course to the next. */
 let rideCameraChoice: RideCamera = "from-above";
+/** How fast the runner last chose to have the Ride play: kept from one course to the next, like the camera. */
+let rideSpeedChoice = 1;
 /** Whether the screen was in the Ride when its controls were last shown: leaving it gives the whole course back. */
 let wasRiding = false;
 /** Whether the Ride was playing then: a pause is not a jump, and the camera must not be told it is one. */
@@ -155,6 +157,10 @@ const rideControls = createRideControls(byId("ride"), {
     showing?.ride.useCamera(camera); // and out of free look: the camera is the Ride's again
   },
   handTheCameraBack: () => showing?.ride.handTheCameraBack(),
+  useSpeed: (times) => {
+    rideSpeedChoice = times;
+    showing?.ride.useSpeed(times);
+  },
   leave: () => showing?.ride.leave(),
 });
 const stripEdge = createStripEdge(byId("strip-edge"), {
@@ -233,7 +239,8 @@ async function show(courseId: string): Promise<void> {
       takesTheMap: takeTheMap,
       wholeCourse: () => frameWholeCourse(flightSeconds()),
       whereIAm: goToRunner,
-      straightDown: () => toggleStraightDown(map, flightSeconds()),
+      straightDown: () => lookStraightDown(map),
+      looksStraightDown: () => looksStraightDown(map),
       fullMap: () => useFullMap(!fullMap),
     });
     whiteModel = createWhiteModel(map);
@@ -503,13 +510,9 @@ function showWhere(km: number, byHand = false): void {
  */
 function startRide(scene: RideScene): Ride {
   const course = rideCourseFor(scene);
-  // How fast the Ride goes at every metre, and which way From above faces there, are worked out
-  // the first time they are asked, about 30 ms each: done now, while nothing is moving, rather than
-  // in the frame that follows the first Play.
-  setTimeout(() => {
-    RIDE_CAMERAS.forEach((camera) => rideSpeedKmPerS(course, 0, camera));
-    rideView(scene, 0, "from-above");
-  }, 0);
+  // Which way each camera faces at every metre is worked out the first time it is asked, about
+  // 30 ms each: done now, while nothing is moving, rather than in the frame that follows the first Play.
+  setTimeout(() => RIDE_CAMERAS.forEach((camera) => rideView(scene, 0, camera)), 0);
   const ride = createRide({
     course,
     frames: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
@@ -521,6 +524,7 @@ function startRide(scene: RideScene): Ride {
     onChange: showRide,
   });
   ride.useCamera(rideCameraChoice);
+  ride.useSpeed(rideSpeedChoice);
   return ride;
 }
 
@@ -552,11 +556,14 @@ function showRideControls(): void {
     playing: ride.playing,
     camera: ride.camera,
     freeLook: ride.freeLook,
+    speed: ride.speed,
     stopLine: stopLine(stops, ride.km, units),
     arrivedAt: around.on === null ? null : stopLine(stops, stops[around.on].km, units),
     canGoBack: around.back !== null,
     canRideOn: around.next !== null,
   });
+  // In a Ride that plays the camera never comes to rest, and resting is when the button reads it (map-controls.ts).
+  if (ride.on) mapControls?.showStraightDown();
 }
 
 /**
@@ -575,7 +582,42 @@ function followTheRide(how: HowItMoved): void {
     rideCamera.lookAround(() => runnerInTheScene(riding.rideScene, riding.km, { heightAt: roadHeight() }));
     return;
   }
-  rideCamera.follow(() => rideView(riding.rideScene, riding.km, riding.ride.camera, { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) }), how);
+  rideCamera.follow(() => {
+    const options = { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) };
+    return riding.ride.straightDown ? straightDownView(riding.rideScene, riding.km, options) : rideView(riding.rideScene, riding.km, riding.ride.camera, options);
+  }, how);
+}
+
+/**
+ * The map's Straight down and Tilted. In the Ride they are a way of following the runner: the
+ * Ride's own camera looks straight down on them, north up, or tilted again, and the Ride plays on
+ * (PLAN.md D67; the owner, 09-24: "When I click straight down, it doesnt follow the person/dot").
+ * In Explore the map is the map: it tips over where it is, and a glide under way gives way first.
+ */
+function lookStraightDown(map: Viewer): void {
+  const ride = showing?.ride;
+  if (!ride?.on) {
+    takeTheMap();
+    toggleStraightDown(map, flightSeconds());
+    return;
+  }
+  const ridesTheCamera = rideCamera?.holdsTheCamera() ?? false;
+  const wasStraightDown = ride.straightDown;
+  ride.lookStraightDown(!looksStraightDown(map));
+  // The map's other buttons had let the camera go, and the Ride already looks the way asked for:
+  // it has nothing new to say, and the camera goes back to following the runner all the same.
+  if (!ridesTheCamera && ride.straightDown === wasStraightDown) followTheRide("jump");
+}
+
+/**
+ * Whether the map looks straight down, as the Straight down button needs it: what it says and what
+ * it does are both read from this. While the Ride has the camera (free look included), the Ride's
+ * own way of looking, since the camera may still be gliding there; once the map's other buttons
+ * have let it go, what is on the screen. Read from two places, the button disagreed with itself.
+ */
+function looksStraightDown(map: Viewer): boolean {
+  const ride = showing?.ride;
+  return ride?.on && rideCamera?.holdsTheCamera() ? ride.straightDown : isLookingStraightDown(map);
 }
 
 /**
@@ -611,7 +653,7 @@ function watchForAHandOnTheMap(): void {
 /** What has the keyboard's focus, as far as the space bar cares (core/ride-keys.ts). */
 function focusIsOn(target: EventTarget | null): WhereThePressLands["focus"] {
   if (!(target instanceof Element)) return "page";
-  if (target.closest(".ride-play, .ride-start, .ride-cameras")) return "play";
+  if (target.closest(".ride-play, .ride-start, .ride-cameras, .ride-speed")) return "play";
   if (target.closest("button, input, select, textarea, summary, a[href]")) return "control";
   if (target.closest("#globe")) return "map";
   if (target.closest("#strip")) return "strip";

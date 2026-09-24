@@ -1,5 +1,5 @@
-// Stops: the places the Ride names, rides to and goes back to, and On the road slows down for
-// (PLAN.md D34, D53, issue #8; from above it keeps one pace, issue #24). A Stop is a landmark, or a
+// Stops: the places the Ride names, rides to and goes back to (PLAN.md D34, D53, issue #8). Neither
+// camera slows down for them any more (from above since issue #24, on the road since D67). A Stop is a landmark, or a
 // stretch where something happens: to begin with, the climbs a runner will remember. Later
 // layers may add theirs. Pure lookups, no drawing: the Ride, the strip and the Ride's controls
 // all ask this module, so they can't disagree about where the Stops are.

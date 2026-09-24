@@ -12,7 +12,11 @@
 // of its two. So the player has as many things on it as it had before free look was built, and one
 // fewer while a hand is on the map. There is no way in from the player: a hand on the map is the
 // way in, and that is the whole of it.
-import { type RideCamera, RIDE_CAMERAS } from "../core/ride";
+//
+// Under them, how fast the Ride plays (PLAN.md D67): a slider from ¼× to 4×, 1× being the
+// time-lapse as built. The space bar still plays and pauses while it has the focus (ride-keys.ts):
+// a slider has no use of its own for the space bar, and its arrows are what move it.
+import { type RideCamera, RIDE_CAMERAS, RIDE_SPEEDS } from "../core/ride";
 import { html } from "../dom";
 import { type Choice, segmented } from "../segmented";
 
@@ -22,6 +26,8 @@ export interface RideActions {
   useCamera(camera: RideCamera): void;
   /** Out of free look: the camera is the Ride's own again, the one it was already riding. */
   handTheCameraBack(): void;
+  /** How many times its own pace the Ride plays: one of `RIDE_SPEEDS`. */
+  useSpeed(times: number): void;
   leave(): void;
 }
 
@@ -32,6 +38,8 @@ export interface RideShowing {
   camera: RideCamera;
   /** Whether the camera is the runner's to turn rather than the Ride's (core/ride.ts). */
   freeLook: boolean;
+  /** How many times its own pace the Ride plays (core/ride.ts). */
+  speed: number;
   /** "Stop 9 of 18: Ed Koch Queensboro Bridge", or "Next stop: Barclays Center, in 7.1 km". */
   stopLine: string;
   /** The Stop the runner is on, as it is said aloud on arriving; null between Stops. */
@@ -91,11 +99,16 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
     },
     "ride-cameras",
   );
+  const speedSlider = html("input", { type: "range", class: "ride-speed-slider", min: "0", max: String(RIDE_SPEEDS.length - 1), step: "1", "aria-label": "Speed" }) as HTMLInputElement;
+  const speedShown = html("output", { class: "ride-speed-value", "aria-hidden": "true" });
+  speedSlider.addEventListener("input", () => actions.useSpeed(RIDE_SPEEDS[Number(speedSlider.value)]));
+  const speed = html("label", { class: "ride-speed", title: "How fast the Ride plays" }, html("span", { text: "Speed" }), speedSlider, speedShown);
   const player = html(
     "div",
     { class: "ride-player", role: "group", "aria-label": "The Ride" },
     html("div", { class: "ride-player-head" }, stopLine, leave),
     html("div", { class: "ride-player-row" }, html("div", { class: "ride-buttons" }, back, play), cameras.box, backToCinematic),
+    speed,
   );
   player.hidden = true;
   // What a screen reader is told, and only that: arriving at a Stop is the Ride's news. The line in
@@ -125,6 +138,12 @@ export function createRideControls(dock: HTMLElement, actions: RideActions): Rid
       back.setAttribute("aria-disabled", String(!showing.canGoBack));
       // The camera the Ride is riding stays lit under free look: it is the one the way back returns to.
       cameras.check(showing.camera);
+      const times = `${showing.speed}×`;
+      if (speedShown.textContent !== times) {
+        speedShown.textContent = times;
+        speedSlider.value = String(Math.max(RIDE_SPEEDS.indexOf(showing.speed), 0));
+        speedSlider.setAttribute("aria-valuetext", showing.speed === 1 ? "1×, the Ride's own pace" : times);
+      }
 
       // The way back stands where the two cameras stand, so only ever one of them is on the player.
       // Whoever had their hands on the one that goes is put on the one that arrives: the way back,

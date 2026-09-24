@@ -77,6 +77,8 @@ through `core/units.ts`.
 
 ## Commands
 - Run the app: `cd app && npm install && npm run dev` → http://localhost:5173
+- Or with Pinokio: the `*.js` files, `pinokio.json` and `icon.png` at the repo root are its launcher (D66), built
+  from Pinokio's own examples (the `gepeto` skill); `app/test/pinokio-launcher.test.ts` checks the menu and Start.
 - App tests / types: `cd app && npm test` · `cd app && npm run typecheck`
 - Rebuild a Course Bundle: `cd pipeline && uv run geopace build berlin` (or `nyc`; downloads into `pipeline/.cache/`).
   New York's trees need one file the pipeline will not fetch for you, because it is **1.3 GB down the wire and 91 GB

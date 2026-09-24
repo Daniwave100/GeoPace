@@ -5,28 +5,36 @@
 // focused, keys for the same things. Dragging, scrolling and Ctrl + drag to tilt are CesiumJS's own.
 import type { Viewer } from "cesium";
 import { html } from "../dom";
-import { isLookingStraightDown, panMap, zoomMap } from "../scene/globe";
+import { panMap, zoomMap } from "../scene/globe";
 
 /** Said by a screen reader on the map, and printed in the small print under the strip. */
 export const MAP_HELP =
-  "Drag to move, scroll to zoom, Ctrl + drag to tilt; the map stays in the city the course is in. In the Ride, dragging turns the camera round you instead and scrolling moves it in and out, while the Ride plays on. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back, F gives the map the full screen.";
+  "Drag to move, scroll to zoom, Ctrl + drag to tilt; the map stays in the city the course is in. In the Ride, dragging turns the camera round you instead and scrolling moves it in and out, while the Ride plays on. With the map focused: arrow keys move, + and − zoom, B looks straight down or tilts back (in the Ride, still following you), F gives the map the full screen.";
 
 export interface MapActions {
   /**
    * Called before any of these buttons or keys moves the map: a Ride that is playing gives way to
    * it, free look included (issues #8, #28). Full map moves nothing, so it isn't one of them: the
-   * Ride plays on.
+   * Ride plays on. Nor is Straight down, which in the Ride is a way of following the runner.
    */
   takesTheMap(): void;
   wholeCourse(): void;
   whereIAm(): void;
+  /** Straight down, or back to tilted: in the Ride the Ride's own camera, still following the runner (PLAN.md D67); in Explore the map, which gives way first. */
   straightDown(): void;
+  /** Whether it looks straight down now, so the button offers the other way: the one answer both what the button says and what it does are read from. */
+  looksStraightDown(): boolean;
   fullMap(): void;
 }
 
 export interface MapControls {
   /** Whether the map has the full screen, so the button can say how to get back. */
   showFullMap(on: boolean): void;
+  /**
+   * Say again which way the Straight down button goes: in a Ride that plays the camera never stops
+   * moving, so the end of a move, which says it otherwise, never comes.
+   */
+  showStraightDown(): void;
 }
 
 export function createMapControls(container: HTMLElement, map: HTMLElement, viewer: Viewer, actions: MapActions): MapControls {
@@ -46,15 +54,18 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
   const whole = button("Whole course", "Show the whole course", moving(actions.wholeCourse));
   // The map moves freely, so scrubbing can leave the runner off the edge of it: this brings them back.
   const whereIAm = button("Where I am", "Bring the map to where you are on the course", moving(actions.whereIAm));
-  const straightDown = button("Straight down", "Look straight down, north up, like a paper map (B)", moving(actions.straightDown));
+  const straightDown = button("Straight down", "Look straight down, north up, like a paper map (B)", actions.straightDown);
   const fullMap = button("Full map", "Give the map the full screen (F)", actions.fullMap);
   fullMap.setAttribute("aria-pressed", "false");
   container.replaceChildren(zoomIn, zoomOut, whole, whereIAm, straightDown, fullMap);
 
-  // The runner can tilt the map by hand too, so the button reads the camera rather than remembering.
-  const showTilt = () => (straightDown.textContent = isLookingStraightDown(viewer) ? "Tilted" : "Straight down");
-  viewer.camera.moveEnd.addEventListener(showTilt);
-  showTilt();
+  // The runner can tilt the map by hand too, so the button asks rather than remembering.
+  const showStraightDown = () => {
+    const text = actions.looksStraightDown() ? "Tilted" : "Straight down";
+    if (straightDown.textContent !== text) straightDown.textContent = text;
+  };
+  viewer.camera.moveEnd.addEventListener(showStraightDown);
+  showStraightDown();
 
   map.tabIndex = 0;
   map.setAttribute("role", "application");
@@ -65,7 +76,7 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
     if (event.key in pan) moving(() => panMap(viewer, ...pan[event.key]))();
     else if (event.key === "+" || event.key === "=") moving(() => zoomMap(viewer, 1))();
     else if (event.key === "-" || event.key === "_") moving(() => zoomMap(viewer, -1))();
-    else if (event.key === "b" || event.key === "B") moving(actions.straightDown)();
+    else if (event.key === "b" || event.key === "B") actions.straightDown();
     else if (event.key === "f" || event.key === "F") actions.fullMap();
     else return;
     event.preventDefault(); // the arrows would otherwise scroll the page
@@ -77,5 +88,6 @@ export function createMapControls(container: HTMLElement, map: HTMLElement, view
       fullMap.title = on ? "Bring back the readout, the strip and the credits (F)" : "Give the map the full screen (F)";
       fullMap.setAttribute("aria-pressed", String(on));
     },
+    showStraightDown,
   };
 }

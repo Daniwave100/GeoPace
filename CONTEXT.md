@@ -38,7 +38,7 @@ A named, sourced place on the course.
 _Avoid_: point of interest, marker
 
 **Stop**:
-A place the Ride names as it goes by, and can ride to or go back to: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). On the road the Ride slows down for it, and for a stretch arrives where it begins and stays slow to where it ends; From above it keeps its one pace.
+A place the Ride names as it goes by, and can ride to or go back to: the start, a landmark, the finish, or a stretch where something happens (to begin with, a climb that gains 15 m or more). The Ride keeps its one pace through it, on either camera (D67).
 _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 
 ### The runner's plan
@@ -86,7 +86,7 @@ The mode that carries the runner along the course as a time-lapse, past its Stop
 _Avoid_: flyover, tour, playback, video, walkthrough
 
 **From above** / **On the road**:
-The Ride's two cameras. From above looks down on the runner from the air; On the road follows along the road itself, 250 ft up and 150 m behind, looking a little above the runner so the horizon stays in view (D64) — a chase camera, no longer a lead vehicle's.
+The Ride's two cameras. From above looks down on the runner from the air; On the road follows along the road, 250 ft up and 150 m behind, looking a little above the runner so the horizon stays in view (D64) — a chase camera, no longer a lead vehicle's, that swings wide round a corner rather than slowing for it (D67).
 _Avoid_: bird's-eye mode, drive cam, runner's-eye, first-person
 
 **Free look**:
@@ -98,14 +98,18 @@ The owner's word for the Ride's own camera, both of its two: what the runner goe
 _Avoid_: cinematic mode, cinematic camera (as a third camera: there are two)
 
 **Time-lapse**:
-How the Ride passes the course: far quicker than any runner, and gentler On the road than From above. From above it is one pace from start to finish; On the road it is quick between Stops, slow at them, and slows into corners.
+How the Ride passes the course: far quicker than any runner, and gentler On the road than From above. On either camera it is one pace from start to finish: it slows for no Stop, climb or corner (D67). The runner can play it faster or slower with **Speed**.
 _Avoid_: fast-forward, speed-up, animation
 
 **Cruise**:
-The time-lapse's speed on the open road between Stops. From above it is the Ride's speed everywhere.
+The time-lapse's own pace: 450 m of road a second From above, 120 On the road. It is the Ride's speed everywhere, at 1×.
+
+**Speed**:
+How many times its own pace the runner has the Ride play: a slider in the player, from ¼× to 4×; 1× is the time-lapse as built. It stays through a switch of camera and from one course to the next.
+_Avoid_: playback rate, fast-forward
 
 **Player**:
-The Ride's controls, on the top of the map: where the Ride is among the Stops, Back, play or pause, which of the two cameras, and Back to the map — and, in free look, **Go back to cinematic** in the cameras' own place. In Explore the same place holds the one button, "Ride the course".
+The Ride's controls, on the top of the map: where the Ride is among the Stops, Back, play or pause, which of the two cameras, **Speed**, and Back to the map — and, in free look, **Go back to cinematic** in the cameras' own place. In Explore the same place holds the one button, "Ride the course".
 _Avoid_: transport bar, toolbar, media controls
 
 **Glide**:
@@ -154,7 +158,7 @@ The map given the whole screen: the readout and the strip step aside, and the cr
 _Avoid_: fullscreen mode, map-only mode
 
 **Straight down**:
-The map seen from directly above with north up, like a paper map; the other way of looking at it is tilted.
+The map seen from directly above with north up, like a paper map; the other way of looking at it is tilted. In the Ride it is a way of following the runner: the Ride's camera looks straight down on them, and the Ride plays on (D67).
 _Avoid_: bird's-eye mode, 2D mode, top view
 
 **Banner**:

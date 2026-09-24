@@ -16,8 +16,9 @@ export interface WhereThePressLands {
   /** A dialog is open over the page: the keyboard is its own. */
   dialogOpen: boolean;
   /**
-   * What has the keyboard's focus. "play": the player's play button, "Ride the course", or one of
-   * the two cameras (the space bar does nothing of its own on a camera that is already chosen).
+   * What has the keyboard's focus. "play": the player's play button, "Ride the course", one of
+   * the two cameras (the space bar does nothing of its own on a camera that is already chosen), or
+   * the Ride's speed (a slider has no use of its own for the space bar either).
    * "control": any other control, the player's other buttons included. Or the map, the strip, or
    * nothing in particular.
    */
