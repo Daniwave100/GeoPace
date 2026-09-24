@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { howSteep } from "../src/core/hills";
 import { heightRow, hillsLayer } from "../src/core/hills-layer";
-import { markLook, rampColor } from "../src/core/mark-look";
+import { HALFTONE_PITCH_PX, markLook, rampColor, RIM_DOT_SHARE, RIM_PX, rimDotRadius, rimLook } from "../src/core/mark-look";
 import { COURSE_EDGE } from "../src/scene/course-ribbon";
 
 const bundleFor = (course: string) =>
@@ -202,5 +202,64 @@ describe("the Hills layer's marks, by steepness", () => {
     expect(Math.min(...amounts)).toBeLessThan(-0.7);
     expect(amounts.filter((amount) => amount === 0).length).toBeGreaterThan(150); // most of New York is flat
     expect(heightRow(nyc).howMuch).toBeUndefined();
+  });
+});
+
+describe("shade, as a rule of ink beside the band (PLAN.md D63)", () => {
+  // The owner, 09-22, with Hills and Shade on together: the hills' band "makes sense", but with
+  // Shade on the line "can get a little bit confusing". The rim is thinner than the band, only
+  // ever ink, paper or grey, and its halftone is a screen fixed to the paper, not counted along the line.
+  const contrast = (a: string, b: string) => {
+    const [dark, light] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => x - y);
+    return (light + 0.05) / (dark + 0.05);
+  };
+  const greys = Array.from({ length: 52 }, (_, i) => `#${(i * 5).toString(16).padStart(2, "0").repeat(3)}`);
+  const encodings = ["measured", "depends-on-leaves", "not-measured", "runner-report", "sample"] as const;
+
+  it("is a rule, never as wide as the band, and never takes a ramp colour", () => {
+    expect(rimLook("measured").widthPx).toBeLessThan(markLook("measured", 0.5).widthPx);
+    for (const encoding of encodings) {
+      const look = rimLook(encoding);
+      for (const colour of [look.color, look.edge, ...(look.gap ? [look.gap] : [])]) expect(["#000000", "#f4f4f0", "#8a8a86"], `${encoding}'s ${colour}`).toContain(colour);
+    }
+  });
+
+  it("shows on any ground: by itself where the ground is pale, by its paper hairline where it is dark", () => {
+    for (const encoding of ["measured", "depends-on-leaves"] as const) {
+      const look = rimLook(encoding);
+      const fill = look.gap ?? look.color;
+      expect(look.edgePx).toBeGreaterThan(0);
+      for (const ground of greys) expect(Math.max(contrast(fill, ground), contrast(look.edge, ground)), `${encoding} over ${ground}`).toBeGreaterThanOrEqual(3);
+    }
+    // Not measured: the grey stands between its paper hairline and the course's white edge, and reads against both.
+    const grey = rimLook("not-measured");
+    expect(grey.gap).toBeNull();
+    expect(contrast(grey.color, grey.edge)).toBeGreaterThanOrEqual(3);
+    expect(contrast(grey.color, COURSE_EDGE)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("always shows a tree's dots: at every offset against the screen the rule meets at least a pixel of a dot, which a 2 px one would not", () => {
+    // The dots are a grid fixed to the screen (scene/course-ribbon.ts), so what a stripe shows
+    // depends on where it happens to fall against that grid. A stripe narrower than the paper
+    // between two dots can fall wholly on the ink, and a tree's shade would then look like a wall's.
+    const dotPx = 2 * rimDotRadius() * HALFTONE_PITCH_PX;
+    const worstOverlap = (stripePx: number) => {
+      let worst = Number.POSITIVE_INFINITY;
+      for (let offset = 0; offset < HALFTONE_PITCH_PX; offset += 0.01) {
+        let overlap = 0;
+        for (let cell = -1; cell <= 2; cell += 1) {
+          const centre = (cell + 0.5) * HALFTONE_PITCH_PX;
+          overlap += Math.max(0, Math.min(offset + stripePx, centre + dotPx / 2) - Math.max(offset, centre - dotPx / 2));
+        }
+        worst = Math.min(worst, overlap);
+      }
+      return worst;
+    };
+    expect(rimLook("depends-on-leaves").widthPx).toBe(RIM_PX);
+    expect(worstOverlap(RIM_PX)).toBeGreaterThanOrEqual(1);
+    expect(worstOverlap(2)).toBeLessThan(1);
+    // The rim's dots are the crowns' size, give or take a hair, so the tree and its shade are printed alike.
+    expect(rimDotRadius(RIM_DOT_SHARE)).toBeGreaterThan(0.22);
+    expect(rimDotRadius(RIM_DOT_SHARE)).toBeLessThan(0.31);
   });
 });

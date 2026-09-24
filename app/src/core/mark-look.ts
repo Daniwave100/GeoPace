@@ -15,13 +15,22 @@
 //   - both ways it gets darker as it gets deeper, never green against red (the pair one man in
 //     twelve can't tell apart), so the scale still reads in a grey screenshot.
 //
-// **The rim** is the dark stripe hugging the blue, and it is what shade looks like on the map
-// (D62): the road's own edge darkens where a building has it in shadow. Solid ink where a wall
-// casts it, the poster's halftone — paper dots knocked out of the ink — where a tree does, and
-// nothing at all in the sun, because the sun is the road's ordinary state and shade is the thing
-// to mark. It is a different shape from the band, not a different colour, which is why the two can
-// share a stretch without either being taken for the other; and it carries no "how much", because
-// shade is binary (D58).
+// **The rim** is a thin rule of ink hugging the blue, and it is what shade looks like on the map
+// (D62, D63): the road's own edge darkens where a building has it in shadow. Solid ink where a
+// wall casts it, the poster's halftone — paper dots knocked out of the ink — where a tree does,
+// and nothing at all in the sun, because the sun is the road's ordinary state and shade is the
+// thing to mark. It is a different shape from the band, not a different colour: a rule, never as
+// wide as the band, which is why the two can share a stretch without either being taken for the
+// other; and it carries no "how much", because shade is binary (D58). The halftone is a screen
+// fixed to the paper — the same 5 px screen the crowns are printed in (scene/white-model.ts) —
+// not dots counted along the line: the draped line's angle is recomputed at every 10 m segment,
+// so a pattern counted along it restarts three times a pixel at the whole-course zoom, which is
+// what fringed the whole course in black static with Shade on (the owner, 09-22: "confusing").
+// The rim is a rule of 4 px against the band's 5 (3 read too faint to the owner, 09-23), and it is
+// never 2, because a 2 px stripe under a 5 px screen shows no dot at all on one axis-aligned
+// stretch in five, and a tree's shade would then look like a wall's. It stays opaque paint: a
+// translucent stripe double-darkens wherever CesiumJS's line joins overlap at a corner, and
+// vanishes over dark imagery.
 //
 // Not measured here is either slot with the colour taken out: flat grey, the same width, the same
 // hairline edge, no pattern. (It was grey dashes. Twice the owner took them for a fault in the
@@ -74,13 +83,33 @@ const BAND_PX = 5;
 /** A dashed band is wider: the insets take room, and the dashes still have to show. */
 const DASHED_BAND_PX = 7;
 const DASH_INSET_PX = 2;
-/** The rim, each side: a stripe, not a line, so it reads as the road's edge darkened. */
-const RIM_PX = 4;
+/**
+ * The rim, each side: a rule of ink, thinner than the band's 5 px, and never 2 (see the top of
+ * the file). 3 px on the first look; the owner (09-23): "it needs to be a bit thicker… it's not
+ * too obvious", so 4, with the screen-fixed dots that made 3 necessary for quiet in the first place.
+ */
+export const RIM_PX = 4;
 /** Every stripe ends in a hairline, so it reads on any ground. */
 const EDGE_PX = 0.75;
 /** Half of a dash-and-gap is a dash; a third of one is a dot. */
 const DASH_SHARE = 0.5;
 const DOT_SHARE = 0.34;
+/**
+ * One dot of the halftone and the paper round it, in CSS px: the one screen the rim and the crowns
+ * are printed in, so a tree's shade on the line and the tree beside it can't be dotted differently.
+ */
+export const HALFTONE_PITCH_PX = 5;
+/**
+ * The paper's share of a leafy rim's area. Its radius, sqrt(share / pi) = 0.30 of a cell, is a
+ * hair over the crowns' 0.26, so that the rule always catches at least a pixel of a dot at
+ * every offset against the screen, at 4 px as at the 3 it was first drawn at (a test sweeps them).
+ */
+export const RIM_DOT_SHARE = 0.29;
+
+/** The radius of a paper dot in the rim's halftone, as a share of one cell of the screen. */
+export function rimDotRadius(share: number = RIM_DOT_SHARE): number {
+  return Math.sqrt(share / Math.PI);
+}
 
 /** The colour for how much: warm above 0, teal below, pale near 0 and deep at 1, fading between. */
 export function rampColor(howMuch: HowMuch): string {
@@ -117,20 +146,25 @@ export function markLook(encoding: Encoding, howMuch?: HowMuch): MarkLook {
   }
 }
 
-/** The rim's look: shade, on the map. Ink where a wall casts it, paper dots in the ink where a tree does. */
+/**
+ * The rim's look: shade, on the map. Ink where a wall casts it, paper dots in the ink where a tree
+ * does, flat grey where the height is filled in. For the rim `dashShare` is the paper's share of
+ * the area under the halftone screen, not of a dash-and-gap along the line (course-ribbon.ts).
+ * Only ever ink, paper or grey: a rim never takes a ramp colour, which is the band's.
+ */
 export function rimLook(encoding: Encoding): MarkLook {
-  const stripe = (color: string, gap: string | null = null, dashShare = DASH_SHARE): MarkLook => ({ widthPx: RIM_PX, color, edge: PAPER, edgePx: EDGE_PX, gap, dashShare, dashInsetPx: 0 });
+  const stripe = (color: string, gap: string | null = null, dashShare = 0): MarkLook => ({ widthPx: RIM_PX, color, edge: PAPER, edgePx: EDGE_PX, gap, dashShare, dashInsetPx: 0 });
   switch (encoding) {
     case "measured":
       return stripe(INK);
     case "depends-on-leaves":
-      return stripe(PAPER, INK, DOT_SHARE);
+      return stripe(PAPER, INK, RIM_DOT_SHARE);
     case "not-measured":
       return stripe(GREY);
     case "runner-report":
       return stripe(PAPER);
     case "sample":
-      return stripe(INK, PAPER);
+      return stripe(INK, PAPER, RIM_DOT_SHARE);
   }
 }
 

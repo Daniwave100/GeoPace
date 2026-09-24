@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { courseStretches } from "../src/core/course-stretches";
 import { hillsLayer } from "../src/core/hills-layer";
-import { markLook, rimLook } from "../src/core/mark-look";
+import { HALFTONE_PITCH_PX, markLook, rimDotRadius, rimLook } from "../src/core/mark-look";
 import { createPlanner, defaultPlan, plannerCourse } from "../src/core/planner";
 import { positionAtKm } from "../src/core/scrub";
 import { nearestIndex } from "../src/core/series";
@@ -242,7 +242,7 @@ describe("the course cut into stretches, each drawn as one line", () => {
 describe("a layer's marks on the course line", () => {
   const marks = hillsLayer(nyc).lineMarks();
   type Rgb = { toCssHexString(): string; alpha: number };
-  const uniforms = (entity: Entity) => entity.polyline!.material!.getValue(NOW) as { coreColor: Rgb; bandColor: Rgb; dashColor: Rgb; rimColor: Rgb; rimDotColor: Rgb; rimEndPx: number; coreEdgeEndPx: number; edgePx: number };
+  const uniforms = (entity: Entity) => entity.polyline!.material!.getValue(NOW) as { coreColor: Rgb; bandColor: Rgb; dashColor: Rgb; rimColor: Rgb; rimDotColor: Rgb; rimDotRadius: number; halftonePitchPx: number; rimEndPx: number; coreEdgeEndPx: number; edgePx: number };
 
   it("are draped with the line on the keyless map, and at the road's height with it in photoreal", () => {
     const [keyless, photoreal] = [scene(), scene()];
@@ -296,7 +296,9 @@ describe("a layer's marks on the course line", () => {
     const shaded = uniforms(at(shadedKm));
     expect(shaded.rimColor.toCssHexString()).toBe("#000000");
     expect(shaded.rimDotColor.alpha).toBe(0);
+    expect(shaded.rimDotRadius).toBe(0); // a wall's shade has no dots at all
     expect(shaded.rimEndPx).toBeGreaterThan(shaded.coreEdgeEndPx);
+    expect(shaded.rimEndPx - shaded.coreEdgeEndPx).toBeLessThan(shaded.edgePx + markLook("measured", 0.5).widthPx); // a rule, thinner than the band
     expect(ribbonWidthPx({ band: null, rim: rimLook("measured") })).toBeGreaterThan(ribbonWidthPx(null));
     // The hill under it keeps its own colour: the rim adds to the band, it does not replace it.
     const hill = marks.find((mark) => mark.encoding === "measured" && mark.fromKm <= shadedKm && mark.toKm >= shadedKm);
@@ -316,6 +318,9 @@ describe("a layer's marks on the course line", () => {
       const dotted = uniforms(at((leafy.fromKm + leafy.toKm) / 2));
       expect(dotted.rimColor.toCssHexString()).toBe("#000000");
       expect(dotted.rimDotColor.alpha).toBe(1);
+      // Printed on the crowns' own screen, fixed to the paper: a radius, on a pitch, not a share of a dash along the line.
+      expect(dotted.rimDotRadius).toBeCloseTo(rimDotRadius(), 6);
+      expect(dotted.halftonePitchPx).toBe(HALFTONE_PITCH_PX);
     }
 
     function firstKmWithNoRim(rim: typeof shade): number {

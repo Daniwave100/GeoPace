@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCourseBundle } from "../src/bundle/loader";
 import { ENCODINGS, type Encoding } from "../src/core/encoding";
-import { heightRow, hillsLayer } from "../src/core/hills-layer";
+import { HEIGHT_CEILING_M, heightRow, hillsLayer } from "../src/core/hills-layer";
 import { everythingOn, isOn, type Layer, NO_LAYERS, onScreen, pressEverything, pressLayer } from "../src/core/layers";
 import { createPlanner, defaultPlan, plannerCourse } from "../src/core/planner";
 import { shadeLayer } from "../src/core/shade-layer";
@@ -189,8 +189,11 @@ describe("the strip's own row, the height", () => {
   it("is there whatever the layers are doing, with its scale, the value under the cursor and the course's total climb", () => {
     const height = heightRow(nyc);
 
-    expect(height.scale("km")).toBe("m, 2 to 78");
-    expect(height.scale("mi")).toBe("ft, 8 to 256");
+    // One scale on every course, from sea level (owner, 09-22): a flat course reads flat beside a hilly one.
+    expect(height.scale("km")).toBe("0 to 100 m on every course");
+    expect(height.scale("mi")).toBe("0 to 328 ft on every course");
+    expect(height.domain).toEqual([0, HEIGHT_CEILING_M]);
+    expect(heightRow(berlin).domain).toEqual(height.domain);
     expect(height.summary?.("km")).toBe("up 262 m, down 293 m");
     expect(height.summary?.("mi")).toBe("up 860 ft, down 962 ft");
     expect(height.valueAt(0, "km")).toEqual({ text: "56 m", notMeasured: null });

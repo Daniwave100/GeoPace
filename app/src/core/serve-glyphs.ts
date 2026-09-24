@@ -15,7 +15,7 @@
 //
 // Every glyph carries the word for it too. An icon on its own is a guess for anybody who hasn't
 // learned it, and a screen reader has nothing at all to say about a path — so the word goes in the
-// label's title and in its hidden text, and the key under the strip names each one.
+// label's title and in its hidden text, and "What the marks mean" names each one.
 import type { Serves } from "./aid";
 
 export interface Glyph {

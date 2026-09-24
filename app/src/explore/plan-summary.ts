@@ -27,10 +27,11 @@ export function createPlanSummary(container: HTMLElement, onOpen: () => void): P
       const date = planner.edition.date;
       day.replaceChildren(raceDate(date.day, "short"), ...(date.confirmed ? [] : [html("small", { class: "carried-over", title: date.note, text: " not yet confirmed" })]));
 
+      // The start time, and whose it is: no wave named (the owner, 09-23: "don't worry about waves").
       const carriedOver = planner.carriedOver;
       start.className = carriedOver ? "carried-over" : "";
       start.title = carriedOver?.reason ?? "";
-      start.textContent = `${planner.wave.name} · ${planner.startLocal}${carriedOver ? ` carried over from ${carriedOver.fromEdition}` : planner.ownStartTime ? " your own time" : ""}`;
+      start.textContent = `Start ${planner.startLocal}${carriedOver ? ` (${carriedOver.fromEdition}'s time)` : planner.ownStartTime ? " (yours)" : ""}`;
 
       goal.textContent = `Goal ${formatElapsed(planner.goalFinishSeconds)} at ${formatPace(paceInUnits(planner.goalPaceSecondsPerKm, units))}/${units}`;
     },

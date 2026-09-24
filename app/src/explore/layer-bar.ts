@@ -11,18 +11,17 @@ export interface LayerBar {
   show(state: LayerState, layers: Pick<Layer, "id" | "name">[]): void;
 }
 
-export function createLayerBar(container: HTMLElement, onLayer: (id: LayerId) => void, onEverything: () => void): LayerBar {
+/** `onKey` opens "What the marks mean" (explore/key-sheet.ts): the one thing on the bar that isn't a switch. */
+export function createLayerBar(container: HTMLElement, onLayer: (id: LayerId) => void, onEverything: () => void, onKey: () => void): LayerBar {
   let switches: { id: LayerId; button: HTMLButtonElement }[] = [];
   const group = html("div", { class: "layer-switches", role: "group", "aria-labelledby": "layer-bar-label" });
   const everything = html("button", { type: "button", class: "switch", "aria-pressed": "false", "aria-controls": "strip", text: "Show everything" });
   everything.addEventListener("click", onEverything);
+  // Not a switch, and not drawn as one: a plain link-like button, so it can't be taken for a layer.
+  const key = html("button", { type: "button", class: "link-button layer-bar-key", "aria-haspopup": "dialog", text: "What the marks mean" });
+  key.addEventListener("click", onKey);
 
-  container.replaceChildren(
-    html("span", { class: "layer-bar-label", id: "layer-bar-label", text: "Show on the course" }),
-    group,
-    everything,
-    html("span", { class: "layer-bar-help", text: "Drag along the course, or use the arrow keys, to move. Drag the strip's top edge to resize it." }),
-  );
+  container.replaceChildren(html("span", { class: "layer-bar-label", id: "layer-bar-label", text: "Show on the course" }), group, everything, key);
 
   return {
     show(state, layers) {

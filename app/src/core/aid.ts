@@ -14,6 +14,7 @@
 // along, which is a little longer (D20). The runner is told the first and the app works in the
 // second, and the gap between them — 77 m at Berlin's km 36 — is why they are not one field.
 import type { AidStationFact, Edition } from "../bundle/types";
+import { formatDistance, type Units } from "./units";
 
 /** What a station hands out. The fixed vocabulary the pipeline writes (edition_facts.py). */
 export type Serves = "water" | "sports-drink" | "gel" | "fruit" | "tea" | "refill" | "own-bottle" | "medical";
@@ -25,6 +26,8 @@ export interface AidStation {
   kmMarked: number;
   /** What the organizer calls it: "9 km", "Mile 12". */
   label: string;
+  /** The unit the organizer counts in, read off that name: Berlin signs kilometres, New York miles. */
+  markedIn: Units;
   serves: Serves[];
   /** A brand, a sponsor's bottle: shown, never reasoned about. */
   detail?: string;
@@ -59,11 +62,29 @@ export function aidStations(edition: Edition): AidStation[] {
   return (edition.aid_stations ?? []).map(fromFact).sort((a, b) => a.km - b.km);
 }
 
+/** The unit an organizer's name for a station is in: "Mile 12" counts in miles, anything else in kilometres. */
+export function markedIn(label: string): Units {
+  return /\bmiles?\b/i.test(label) ? "mi" : "km";
+}
+
+/**
+ * What a station is called on screen, in the runner's units (PLAN.md D42): the organizer's own
+ * name where the runner counts as the organizer does ("Mile 12", "9 km"), and otherwise the
+ * organizer's distance converted, to a tenth ("19.3 km", "5.6 mi"). One rule on the map, on the
+ * strip and in the sentence, so that switching units moves every station's name at once — it
+ * used to be that Berlin's read in kilometres and New York's in miles whatever the switch said
+ * (owner, 09-22).
+ */
+export function stationName(station: Pick<AidStation, "label" | "kmMarked" | "markedIn">, units: Units): string {
+  return units === station.markedIn ? station.label : formatDistance(station.kmMarked, units, 1);
+}
+
 function fromFact(fact: AidStationFact): AidStation {
   return {
     km: fact.km,
     kmMarked: fact.km_marked,
     label: fact.label,
+    markedIn: markedIn(fact.label),
     serves: fact.serves as Serves[],
     detail: fact.detail,
     note: fact.note,

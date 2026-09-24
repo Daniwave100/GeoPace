@@ -44,7 +44,7 @@ _Avoid_: chapter, waypoint (a waypoint is a turn point used to trace a route)
 ### The runner's plan
 
 **Race Plan**:
-The runner's own choices for one course: edition, wave, own start time if they have typed one, goal time or pace, and fueling plan.
+The runner's own choices for one course: edition, own start time if they have typed one, goal time or pace, and fueling plan. Underneath it still names a wave — the organizer's first start with a published time — but the runner never picks one (D64).
 _Avoid_: settings, profile
 
 **Units**:
@@ -52,11 +52,11 @@ Kilometres or miles, with metres or feet to match: what the runner reads and typ
 _Avoid_: imperial mode, locale
 
 **Wave**:
-A group of runners with its own start time.
+A group of runners with its own start time. An edition fact (D38), not a choice on screen since D64: the plan takes the first wave with a published time as the organizer's start, and the runner types their own over it.
 _Avoid_: corral, start block (those are positions inside a wave)
 
 **Own start time**:
-The start time a runner types in themselves, from their start card. It outranks the wave's published or carried-over time, and is never greyed.
+The start time a runner types in themselves, from their start card, over the organizer's first start. It outranks the published or carried-over time, and is never greyed.
 _Avoid_: custom time, override, manual time
 
 **Race clock**:
@@ -86,7 +86,7 @@ The mode that carries the runner along the course as a time-lapse, past its Stop
 _Avoid_: flyover, tour, playback, video, walkthrough
 
 **From above** / **On the road**:
-The Ride's two cameras. From above looks down on the runner from the air; On the road follows from a few metres up and behind, the way a lead vehicle films a race.
+The Ride's two cameras. From above looks down on the runner from the air; On the road follows along the road itself, 250 ft up and 150 m behind, looking a little above the runner so the horizon stays in view (D64) — a chase camera, no longer a lead vehicle's.
 _Avoid_: bird's-eye mode, drive cam, runner's-eye, first-person
 
 **Free look**:
@@ -135,7 +135,15 @@ The one plain-language line saying what the course is doing where the runner is 
 _Avoid_: caption, subtitle, summary
 
 **Clause**:
-One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's.
+One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's. Anything more it has to say (why a value is filled in, whose list a station is on) is its tooltip, never printed under the sentence (D63).
+
+**What the marks mean**:
+The key, as a sheet one press from the layer switches: the course line, each layer's marks (Aid's drawn beside their words), solid / grey / dotted, where this course's height is filled in and why, and how to move the map and the strip. Nothing of it is on the first screen (D63).
+_Avoid_: legend, help, definitions
+
+**Sources & credits**:
+The sheet one press from the one-line footer: our data credits and every source with its licence and the day it was fetched. The map's own credit line never folds into it: it is on the map.
+_Avoid_: about, attribution page
 
 **Strip's top edge**:
 The rule between the map and the strip, which drags up and down to resize the strip.
@@ -242,7 +250,7 @@ The wide, coloured slot of the course line, outside the blue: where a hill is, c
 _Avoid_: stripe, fill, highlight
 
 **Rim**:
-The dark slot hugging the blue: the road's own edge darkened where it is in shade — solid for a building's, dotted for a tree's, nothing in the sun.
+The thin rule of ink hugging the blue, never as wide as the band: the road's own edge darkened where it is in shade — solid for a building's, dotted for a tree's on the same screen the crowns are printed in, grey where the height is filled in, nothing in the sun (D63).
 _Avoid_: border, outline, shadow line
 
 **Chip**:

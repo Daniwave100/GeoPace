@@ -60,16 +60,12 @@
         <div id="layers" class="layer-bar"></div>
         <div id="strip"></div>
       </section>
+      <!-- One line: who we aren't, and the way to everything the screen rests on. Our own credits
+           and sources are one press away (issue #33, PLAN.md D63); the map's own credits (the
+           terrain's, Google's) are on the map itself and never fold. -->
       <footer class="credits">
         <p class="credits-unofficial"><strong>Unofficial. Not affiliated with any race organizer.</strong></p>
-        <!-- Always open, except with the map on the full screen, where it folds to the one word "Credits".
-             The map's own credits (OpenStreetMap's, Google's) are on the map itself and never fold. -->
-        <details id="credits-more" class="credits-more" open>
-          <summary>Credits</summary>
-          <ul id="attributions" class="credits-list" aria-label="Data and map credits"></ul>
-        </details>
-        <div id="sources"></div>
-        <p id="map-help" class="credits-help"></p>
+        <button type="button" id="sources-open" class="link-button" aria-haspopup="dialog">Sources &amp; credits</button>
       </footer>
     </div>
     <dialog id="plan-dialog" class="sheet" aria-labelledby="plan-heading">
@@ -79,6 +75,26 @@
       </div>
       <div id="plan"></div>
       <div id="splits"></div>
+    </dialog>
+    <!-- What the marks mean: the course line, each layer's marks, the encodings, where the height
+         is filled in, and how to move the map and the strip (explore/key-sheet.ts). -->
+    <dialog id="key-dialog" class="sheet" aria-labelledby="key-heading">
+      <div class="sheet-head">
+        <h2 id="key-heading">What the marks mean</h2>
+        <form method="dialog"><button type="submit" class="button">Close</button></form>
+      </div>
+      <div id="key" class="key-sheet"></div>
+    </dialog>
+    <!-- Where everything comes from: the credits, and the sources behind them with their licences. -->
+    <dialog id="sources-dialog" class="sheet" aria-labelledby="sources-heading">
+      <div class="sheet-head">
+        <h2 id="sources-heading">Sources &amp; credits</h2>
+        <form method="dialog"><button type="submit" class="button">Close</button></form>
+      </div>
+      <h3>Credits</h3>
+      <ul id="attributions" class="credits-list" aria-label="Data and map credits"></ul>
+      <h3>Sources</h3>
+      <div id="sources"></div>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>

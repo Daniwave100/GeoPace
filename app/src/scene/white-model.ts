@@ -22,6 +22,7 @@ import { Cartesian3, Color, Material, MaterialAppearance, PolygonGeometry, Polyg
 import type { WhiteModel } from "../bundle/white-model";
 import { heightAboveGround } from "./globe";
 import type { Theme } from "../core/theme";
+import { HALFTONE_PITCH_PX } from "../core/mark-look";
 import { DEFAULT_WHITE_MODEL, SHADOWS, shadowDistanceM, type WhiteModelChoice } from "../core/white-model";
 
 /**
@@ -58,7 +59,8 @@ const BLOCK_LOOK: Record<Theme, { face: string; shadowDarkness: number; leafDot:
  * wherever the thing they are printing happens to be. `dotPx` is one dot and its white together.
  */
 const CROWN_MATERIAL = "GeoPaceCrown";
-const CROWN_DOT_PX = 5.0;
+/** One dot and its white together: the one screen the course line's leafy rim is printed in too (core/mark-look.ts). */
+const CROWN_DOT_PX = HALFTONE_PITCH_PX;
 const CROWN_SOURCE = `
 uniform vec4 faceColor;
 uniform vec4 dotColor;

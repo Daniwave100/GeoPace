@@ -20,6 +20,7 @@ import { rampColor } from "../core/mark-look";
 import { tracePaths } from "../core/trace";
 import { axisMarks, distanceNumber, unitKm, unitName, type Units } from "../core/units";
 import { html } from "../dom";
+import { glyphNode } from "../glyph-node";
 import { drawToFit, svg } from "../svg";
 
 const RIGHT_PAD = 28;
@@ -43,16 +44,9 @@ export interface StripContent {
   baseRow: StripRow;
   /** The rows of the layers that are on (or of all of them, with "Show everything"). */
   layerRows: StripRow[];
-  /** What the marks on screen mean, in a line under the strip. Empty while no layer is on: the first screen needs no key. */
-  key: KeyEntry[];
   /** How tall the runner has made the rows, as a multiple of their designed height (core/strip-size.ts). */
   size: number;
   units: Units;
-}
-
-export interface KeyEntry {
-  name: string;
-  meaning: string;
 }
 
 /** How tall the rows that resize are at the designed size: what the strip's top edge needs to turn a drag into a size. */
@@ -87,8 +81,9 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   const rowsBox = html("div", { class: "strip-rows" });
   const heads = html("div", { class: "strip-heads", "aria-hidden": "true" });
   const slider = html("div", { class: "strip", role: "slider", tabindex: 0, "aria-valuemin": 0 }, rowsBox, heads);
-  const key = html("p", { class: "strip-key" });
-  container.replaceChildren(slider, key);
+  // No key under the strip: what the marks mean is one press away (explore/key-sheet.ts), so the
+  // screen that opens is the map and the charts and nothing else (owner, 09-22).
+  container.replaceChildren(slider);
 
   const sayWhere = () => {
     if (content) slider.setAttribute("aria-valuenow", distanceNumber(km, content.units));
@@ -126,7 +121,11 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
 
   const redraw = drawToFit(rowsBox, (width) => {
     if (!content) return;
-    const { drawing, headCells, place } = draw(content, width, heads.clientWidth);
+    const { drawing, headCells, place, height } = draw(content, width, heads.clientWidth);
+    // The box and the drawing come from the one measurement: a row of marks is taller when the
+    // header is narrow (its key goes to one column), and the header's width can change without a
+    // show() — the window narrowed past the phone breakpoint, or Full map left and came back.
+    rowsBox.style.height = `${height}px`;
     rowsBox.replaceChildren(drawing);
     heads.replaceChildren(...headCells.map((cell) => cell.node));
     moveCursor = () => {
@@ -142,11 +141,9 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
   return {
     show(next) {
       content = next;
-      rowsBox.style.height = `${stripHeight(next)}px`;
+      rowsBox.style.height = `${stripHeight(next, keyColumnsFor(heads.clientWidth))}px`;
       slider.setAttribute("aria-label", `Where you are on the course, in ${unitName(next.units, "many")}`);
       slider.setAttribute("aria-valuemax", distanceNumber(next.lengthKm, next.units));
-      key.hidden = next.key.length === 0;
-      key.replaceChildren(...next.key.map((entry) => html("span", {}, html("b", { text: `${entry.name} ` }), entry.meaning)));
       redraw();
     },
     setKm(value, spoken, quietly = false) {
@@ -159,16 +156,31 @@ export function createStrip(container: HTMLElement, onScrub: (km: number) => voi
 }
 
 /** The rows are what resizes; the Stops' lane and the blue line keep their height, since they are type, not traces. */
-function rowHeight(row: StripRow, content: StripContent): number {
+function rowHeight(row: StripRow, content: StripContent, keyColumns: number): number {
   // A row of marks is as tall as its tallest stack of them, whatever the strip is dragged to:
   // marks are type, not a trace, and scaling them would make them unreadable long before small.
-  if (row.marks) return MARK_ROW_PAD * 2 + Math.max(1, ...row.marks().map((mark) => mark.glyphs.length)) * (GLYPH_PX + GLYPH_GAP_PX);
+  if (row.marks) {
+    const stacks = MARK_ROW_PAD * 2 + Math.max(1, ...row.marks(content.units).map((mark) => mark.glyphs.length)) * (GLYPH_PX + GLYPH_GAP_PX);
+    // Never shorter than its own header needs: the name's line, the scale, and the rows of the key of its marks.
+    const headLines = HEAD_NAME_LINE_PX + (row.scale(content.units) ? HEAD_KEY_LINE_PX : 0) + Math.ceil((row.keyGlyphs?.length ?? 0) / keyColumns) * HEAD_KEY_LINE_PX;
+    return Math.max(stacks, headLines + MARK_ROW_PAD);
+  }
   return Math.round((row === content.baseRow ? BASE_ROW_HEIGHT : LAYER_ROW_HEIGHT) * content.size);
 }
 
+/** The header's first line (the row's name and its value), and one line of its scale or of the key of a row's marks, in px: what style.css draws them at. */
+const HEAD_NAME_LINE_PX = 20;
+const HEAD_KEY_LINE_PX = 13;
+/** A header at least this wide sets the key two marks to a line; a narrower one (a phone's 118 px) sets them one under another. */
+const TWO_COLUMN_KEY_FROM_PX = 150;
+
+function keyColumnsFor(headWidth: number): number {
+  return headWidth >= TWO_COLUMN_KEY_FROM_PX ? 2 : 1;
+}
+
 /** The Stops' lane, every row, and the blue line. */
-function stripHeight(content: StripContent): number {
-  return STOPS_HEIGHT + [content.baseRow, ...content.layerRows].reduce((sum, row) => sum + rowHeight(row, content), 0) + LINE_HEIGHT;
+function stripHeight(content: StripContent, keyColumns: number): number {
+  return STOPS_HEIGHT + [content.baseRow, ...content.layerRows].reduce((sum, row) => sum + rowHeight(row, content, keyColumns), 0) + LINE_HEIGHT;
 }
 
 interface HeadCell {
@@ -179,6 +191,8 @@ interface HeadCell {
 interface Drawing {
   drawing: SVGSVGElement;
   headCells: HeadCell[];
+  /** How tall the drawing is: what the rows' box is set to, so the two never disagree. */
+  height: number;
   place(km: number, units: Units): void;
 }
 
@@ -186,8 +200,10 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   const rows = [content.baseRow, ...content.layerRows];
   const x = linearScale([0, content.lengthKm], [headWidth, width - RIGHT_PAD]);
   const binCount = Math.max(60, Math.round((width - headWidth - RIGHT_PAD) / PIXELS_PER_BIN));
-  const height = stripHeight(content);
+  const keyColumns = keyColumnsFor(headWidth);
+  const height = stripHeight(content, keyColumns);
   const drawing = svg("svg", { width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" });
+  const units = content.units;
   drawing.append(
     svg(
       "defs",
@@ -215,14 +231,14 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   const headCells: HeadCell[] = [];
   let top = STOPS_HEIGHT;
   for (const row of rows) {
-    const rowH = rowHeight(row, content);
-    drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }), traceGroup(row, binCount, x, top, rowH));
-    headCells.push(headCell(row, top, rowH, content.units));
+    const rowH = rowHeight(row, content, keyColumns);
+    drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }), traceGroup(row, binCount, x, top, rowH, units));
+    headCells.push(headCell(row, top, rowH, units, keyColumns));
     top += rowH;
   }
   drawing.append(svg("line", { x1: 0, x2: width, y1: top, y2: top, class: "strip-rule" }));
 
-  // The blue line: the course itself, with a notch and a number every five km or miles.
+  // The course itself, as the blue line, with a notch and a number every five km or miles.
   const lineY = top + 12;
   drawing.append(svg("rect", { x: x(0), y: lineY - 4, width: x(content.lengthKm) - x(0), height: 8, class: "strip-line" }));
   for (const mark of marks) {
@@ -231,7 +247,7 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
       svg("text", { x: x(mark.km), y: lineY + 22, "text-anchor": "middle", class: "strip-mark", text: mark.label }),
     );
   }
-  headCells.push(lineHead(top, content.units));
+  headCells.push(lineHead(top, units));
 
   // Where you are: a blue bar through every row, and a flag on the blue line with the distance.
   const flagText = svg("text", { x: 0, y: lineY + 22, "text-anchor": "middle", class: "strip-cursor-text" });
@@ -247,6 +263,7 @@ function draw(content: StripContent, width: number, headWidth: number): Drawing 
   return {
     drawing,
     headCells,
+    height,
     place(km, units) {
       cursor.setAttribute("transform", `translate(${x(km).toFixed(1)} 0)`);
       flagText.textContent = distanceNumber(km, units);
@@ -282,8 +299,8 @@ function stopLane(content: StripContent, x: Scale): SVGGElement {
 }
 
 /** One row's trace: solid with a light fill where measured, dashed grey where the value is filled in, a grey block where there is none. */
-function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, height: number): SVGGElement {
-  if (row.marks) return markGroup(row.marks(), x, top, height);
+function traceGroup(row: StripRow, binCount: number, x: Scale, top: number, height: number, units: Units): SVGGElement {
+  if (row.marks) return markGroup(row.marks(units), x, top, height);
   const group = svg("g", {});
   const bins = row.bins(binCount);
   const paths = tracePaths(row, bins, { x, top, height }, row.howMuch?.(binCount));
@@ -341,14 +358,26 @@ function markGroup(marks: RowMark[], x: Scale, top: number, height: number): SVG
   return group;
 }
 
-/** A row's header: its name, its labelled scale, and the value under the cursor. */
-function headCell(row: StripRow, top: number, height: number, units: Units): HeadCell {
+/**
+ * A row's header: its name and, on the same line, the value under the cursor; under them its
+ * labelled scale, its summary, and, for a row of marks, the key of its marks. The value shares
+ * the name's line rather than standing beside every line, so the scale gets the header's whole
+ * width: "clear sky, buildings and trees" used to be cut off beside "In leafy shade" (owner, 09-22).
+ */
+function headCell(row: StripRow, top: number, height: number, units: Units, keyColumns: number): HeadCell {
   const value = html("span", { class: "strip-head-value" });
-  const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: row.name }), value, html("span", { class: "strip-head-scale", text: row.scale(units) }));
+  const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: row.name }), value);
+  const scale = row.scale(units);
+  if (scale) node.append(html("span", { class: "strip-head-scale", text: scale }));
   if (row.summary) node.append(html("span", { class: "strip-head-scale", text: row.summary(units) }));
+  if (row.keyGlyphs && row.keyGlyphs.length > 0) {
+    node.append(html("span", { class: `strip-head-key${keyColumns === 1 ? " is-one-column" : ""}` }, ...row.keyGlyphs.map((glyph) => html("span", { class: "strip-head-key-entry" }, glyphNode(glyph, "strip-head-glyph"), glyph.name))));
+  }
   node.style.top = `${top}px`;
   node.style.height = `${height}px`;
   node.classList.toggle("is-tight", height < TIGHT_ROW_PX);
+  // A value in words rather than a number is printed under the name, on the header's whole width.
+  node.classList.toggle("has-value-below", row.valueBelow === true);
   return {
     node,
     update(km, shownIn) {
@@ -356,13 +385,14 @@ function headCell(row: StripRow, top: number, height: number, units: Units): Hea
       // Not measured here: grey and struck through, the same as in the sentence, which also prints the reason.
       value.replaceChildren(notMeasured !== null ? html("s", { text }) : text);
       value.title = notMeasured ?? "";
-      value.className = `strip-head-value ${ENCODINGS[notMeasured !== null ? "not-measured" : row.encoding].cssClass}${text.length > 9 ? " is-long" : ""}`;
+      value.className = `strip-head-value ${ENCODINGS[notMeasured !== null ? "not-measured" : row.encoding].cssClass}${text.length > 9 && !row.valueBelow ? " is-long" : ""}`;
     },
   };
 }
 
+/** The course's own row: the blue line is the course, and the flag on it is where you are. ("The blue line" said what it looked like, not what it was: owner, 09-22.) */
 function lineHead(top: number, units: Units): HeadCell {
-  const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: "The blue line" }), html("span", { class: "strip-head-scale", text: `${unitName(units, "many")} along the course line` }));
+  const node = html("div", { class: "strip-head" }, html("span", { class: "strip-head-name", text: "The course" }), html("span", { class: "strip-head-scale", text: `${unitName(units, "many")} from the start` }));
   node.style.top = `${top}px`;
   node.style.height = `${LINE_HEIGHT}px`;
   return { node, update: () => undefined };

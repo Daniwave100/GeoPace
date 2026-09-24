@@ -76,10 +76,12 @@ const MOST_CRUISE_THROUGH_A_STRETCH = 0.3;
  * camera's own facing, which turns no faster than it may (core/ride-view.ts; D53 has the numbers).
  *
  * On the road the same speed would be a blur, so the time-lapse is gentler (PLAN.md D33, §6 "The
- * ride"), and slows to a fast run at a Stop. There the camera looks at the runner from 25 m behind,
- * so a street corner swings the view a quarter turn in those 25 m: the Ride takes it as a vehicle
- * would, in a second and a half, at some 13 m/s. A Stop is slower still: 12 m/s for the 60 m
- * around it, five seconds to read it by.
+ * ride"), and slows to a fast run at a Stop. There the camera looks at the runner from behind, and
+ * a street corner swings the view round: the Ride takes it as a vehicle would, in a second and a
+ * half, at some 13 m/s. The floor through a turn was tuned when the camera followed 25 m behind,
+ * where a right angle swung the view a quarter turn in those 25 m; it now follows 150 m behind
+ * (core/ride-view.ts, D64), which swings more gently, so the floor is on the safe side of the
+ * bound it keeps. A Stop is slower still: 12 m/s for the 60 m around it, five seconds to read it by.
  */
 const TIME_LAPSE: Record<RideCamera, TimeLapse> = {
   "from-above": { cruiseKmPerS: 0.45, brakingKmPerS2: 0.4 },

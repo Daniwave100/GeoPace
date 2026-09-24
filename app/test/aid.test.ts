@@ -11,7 +11,7 @@ import { rowsHeightAtSizeOne } from "../src/strip/strip";
 import { SERVE_GLYPH } from "../src/core/serve-glyphs";
 import { hillsLayer } from "../src/core/hills-layer";
 import { aidLayer, furthestWithoutWater } from "../src/core/aid-layer";
-import { type AidStation, aidStations, nextServing, servesInWords } from "../src/core/aid";
+import { type AidStation, aidStations, markedIn, nextServing, servesInWords, stationName } from "../src/core/aid";
 import { checkFueling, type FuelItem, type FuelKind, sanitizeFueling, WATER_WITHIN_KM } from "../src/core/fueling";
 import { somewhereFree } from "../src/plan/fueling-panel";
 import { createPlanner, plannerCourse, type RacePlan } from "../src/core/planner";
@@ -31,7 +31,7 @@ const layerFor = (bundle: CourseBundle) => aidLayer(bundle, createPlanner(planne
 
 /** A made-up list, for the cases the real courses don't happen to hold. */
 function station(km: number, serves: string[], extra: Partial<AidStation> = {}): AidStation {
-  return { km, kmMarked: km, label: `${km} km`, serves: serves as AidStation["serves"], carriedOver: false, source: "https://example.org/course", ...extra };
+  return { km, kmMarked: km, label: `${km} km`, markedIn: "km", serves: serves as AidStation["serves"], carriedOver: false, source: "https://example.org/course", ...extra };
 }
 
 const item = (km: number, kind: FuelKind, id = `i-${km}-${kind}`): FuelItem => ({ id, km, kind });
@@ -182,12 +182,12 @@ describe("the Aid layer", () => {
     const [row] = layerFor(berlin)!.rows();
 
     expect(row.bins(400)).toEqual([]);
-    expect(row.marks!()).toHaveLength(15);
-    expect(row.marks!()[1].glyphs.map((glyph) => glyph.name)).toEqual(["Water", "Sports drink", "Tea", "Fruit"]);
-    expect(row.marks!()[1].km).toBeCloseTo(9.019, 2);
-    expect(row.marks!()[1].label).toBe("9 km: water, a sports drink, tea and fruit");
+    expect(row.marks!("km")).toHaveLength(15);
+    expect(row.marks!("km")[1].glyphs.map((glyph) => glyph.name)).toEqual(["Water", "Sports drink", "Tea", "Fruit"]);
+    expect(row.marks!("km")[1].km).toBeCloseTo(9.019, 2);
+    expect(row.marks!("km")[1].label).toBe("9 km: water, a sports drink, tea and fruit");
     // How far the next water is hasn't gone: it is the readout, where a number belongs.
-    expect(row.valueAt(9.02, "km").text).toBe("water here");
+    expect(row.valueAt(9.02, "km").text).toBe("here"); // under the scale line "to the next water"
     expect(row.valueAt(10, "km").text).toMatch(/km|m$/);
   });
 
@@ -198,7 +198,9 @@ describe("the Aid layer", () => {
 
     expect(furthestWithoutWater(withADepot, 42)).toBe(22); // the finish to the last water, not 8 to the depot
     expect(furthestWithoutWater([station(5, ["water"]), station(20, ["water"])], 42)).toBe(22);
-    expect(layerFor(berlin)!.rows()[0].scale("km")).toMatch(/longest run without water is 5\.0 km/);
+    // Said in "What the marks mean" (the layer's key), now that the row's header holds the key of its marks.
+    expect(layerFor(berlin)!.key!("km")).toMatch(/longest run without water is 5\.0 km/);
+    expect(layerFor(berlin)!.key!("mi")).toMatch(/longest run without water is 3\.1 mi/);
   });
 
   it("says there is no more water once the last station is behind you", () => {
@@ -369,3 +371,52 @@ describe("a fueling plan that has been through browser storage", () => {
     expect(new Set(kept.map((fuel) => fuel.id)).size).toBe(2);
   });
 });
+
+describe("a station's name follows the runner's units (owner, 09-22)", () => {
+  // It used to be the organizer's own words whatever the switch said: Berlin's chips read in
+  // kilometres and New York's in miles, in both units.
+  it("reads the unit the organizer counts in off the organizer's own name", () => {
+    expect(markedIn("Mile 12")).toBe("mi");
+    expect(markedIn("mile 3")).toBe("mi");
+    expect(markedIn("9 km")).toBe("km");
+    expect(markedIn("Miles Ave")).toBe("mi"); // and a street called that would be wrong: the organizer names stations by distance
+    expect(aidStations(berlin.editions[0]).every((s) => s.markedIn === "km")).toBe(true);
+    expect(aidStations(nyc.editions[0]).every((s) => s.markedIn === "mi")).toBe(true);
+  });
+
+  it("is the organizer's own name where the runner counts as the organizer does, and the organizer's distance converted otherwise", () => {
+    const berlinStations = aidStations(berlin.editions[0]);
+    const nycStations = aidStations(nyc.editions[0]);
+
+    expect(stationName(berlinStations[0], "km")).toBe("5 km");
+    expect(stationName(berlinStations[0], "mi")).toBe("3.1 mi");
+    expect(stationName(berlinStations[4], "mi")).toBe("10.9 mi"); // 17.5 km
+    expect(stationName(nycStations[0], "mi")).toBe("Mile 3");
+    expect(stationName(nycStations[0], "km")).toBe("4.8 km"); // the organizer's 4.828 km, not the 4.884 on our longer line
+  });
+
+  it("moves every station's name at once: on the map, on the strip and in the sentence", () => {
+    const layer = layerFor(nyc)!;
+    const first = nycStations0();
+
+    expect(layer.lineLabels()[0].text("mi")).toBe("Mile 3");
+    expect(layer.lineLabels()[0].text("km")).toBe("4.8 km");
+    // The strip's tooltip keeps the organizer's name beside the converted one: the road sign says "Mile 3" whatever the switch says.
+    expect(layer.rows()[0].marks!("km")[0].label).toMatch(/^4\.8 km \(Mile 3\): /);
+    expect(layer.rows()[0].marks!("mi")[0].label).toMatch(/^Mile 3: /);
+    expect(layer.clause(first.km - 0.4, "mi")?.text).toMatch(/, at Mile 3\.$/);
+    expect(layer.clause(first.km - 0.4, "km")?.text).toMatch(/, at 4\.8 km\.$/);
+    // The row's readout is a bare distance; its scale line says what it is a distance to.
+    expect(layer.rows()[0].valueAt(first.km - 0.4, "km").text).toBe("400 m");
+    expect(layer.rows()[0].scale("km")).toBe("to the next water station");
+  });
+
+  it("gives the key of its marks to its row, and only the marks this course uses", () => {
+    expect(layerFor(berlin)!.rows()[0].keyGlyphs!.map((glyph) => glyph.name)).toEqual(["Water", "Sports drink", "Tea", "Gel", "Fruit"]);
+    expect(layerFor(nyc)!.rows()[0].keyGlyphs!.map((glyph) => glyph.name)).toEqual(["Water", "Sports drink", "Gel", "Fruit", "Medical help"]);
+  });
+});
+
+function nycStations0(): AidStation {
+  return aidStations(nyc.editions[0])[0];
+}

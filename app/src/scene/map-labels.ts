@@ -16,7 +16,7 @@ import { type Encoding, ENCODINGS } from "../core/encoding";
 import { isOverTheHorizon } from "../core/horizon";
 import { html } from "../dom";
 import type { Glyph } from "../core/serve-glyphs";
-import { glyphNode } from "./glyph-node";
+import { glyphNode } from "../glyph-node";
 import { type Placement, scenePosition } from "./placement";
 
 export interface MapLabel {

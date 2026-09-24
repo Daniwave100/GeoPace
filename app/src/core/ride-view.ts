@@ -12,22 +12,33 @@ import type { RideCamera, RideCourse } from "./ride";
 import { positionAtKm, type RoadPosition } from "./scrub";
 
 /**
- * On the road: how far above the road the camera rides. The one setting issue #8 asks for. A lead
- * vehicle's camera height: the imagery sets no floor (PLAN.md D33), and it has to fit under the
- * Queensboro's upper deck, which the LiDAR puts 6.4 m above the lower one runners use (D23),
- * its own structure included.
+ * On the road: how far above the road the camera rides. The one setting issue #8 asks for. It was
+ * 3 m, a lead vehicle's camera, and Google's mesh is too soft that close (PLAN.md D53, #27). The
+ * owner read a height they liked off the camera readout and asked for 216 ft (09-23), then, on
+ * seeing it, "a bit higher": 250 ft.
  */
-export const ON_THE_ROAD_HEIGHT_M = 3;
+export const ON_THE_ROAD_HEIGHT_M = 76.2;
+
+/**
+ * How far above the runner the camera looks, in degrees. The view is about 36° top to bottom, so
+ * looking straight at the runner from up here is "facing the road too much" (the owner, 09-23:
+ * "the angle has to look a little bit more parallel to the ground… I have to be able to look up a
+ * bit"). Lifted by this much the runner sits in the lower third of the frame and the horizon is
+ * in the top of it: a chase camera, not a look down.
+ */
+export const ON_THE_ROAD_LOOK_UP_DEG = 12;
 
 const ON_THE_ROAD = {
   /**
-   * How far behind the runner the camera follows, along the road itself: where a vehicle behind
-   * them would be. On the road, it is never inside a building on a corner. It looks at the runner,
-   * so they are always in the middle of the view, round any corner, hairpin or loop; how fast the
-   * view swings round is kept down by the Ride easing off through the turn (core/ride.ts), the way
-   * a vehicle slows into a corner.
+   * How far behind the runner the camera follows, along the road itself. Far enough back that the
+   * runner, 250 ft below, is only 27° under the horizon: with the lift above, that is a view
+   * pitched 15° down, the horizon three degrees inside its top edge. From a vehicle's 25 m the
+   * same camera would be looking almost straight down, with the road ahead out of shot. It looks
+   * at the runner, so they are always in the middle of the view sideways, round any corner,
+   * hairpin or loop; how fast the view swings round is kept down by the Ride easing off through
+   * the turn (core/ride.ts), the way a vehicle slows into a corner. Claude's number; one line.
    */
-  behindM: 25,
+  behindM: 150,
 };
 
 /**
@@ -230,7 +241,7 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
     // It looks at the road where the runner is: up a climb it looks up, over a crest it looks down,
     // and where the road doubles back, so that the runner is a few metres away, well down at them.
     const toRunnerM = Math.max(flatDistanceM(eye, runner), 1);
-    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, toRunnerM) / RAD };
+    return { eye: { lat: eye.lat, lon: eye.lon, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, toRunnerM) / RAD + ON_THE_ROAD_LOOK_UP_DEG };
   }
 
   const { rangeM } = FROM_ABOVE;
