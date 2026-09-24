@@ -8,7 +8,7 @@ import { parseCourseBundle } from "../src/bundle/loader";
 import type { CourseLine } from "../src/bundle/types";
 import { relativeBearing } from "../src/core/bearing";
 import { type RideCamera, rideSpeedKmPerS } from "../src/core/ride";
-import { ON_THE_ROAD_HEIGHT_M, ON_THE_ROAD_LOOK_UP_DEG, rideCourseFor, type RideScene, rideView, runnerInTheScene } from "../src/core/ride-view";
+import { ON_THE_ROAD_HEIGHT_M, ON_THE_ROAD_LOOK_UP_DEG, type RideScene, rideView, runnerInTheScene } from "../src/core/ride-view";
 import { M_PER_FOOT } from "../src/core/units";
 import { positionAtKm } from "../src/core/scrub";
 import { stopsFor } from "../src/core/stops";
@@ -76,46 +76,62 @@ function distanceM(runner: { lat: number; lon: number; ellipsoidHeightM: number 
   return Math.hypot(back.north, back.east, eye.heightM - runner.ellipsoidHeightM);
 }
 
-interface Swing {
-  /** The fastest the view swings, degrees a second, where the Ride could still have gone slower; and where. */
-  degPerS: number;
-  km: number;
-  /** How many metres of the course the Ride is already as slow as it may go through a turn, and the fastest swing among them. */
-  atItsSlowestM: number;
-  fastestAtItsSlowestDegPerS: number;
+/**
+ * The fastest the view swings round anywhere on a course, degrees a second, at the Ride's own pace
+ * for that camera; and where. Walked a metre at a time, because round Columbus Circle the whole
+ * turn falls within some 4 m. Both cameras keep one pace (issue #24; the owner, 09-24), so no metre
+ * of either course is excused: what keeps the view from whipping round is the camera's own facing.
+ */
+function fastestSwing(scene: RideScene, camera: RideCamera): { degPerS: number; km: number } {
+  const pace = rideSpeedKmPerS(camera);
+  let fastest = { degPerS: 0, km: 0 };
+  let last = rideView(scene, 0, camera).headingDeg;
+  for (let m = 1; m <= scene.line.length_m; m += 1) {
+    const heading = rideView(scene, m / 1000, camera).headingDeg;
+    // Degrees in a metre of road, times how many metres go by in a second.
+    const degPerS = Math.abs(relativeBearing(last, heading)) * pace * 1000;
+    if (degPerS > fastest.degPerS) fastest = { degPerS, km: m / 1000 };
+    last = heading;
+  }
+  return fastest;
 }
 
 /**
- * How fast the view swings round along a whole course, at the speed the Ride goes there; walked a
- * metre at a time, because round Columbus Circle the whole swing falls within some 4 m. Where the
- * Ride is already as slow as it is allowed to go the swing is whatever the road demands (PLAN.md
- * D53), so those metres are kept apart: but they are counted, and their swing measured, so that
- * raising the floor through a turn can't quietly excuse every corner on the course.
+ * The White model's blocks (PLAN.md D56), for asking whether a camera is inside one: each outline
+ * in metres east and north of a point near the course, with its roof, filed in a grid of 50 m
+ * squares so that a place is only tried against the blocks around it.
  */
-function swingAlong(scene: RideScene, camera: RideCamera): Swing {
-  const course = rideCourseFor(scene);
-  const asSlowAsItGoes = { ...course, swingDegPerKm: () => Number.MAX_VALUE };
-  // Both worked out once: a fresh course object every metre would rebuild its whole table of speeds.
-  const withNoTurns = { ...course, swingDegPerKm: undefined };
-  const swing: Swing = { degPerS: 0, km: 0, atItsSlowestM: 0, fastestAtItsSlowestDegPerS: 0 };
-  let last = rideView(scene, 0, camera).headingDeg;
-  for (let m = 1; m <= course.lengthKm * 1000; m += 1) {
-    const km = m / 1000;
-    const heading = rideView(scene, km, camera).headingDeg;
-    const speed = rideSpeedKmPerS(course, km, camera);
-    // Degrees in a metre of road, times how many metres go by in a second.
-    const degPerS = Math.abs(relativeBearing(last, heading)) * speed * 1000;
-    last = heading;
-    // A camera whose Ride never eases off for a turn (From above keeps one pace, issue #24) is never
-    // "as slow as it may go": every metre of it is measured, or the bound below would mean nothing.
-    const slowedForThisTurn = speed < rideSpeedKmPerS(withNoTurns, km, camera) * 0.999;
-    if (slowedForThisTurn && speed <= rideSpeedKmPerS(asSlowAsItGoes, km, camera) * 1.001) {
-      // Only a turn counts: near a Stop the Ride is this slow on a dead straight road too.
-      if (degPerS > 1) swing.atItsSlowestM += 1;
-      swing.fastestAtItsSlowestDegPerS = Math.max(swing.fastestAtItsSlowestDegPerS, degPerS);
-    } else if (degPerS > swing.degPerS) Object.assign(swing, { degPerS, km });
-  }
-  return swing;
+function blocksOf(id: string) {
+  const buildings = JSON.parse(readFileSync(new URL(`../../data/derived/${id}/white-model.json`, import.meta.url), "utf8")).buildings as { ring: number[][]; roof_m: number[] };
+  const origin = { lat: buildings.ring[0][1], lon: buildings.ring[0][0] };
+  const flat = (lon: number, lat: number) => metersFrom(origin, { lat, lon });
+  const blocks = buildings.ring.map((ring, i) => ({ roofM: buildings.roof_m[i], outline: Array.from({ length: ring.length / 2 }, (_, j) => flat(ring[2 * j], ring[2 * j + 1])) }));
+  const CELL_M = 50;
+  const grid = new Map<string, number[]>();
+  blocks.forEach((block, i) => {
+    const easts = block.outline.map((corner) => corner.east);
+    const norths = block.outline.map((corner) => corner.north);
+    for (let e = Math.floor(Math.min(...easts) / CELL_M); e <= Math.floor(Math.max(...easts) / CELL_M); e += 1) {
+      for (let n = Math.floor(Math.min(...norths) / CELL_M); n <= Math.floor(Math.max(...norths) / CELL_M); n += 1) {
+        const key = `${e},${n}`;
+        grid.set(key, [...(grid.get(key) ?? []), i]);
+      }
+    }
+  });
+  /** Whether a place in the scene is inside a block: under its roof, and within its outline. */
+  return (at: { lat: number; lon: number; heightM: number }): boolean => {
+    const { east, north } = flat(at.lon, at.lat);
+    return (grid.get(`${Math.floor(east / CELL_M)},${Math.floor(north / CELL_M)}`) ?? []).some((i) => {
+      const { roofM, outline } = blocks[i];
+      if (at.heightM >= roofM) return false;
+      let inside = false;
+      for (let j = 0, k = outline.length - 1; j < outline.length; k = j, j += 1) {
+        const [a, b] = [outline[j], outline[k]];
+        if (a.north > north !== b.north > north && east < ((b.east - a.east) * (north - a.north)) / (b.north - a.north) + a.east) inside = !inside;
+      }
+      return inside;
+    });
+  };
 }
 
 describe("On the road", () => {
@@ -156,22 +172,16 @@ describe("On the road", () => {
     }
   });
 
-  it("turns into a corner gradually, never in a jolt, along the whole of both courses", () => {
-    // A quarter turn takes a second and a half at the least: 60° a second. The Ride eases off to
-    // keep to it at every street corner, where corners come in a row (New York's mile in the
-    // Bronx), and where the road loops (the Queensboro Bridge).
+  it("turns into a corner as one steady sweep at the Ride's own pace, never a jolt, along the whole of both courses", () => {
+    // The owner, 09-24: "in turns, especially in new york, it takes forever and slows down which is
+    // weird." The Ride used to brake to keep a corner's swing under 60° a second (to 12.5 m/s, a
+    // tenth of its pace); it keeps one pace now, and the camera's own facing keeps to the same 60°:
+    // a quarter turn in a second and a half, a hairpin in three. Pointed at the runner from the road
+    // behind, as it was, the same pace would have swung it 653° a second at Columbus Circle.
     for (const scene of [cornerCourse(), nyc, berlin]) {
-      const swing = swingAlong(scene, "on-the-road");
+      const swing = fastestSwing(scene, "on-the-road");
       expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(61);
     }
-    // What is left over. The floor through a turn was tuned to a right angle, which from 25 m behind
-    // swings 57° a second at 12.5 m/s. New York has three sharper turns where the Ride, as slow as
-    // it may go, still swings faster: two corners of about 105° in Greenpoint (km 19.67 and 19.90)
-    // and the turn back on itself at Columbus Circle (km 41.99, at 3 m/s). Berlin has none.
-    const newYork = swingAlong(nyc, "on-the-road");
-    expect(newYork.atItsSlowestM).toBeLessThan(400);
-    expect(newYork.fastestAtItsSlowestDegPerS).toBeLessThan(115);
-    expect(swingAlong(berlin, "on-the-road").fastestAtItsSlowestDegPerS).toBeLessThan(61);
   });
 
   it("keeps the runner in the middle of the view round every corner, hairpin and loop of both courses", () => {
@@ -206,33 +216,44 @@ describe("On the road", () => {
     }
   });
 
-  it("stays on the road itself, so it is never inside a building on a corner", () => {
-    for (const scene of [nyc, berlin]) {
-      const { line } = scene;
-      // From 160 m in: before that the camera stands on the road's own line carried back past the start.
-      for (let km = 0.16; km <= line.length_m / 1000; km += 0.01) {
-        const { eye } = rideView(scene, km, "on-the-road");
-        const behind = positionAtKm(line, km - 0.15); // 150 m behind the runner, on the road
-        const off = metersFrom(behind, eye);
-        expect(Math.hypot(off.north, off.east), `km ${km.toFixed(2)}`).toBeLessThan(1);
+  it("swings wide of the road round a corner, over the blocks, and is inside one for a few hundred metres of New York at most", () => {
+    // The price of a steady sweep. The camera used to stand on the road 150 m back, and never went
+    // into a building; trailing the runner the way the course is going, it cuts across the outside
+    // of every corner, 250 ft up, and New York has towers taller than that. Measured against the
+    // White model's own blocks: 200 m of New York (under two seconds of the Ride, most of it round
+    // Columbus Circle) and 20 m of Berlin. CesiumJS draws a block from inside as nothing, so the
+    // moment reads as the block going see-through; and the runner's dot is laid over the map, so
+    // no block ever hides it.
+    for (const [id, scene, mostM] of [["nyc", nyc, 400], ["berlin", berlin, 50]] as const) {
+      const isInABlock = blocksOf(id);
+      let insideM = 0;
+      for (let km = 0; km <= scene.line.length_m / 1000; km += 0.01) {
+        if (isInABlock(rideView(scene, km, "on-the-road").eye)) insideM += 10;
       }
+      expect(insideM, id).toBeLessThanOrEqual(mostM);
     }
   });
 
-  it("faces the way the road goes on every straight, whichever way that is, due north included", () => {
+  it("faces the way the road goes on every straight, whichever way that is, due north included, from above the road itself", () => {
     let straights = 0;
     for (const scene of [nyc, berlin]) {
       const { line } = scene;
-      for (let i = 10; i < line.km.length - 10; i += 1) {
-        // A straight long enough that the camera, 150 m behind, is on it too.
-        const around = line.bearing_deg.slice(i - 16, i + 6);
+      for (let i = 20; i < line.km.length - 20; i += 1) {
+        // A straight long enough that the stretch the camera takes its way from, 150 m either side
+        // of the runner, is on it: the camera begins to turn for a corner that far before it.
+        const around = line.bearing_deg.slice(i - 16, i + 16);
         if (around.some((bearing) => Math.abs(relativeBearing(line.bearing_deg[i], bearing)) > 1)) continue; // not a straight
         straights += 1;
+        // Within a few degrees: out of the loop onto the Queensboro Bridge the camera is still
+        // finishing that turn at the start of the lower deck (km 24.07), 4° off the road.
         const view = rideView(scene, line.km[i], "on-the-road");
-        expect(Math.abs(relativeBearing(line.bearing_deg[i], view.headingDeg)), `km ${line.km[i]}`).toBeLessThan(3);
+        expect(Math.abs(relativeBearing(line.bearing_deg[i], view.headingDeg)), `km ${line.km[i]}`).toBeLessThan(5);
+        // And on a straight the camera is over the road, 150 m back along it.
+        const off = metersFrom(positionAtKm(line, line.km[i] - 0.15), view.eye);
+        expect(Math.hypot(off.north, off.east), `km ${line.km[i]}`).toBeLessThan(14);
       }
     }
-    expect(straights).toBeGreaterThan(3000); // most of both courses, New York's northbound avenues among them
+    expect(straights).toBeGreaterThan(1500); // much of both courses, New York's northbound avenues among them
   });
 
   it("looks up a climb and down a descent: the road ahead is what it looks at", () => {
@@ -350,12 +371,8 @@ describe("From above", () => {
 
   it("turns with the course slowly: a change of direction is a sweep of several seconds, not a spin", () => {
     for (const scene of [cornerCourse(), nyc, berlin]) {
-      const swing = swingAlong(scene, "from-above");
+      const swing = fastestSwing(scene, "from-above");
       expect(swing.degPerS, `km ${swing.km.toFixed(3)}`).toBeLessThan(21);
-      // From above the Ride eases off for nothing (issue #24), so every metre is measured above and
-      // none is excused: what keeps the view from whipping round is the camera's own facing.
-      expect(swing.atItsSlowestM).toBe(0);
-      expect(swing.fastestAtItsSlowestDegPerS).toBe(0);
     }
   });
 });

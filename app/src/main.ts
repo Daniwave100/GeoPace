@@ -10,7 +10,7 @@ import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type 
 import { type Vicinity, vicinityOf } from "./core/map-bounds";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
-import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera, rideSpeedKmPerS } from "./core/ride";
+import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera } from "./core/ride";
 import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
 import { rideCourseFor, type RideScene, rideView, runnerInTheScene } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
@@ -503,13 +503,9 @@ function showWhere(km: number, byHand = false): void {
  */
 function startRide(scene: RideScene): Ride {
   const course = rideCourseFor(scene);
-  // How fast the Ride goes at every metre, and which way From above faces there, are worked out
-  // the first time they are asked, about 30 ms each: done now, while nothing is moving, rather than
-  // in the frame that follows the first Play.
-  setTimeout(() => {
-    RIDE_CAMERAS.forEach((camera) => rideSpeedKmPerS(course, 0, camera));
-    rideView(scene, 0, "from-above");
-  }, 0);
+  // Which way each camera faces at every metre is worked out the first time it is asked, about
+  // 30 ms each: done now, while nothing is moving, rather than in the frame that follows the first Play.
+  setTimeout(() => RIDE_CAMERAS.forEach((camera) => rideView(scene, 0, camera)), 0);
   const ride = createRide({
     course,
     frames: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
