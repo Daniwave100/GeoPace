@@ -7,7 +7,17 @@ elevation profile that shows where it's actually hard.
 
 ## Run the app
 
-You need [Node.js](https://nodejs.org/) 22.12 or newer. No Python, account, or API key.
+**With [Pinokio](https://pinokio.co), no terminal.** Pinokio installs and runs apps like this one, and brings its
+own Node.js and git.
+
+1. In Pinokio, choose **Create** in the sidebar and switch to **Download**. Paste
+   `https://github.com/Daniwave100/GeoPace` as the **Git URL**, name the folder `geopace`, and press **Create**.
+2. GeoPace's page runs **Install**, then **Start**, by itself. When the app is ready, **Open GeoPace** shows it.
+
+Next time, open GeoPace in Pinokio and it starts again. **Update** fetches the newest GeoPace and reinstalls;
+**Reset** clears the installed packages so **Install** starts clean. Tested with Pinokio 8.0.40 on a Mac.
+
+**With a terminal.** You need [Node.js](https://nodejs.org/) 22.12 or newer. No Python, account, or API key.
 
 ```sh
 cd app && npm install && npm run dev
