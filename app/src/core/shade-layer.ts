@@ -114,7 +114,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
       // The sun down, too low, or outside the hours worked out: none of those counts down, and none
       // of them comes or goes within a beat of race morning, so the stretch's start says it.
       if (first.state === "down" || first.state === "unknown") return clauseFor(first, fromKm, lengthKm, units, floorDeg, planner.carriedOver !== null, hours, filledIn(gaps, fromKm), leaves);
-      return stretchClauseFor(along, fromKm, toKm, planner.carriedOver !== null, gaps.find((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves);
+      return stretchClauseFor(along, fromKm, toKm, planner.carriedOver !== null, gaps.filter((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves);
     },
   };
 }
@@ -124,7 +124,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
  * shade" where the sun and the shade take turns. Never how far, which counts down, and never a
  * share of the stretch (D58: binary, every 10 m).
  */
-function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carriedOver: boolean, gap: NotMeasuredSpan | undefined, leaves: LeafNote): Clause {
+function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carriedOver: boolean, gaps: NotMeasuredSpan[], leaves: LeafNote): Clause {
   const first = along.at(fromKm);
   const states = new Set([first.state, ...along.runs.filter((run) => run.fromKm < toKm && run.toKm > fromKm).map((run) => run.state)]);
   const sunny = states.has("sun");
@@ -136,10 +136,15 @@ function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carried
       : sunny
         ? "In and out of the shade."
         : "In shade.";
-  if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}`, carriedOver };
+  // Worked out from a filled-in height where the road's is: greyed where most of the stretch is,
+  // and said, as the reason, wherever any of it is. A beat is 1.8 km from above, and a bridge's
+  // gap of 50 m in it doesn't make the rest of it any less measured.
+  const filledInKm = gaps.reduce((sum, gap) => sum + Math.max(0, Math.min(gap.km_end, toKm) - Math.max(gap.km_start, fromKm)), 0);
+  const filledIn = gaps.length > 0 ? `Part of the shade here is worked out from a height that is filled in, not measured. ${gaps[0].reason}` : undefined;
+  if (filledInKm > (toKm - fromKm) / 2) return { text, encoding: "not-measured", note: filledIn, carriedOver };
   // Some of the shade is a tree's: the whole clause rests on the leaves, as a tree's rim does.
-  if (states.has("leafy")) return { text, encoding: "depends-on-leaves", note: leaves.why, carriedOver };
-  return { text, encoding: "measured", carriedOver };
+  if (states.has("leafy")) return { text, encoding: "depends-on-leaves", note: [leaves.why, filledIn].filter(Boolean).join(" ") || undefined, carriedOver };
+  return { text, encoding: "measured", note: filledIn, carriedOver };
 }
 
 /**

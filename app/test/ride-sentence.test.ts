@@ -96,10 +96,28 @@ describe("each layer's clause for a stretch", () => {
     expect(hillsLayer(berlin).stretchClause(10, 11, "km")?.text).toBe("Flat.");
   });
 
-  it("Hills: greyed, with the reason, wherever the stretch crosses height that is filled in", () => {
-    // The middle of the Verrazzano's main span has no LiDAR returns: km 0.77 to 1.36 (D45).
-    const clause = hillsLayer(nyc).stretchClause(0.5, 1.0, "km");
+  it("Hills: a hill's clause looks as the hill's label on the map does, on both courses", () => {
+    // Greyed where more than half the hill is filled in, with the reason whenever any of it is
+    // (D45): the Queensboro Bridge's climb is all measured, and was struck through for a whole
+    // beat because the stretch ran on to the gaps in its lower deck (the owner's video, 09-25).
+    for (const bundle of [berlin, nyc]) {
+      const hills = hillsLayer(bundle);
+      for (const label of hills.lineLabels()) {
+        const clause = hills.stretchClause(label.startKm, label.startKm + 0.01, "km");
+        expect(clause?.encoding, `${bundle.course_id} hill from km ${label.startKm}`).toBe(label.encoding);
+        expect(clause?.note !== undefined, `${bundle.course_id} hill from km ${label.startKm}`).toBe(label.note !== undefined);
+      }
+    }
+    expect(hillsLayer(nyc).stretchClause(23.7, 25.5, "km")).toMatchObject({ encoding: "measured", note: undefined });
+    expect(hillsLayer(nyc).stretchClause(1.0, 2.0, "km")?.note).toMatch(/Verrazzano/);
+  });
 
+  it("Hills: flat, greyed where more than half of the stretch is filled in", () => {
+    // Between the Verrazzano's climb (to km 0.72) and its descent (from 0.86), most of it the
+    // unscanned main span (from 0.77).
+    const clause = hillsLayer(nyc).stretchClause(0.73, 0.85, "km");
+
+    expect(clause?.text).toBe("Flat.");
     expect(clause?.encoding).toBe("not-measured");
     expect(clause?.note).toMatch(/Verrazzano/);
   });
@@ -113,6 +131,18 @@ describe("each layer's clause for a stretch", () => {
 
     expect(shade.stretchClause(long.fromKm + 0.05, long.toKm - 0.05, "km")?.text).toBe(long.state === "sun" ? "In the sun." : "In shade.");
     expect(shade.stretchClause(changing.toKm - 0.04, changing.toKm + 0.04, "km")?.text).toBe("In and out of the shade.");
+  });
+
+  it("Shade: greyed only where more than half of the stretch is filled in, with the reason where any is", () => {
+    const planner = plannerFor(nyc, "09:10");
+    const shade = shadeLayer(nyc, planner)!;
+
+    // The Queensboro's approach and the first 250 m of its lower deck's gaps: mostly measured.
+    const mostly = shade.stretchClause(24.9, 25.4, "km");
+    expect(mostly?.encoding).not.toBe("not-measured");
+    expect(mostly?.note).toMatch(/filled in/);
+    // Most of it the Verrazzano's unscanned main span.
+    expect(shade.stretchClause(0.8, 1.2, "km")?.encoding).toBe("not-measured");
   });
 
   it("Shade: a tree's shade is still a claim that depends on the leaves", () => {
