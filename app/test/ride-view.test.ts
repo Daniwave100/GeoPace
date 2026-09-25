@@ -158,6 +158,26 @@ describe("On the road", () => {
     expect(ON_THE_ROAD_LOOK_UP_DEG).toBeLessThan(18);
   });
 
+  it("looks up less on a map too short to hold the runner 12 degrees under its middle, and never more", () => {
+    // With every layer's row on the strip the map is wide and short, and CesiumJS keeps the width
+    // of the view: 1280 x 380 px is a view 19 degrees top to bottom, and 12 degrees under its
+    // middle the runner was under the map's bottom edge (the owner, 09-25: "it cuts off the blue
+    // dot that represents the runner"). The lift gives way so they stay 4 degrees inside it.
+    const scene = cornerCourse();
+    const runner = positionAtKm(scene.line, 1);
+    const liftFor = (verticalFovDeg?: number) => {
+      const view = rideView(scene, 1, "on-the-road", { verticalFovDeg });
+      const behind = metersFrom(runner, view.eye);
+      return view.pitchDeg - (Math.atan2(100 - view.eye.heightM, -behind.north) * 180) / Math.PI;
+    };
+
+    expect(liftFor(36)).toBeCloseTo(ON_THE_ROAD_LOOK_UP_DEG, 6); // the view the lift was chosen for
+    expect(liftFor(50)).toBeCloseTo(ON_THE_ROAD_LOOK_UP_DEG, 6); // a tall map: no more than chosen
+    expect(liftFor(19.4)).toBeCloseTo(19.4 / 2 - 4, 6); // every layer on: 4 degrees inside the edge
+    expect(liftFor(6)).toBeCloseTo(0, 6); // a sliver of a map: straight at the runner, never below them
+    expect(liftFor()).toBeCloseTo(ON_THE_ROAD_LOOK_UP_DEG, 6); // not told: as chosen
+  });
+
   it("is still behind the runner on the start line and on the finish line, where there is no road behind or ahead to follow", () => {
     const scene = cornerCourse();
     for (const km of [0, 0.01, 3.99, 4]) {

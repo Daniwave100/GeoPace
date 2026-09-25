@@ -40,7 +40,7 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isFlying, isLookingStraightDown, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isFlying, isLookingStraightDown, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, verticalFovDeg, watchCameraHeight } from "./scene/globe";
 import { keepTheMapInTheVicinity } from "./scene/map-bounds";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
@@ -610,7 +610,7 @@ function followTheRide(how: HowItMoved): void {
     return;
   }
   rideCamera.follow(() => {
-    const options = { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) };
+    const options = { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()), verticalFovDeg: verticalFovDeg(map) };
     return riding.ride.straightDown ? straightDownView(riding.rideScene, riding.km, options) : rideView(riding.rideScene, riding.km, riding.ride.camera, options);
   }, how);
 }
