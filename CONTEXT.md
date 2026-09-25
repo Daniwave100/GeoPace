@@ -141,6 +141,10 @@ _Avoid_: caption, subtitle, summary
 **Clause**:
 One short, complete statement in the sentence: a layer's, the nearby landmark's, or the sun's. Anything more it has to say (why a value is filled in, whose list a station is on) is its tooltip, never printed under the sentence (D63).
 
+**Beat**:
+While a Ride plays, how long one sentence stays up (4 seconds), and the stretch of course the Ride covers in that time. The sentence for a beat says only what is true of the whole stretch, so it never counts down ("Water at 38 km.", not "Water in 1.7 km."); paused, scrubbed or in Explore the sentence follows the runner instead (D68).
+_Avoid_: tick, refresh, subtitle
+
 **What the marks mean**:
 The key, as a sheet one press from the layer switches: the course line, each layer's marks (Aid's drawn beside their words), solid / grey / dotted, where this course's height is filled in and why, and how to move the map and the strip. Nothing of it is on the first screen (D63).
 _Avoid_: legend, help, definitions

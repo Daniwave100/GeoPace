@@ -30,7 +30,7 @@ import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
 import type { Encoding } from "./encoding";
 import type { Clause, HowMuch, Layer, LineMark, RowBin, RowValue, StripRow } from "./layers";
 import type { Planner } from "./planner";
-import { sunAlong, type SunAt, type SunRun, type SunState } from "./sun";
+import { sunAlong, type SunAlong, type SunAt, type SunRun, type SunState } from "./sun";
 import { formatNearby, type Units } from "./units";
 
 /** How deep the warm and the teal are on a binary layer: one step, not a scale. */
@@ -108,7 +108,38 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     lineMarks: () => marks,
     lineLabels: () => [],
     clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km), leaves),
+    stretchClause: (fromKm, toKm, units) => {
+      const hours = { firstStep, lastStep, timezone: bundle.course.timezone };
+      const first = along.at(fromKm);
+      // The sun down, too low, or outside the hours worked out: none of those counts down, and none
+      // of them comes or goes within a beat of race morning, so the stretch's start says it.
+      if (first.state === "down" || first.state === "unknown") return clauseFor(first, fromKm, lengthKm, units, floorDeg, planner.carriedOver !== null, hours, filledIn(gaps, fromKm), leaves);
+      return stretchClauseFor(along, fromKm, toKm, planner.carriedOver !== null, gaps.find((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves);
+    },
   };
+}
+
+/**
+ * Shade over a stretch of the Ride: one state where the whole stretch is in it, "in and out of the
+ * shade" where the sun and the shade take turns. Never how far, which counts down, and never a
+ * share of the stretch (D58: binary, every 10 m).
+ */
+function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carriedOver: boolean, gap: NotMeasuredSpan | undefined, leaves: LeafNote): Clause {
+  const first = along.at(fromKm);
+  const states = new Set([first.state, ...along.runs.filter((run) => run.fromKm < toKm && run.toKm > fromKm).map((run) => run.state)]);
+  const sunny = states.has("sun");
+  const text =
+    states.size === 1
+      ? first.alwaysInSun && first.alwaysUntilKm >= toKm
+        ? "No shade, at any hour."
+        : `In ${whereYouAre(first.state)}.`
+      : sunny
+        ? "In and out of the shade."
+        : "In shade.";
+  if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}`, carriedOver };
+  // Some of the shade is a tree's: the whole clause rests on the leaves, as a tree's rim does.
+  if (states.has("leafy")) return { text, encoding: "depends-on-leaves", note: leaves.why, carriedOver };
+  return { text, encoding: "measured", carriedOver };
 }
 
 /**

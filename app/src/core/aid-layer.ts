@@ -104,6 +104,7 @@ export function aidLayer(bundle: CourseBundle, planner: Planner): Layer | null {
     lineMarks: () => [],
     lineLabels: () => labels,
     clause: (km, units) => clauseFor(km, stations, units, carriedOver),
+    stretchClause: (fromKm, toKm, units) => stretchClauseFor(fromKm, toKm, stations, units, carriedOver),
   };
 }
 
@@ -144,6 +145,23 @@ function clauseFor(km: number, stations: AidStation[], units: Units, carriedOver
     encoding: "measured",
     note: noteFor(next, carriedOver),
     carriedOver: next.carriedOver,
+    carriedOverSaid: LAST_YEARS_LIST,
+  };
+}
+
+/**
+ * The station a stretch of the Ride passes, by its name, or else the next one by where it is:
+ * "at 38 km" stays true while the Ride goes there, where "in 1.7 km" would be stale before it was read.
+ */
+function stretchClauseFor(fromKm: number, toKm: number, stations: AidStation[], units: Units, carriedOver: { from_edition: number; reason: string } | undefined): Clause {
+  const passed = stations.find((station) => station.km >= fromKm - AT_IT_KM && station.km <= toKm);
+  const station = passed ?? stations.find((candidate) => candidate.km > toKm);
+  if (!station) return { text: "No more aid stations.", encoding: "measured" };
+  return {
+    text: `${capital(servesInWords(station))} at ${passed ? `the ${stationName(station, units)} station` : stationName(station, units)}.`,
+    encoding: "measured",
+    note: noteFor(station, carriedOver),
+    carriedOver: station.carriedOver,
     carriedOverSaid: LAST_YEARS_LIST,
   };
 }
