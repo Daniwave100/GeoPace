@@ -294,10 +294,7 @@ under **Sources & credits**.
 
 ## Status, licence and what's next
 
-**v0.1.0, the first public release.** Two courses: Berlin, Sunday 27 September 2026, and New York City,
-whose 2026 date the organizer hasn't confirmed yet and whose start times and aid stations are
-2025's until they publish this year's; the app marks each of them. Times assume an even pace. Built
-and tested in Chrome on a Mac; the Pinokio install is untested on Windows and Linux.
+**v0.1.0, the first public release.** Two courses: Berlin, Sunday 27 September 2026, and New York City.
 
 **Licence.** The code is [MIT](LICENSE). The data keeps its sources' licences (the table above), and
 geometry derived from OpenStreetMap is under the ODbL.
