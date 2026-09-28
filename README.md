@@ -8,8 +8,8 @@
 
 <sub>In photoreal mode, which uses a Google or Cesium key.</sub>
 
-**Open-source, no Python** Install it with [Pinokio](#one-click-no-terminal) in one click, or
-[from the terminal](#terminal). **[→ Quick start](#quick-start)**
+**Open-source, no Python** Install it with [Pinokio](#method-1-easiest-no-terminal) in one click, or
+[from the terminal](#method-2-terminal). **[→ Quick start](#quick-start)**
 
 </div>
 
@@ -17,7 +17,7 @@
 
 <div align="center">
 
-**[Why](#why-this-exists) · [What it does](#what-it-does) · [The first five minutes](#the-first-five-minutes) · [Quick start](#quick-start) · [Keys](#keys-and-what-they-cost) · [How it's built](#how-its-built) · [Data](#data-sources-and-licences)**
+**[What is GeoPace](#what-is-geopace) · [The first five minutes](#the-first-five-minutes) · [Quick start](#quick-start) · [Keys](#keys-and-what-they-cost) · [How it's built](#how-its-built) · [Data](#data-sources-and-licences)**
 
 </div>
 
