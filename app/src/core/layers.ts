@@ -39,6 +39,12 @@ export interface Layer {
   lineLabels(): MarkLabel[];
   /** Its clause in the sentence where the runner is, or null when it has nothing to say there. */
   clause(km: number, units: Units): Clause | null;
+  /**
+   * Its clause for a stretch that a Ride that plays is about to cover (PLAN.md D68): true of every
+   * metre of it, because it stays up for the whole beat, and so never a countdown ("in 1.7 km",
+   * "for the next 50 m"), which is stale before anyone has read it. null when it has nothing to say.
+   */
+  stretchClause(fromKm: number, toKm: number, units: Units): Clause | null;
 }
 
 /** One clause of the sentence: a short, complete statement ending in a full stop. */
@@ -225,6 +231,8 @@ export interface OnScreen {
   lineLabels: MarkLabel[];
   /** Every on layer's clause where the runner is, in the layers' order, leaving out the ones with nothing to say. */
   clauses(km: number, units: Units): Clause[];
+  /** The same for a stretch of a Ride that plays (`Layer.stretchClause`). */
+  stretchClauses(fromKm: number, toKm: number, units: Units): Clause[];
 }
 
 /** What the layers put on the strip, on the map and in the sentence, for these switches. */
@@ -236,5 +244,6 @@ export function onScreen(state: LayerState, layers: Layer[]): OnScreen {
     lineMarks: on.flatMap((layer) => layer.lineMarks()),
     lineLabels: on.flatMap((layer) => layer.lineLabels()),
     clauses: (km, units) => on.map((layer) => layer.clause(km, units)).filter((clause): clause is Clause => clause !== null),
+    stretchClauses: (fromKm, toKm, units) => on.map((layer) => layer.stretchClause(fromKm, toKm, units)).filter((clause): clause is Clause => clause !== null),
   };
 }

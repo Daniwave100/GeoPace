@@ -10,6 +10,7 @@ import type { CourseLine, NotMeasuredSpan } from "../bundle/types";
 import { relativeBearing } from "./bearing";
 import type { RideCamera, RideCourse } from "./ride";
 import { positionAtKm, type RoadPosition } from "./scrub";
+import { clamp } from "./series";
 
 /**
  * On the road: how far above the road the camera rides. The one setting issue #8 asks for. It was
@@ -27,6 +28,14 @@ export const ON_THE_ROAD_HEIGHT_M = 76.2;
  * in the top of it: a chase camera, not a look down.
  */
 export const ON_THE_ROAD_LOOK_UP_DEG = 12;
+
+/**
+ * How far inside the bottom edge of the view On the road keeps the runner, in degrees, where the
+ * map is too short to hold them the lift's 12 degrees under its middle: with every layer's row on
+ * the strip the map is wide and short, CesiumJS keeps the width of the view, and the runner was
+ * under the map's bottom edge (the owner, 09-25: "it cuts off the blue dot"). There the lift gives way.
+ */
+const RUNNER_INSIDE_THE_EDGE_DEG = 4;
 
 /** How a camera faces: the way the course goes over a stretch of it round the runner, turning no faster than it may. */
 interface Facing {
@@ -149,6 +158,8 @@ export interface RideViewOptions {
    * of what the runner can see (core/framing.ts); looking a little left puts them there.
    */
   leftOfRunner?: number;
+  /** How tall the map's view is, top to bottom, in degrees: On the road looks up less where it is short. Left out, it looks up as chosen. */
+  verticalFovDeg?: number;
 }
 
 /** The course as the Ride needs it: its length and its Stops. */
@@ -230,7 +241,8 @@ export function rideView(scene: RideScene, km: number, camera: RideCamera, optio
     const eye = moved(runner, headingDeg + 180, ON_THE_ROAD.behindM);
     const behindKm = km - ON_THE_ROAD.behindM / 1000;
     const heightM = roadM(placeAlong(line, behindKm), behindKm) + ON_THE_ROAD_HEIGHT_M;
-    return { eye: { ...eye, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, ON_THE_ROAD.behindM) / RAD + ON_THE_ROAD_LOOK_UP_DEG };
+    const lift = options.verticalFovDeg === undefined ? ON_THE_ROAD_LOOK_UP_DEG : clamp(options.verticalFovDeg / 2 - RUNNER_INSIDE_THE_EDGE_DEG, 0, ON_THE_ROAD_LOOK_UP_DEG);
+    return { eye: { ...eye, heightM }, headingDeg, pitchDeg: Math.atan2(roadM(runner, km) - heightM, ON_THE_ROAD.behindM) / RAD + lift };
   }
 
   const { rangeM } = FROM_ABOVE;

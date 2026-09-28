@@ -166,6 +166,19 @@ export function mapView(viewer: Viewer, coveredLeftPx: number): MapView {
   return { fovRad: horizontalFov(viewer), viewWidthPx: viewer.canvas.clientWidth, viewHeightPx: viewer.canvas.clientHeight, coveredLeftPx };
 }
 
+/**
+ * How tall the map's view is, top to bottom, in degrees. CesiumJS keeps the width of the view, so a
+ * short, wide map (every layer's row on the strip) sees much less of the height: On the road looks
+ * up less there, so the runner stays inside it (core/ride-view.ts).
+ */
+export function verticalFovDeg(viewer: Viewer): number {
+  const widthPx = viewer.canvas.clientWidth;
+  const heightPx = viewer.canvas.clientHeight;
+  const across = horizontalFov(viewer);
+  if (widthPx === 0 || heightPx === 0) return CesiumMath.toDegrees(across);
+  return CesiumMath.toDegrees(2 * Math.atan((Math.tan(across / 2) * heightPx) / widthPx));
+}
+
 function horizontalFov(viewer: Viewer): number {
   const frustum = viewer.camera.frustum;
   if (!(frustum instanceof PerspectiveFrustum) || frustum.fov === undefined) return CesiumMath.toRadians(60);

@@ -82,6 +82,21 @@ export function hillsLayer(bundle: CourseBundle): Layer {
       const text = Math.abs(at.gradePercent) < FLAT_BELOW_PERCENT ? "Flat." : `${at.gradePercent > 0 ? "Climbing" : "Downhill"} ${Math.max(percent, 1)}%.`;
       return at.notMeasured === null ? { text, encoding: "measured" } : { text, encoding: "not-measured", note: at.notMeasured };
     },
+    stretchClause(fromKm, toKm, units) {
+      // The hill the stretch is on or comes to, in its own words from the map's label: its grade
+      // and its length are facts about the hill, and don't count down as the Ride goes up it. It
+      // looks as that label does: greyed where more than half the hill is filled in, with the
+      // reason whenever any of it is.
+      const hill = hills.find((candidate) => candidate.fromKm < toKm && candidate.toKm > fromKm);
+      if (hill) {
+        const label = labels[hills.indexOf(hill)];
+        return { text: `${hill.kind === "climb" ? "Climbing" : "Downhill"} ${Math.abs(hill.meanGradePercent).toFixed(1)}% for ${formatNearby(hill.toKm - hill.fromKm, units)}.`, encoding: label.encoding, note: label.note };
+      }
+      // No hill: the stretch is flat, which is a claim about its height where it is filled in too.
+      const filledInKm = gaps.reduce((sum, span) => sum + Math.max(0, Math.min(span.km_end, toKm) - Math.max(span.km_start, fromKm)), 0);
+      const gap = gaps.find((span) => span.km_start < toKm && span.km_end > fromKm);
+      return { text: "Flat.", encoding: filledInKm > (toKm - fromKm) / 2 ? "not-measured" : "measured", note: gap?.reason };
+    },
   };
 }
 

@@ -6,15 +6,15 @@ import type { CourseBundle } from "./bundle/types";
 import { loadWhiteModel, type WhiteModel, WhiteModelError } from "./bundle/white-model";
 import { aidLayer } from "./core/aid-layer";
 import { heightRow, hillsLayer } from "./core/hills-layer";
-import { type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
+import { type Clause, type Layer, type LayerState, type MarkLabel, NO_LAYERS, onScreen, type OnScreen, pressEverything, pressLayer, type StripRow } from "./core/layers";
 import { type Vicinity, vicinityOf } from "./core/map-bounds";
 import { createPlanner, type Planner, plannerCourse, type PlannerCourse, type RacePlan } from "./core/planner";
 import { formatElapsed } from "./core/race-clock";
-import { createRide, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera } from "./core/ride";
+import { createRide, cruiseKmPerS, type HowItMoved, type Ride, RIDE_CAMERAS, type RideCamera } from "./core/ride";
 import { spaceBarForTheRide, type WhereThePressLands } from "./core/ride-keys";
 import { rideCourseFor, type RideScene, rideView, runnerInTheScene, straightDownView } from "./core/ride-view";
 import { positionAtKm } from "./core/scrub";
-import { sentenceAt } from "./core/sentence";
+import { BEAT_SECONDS, beatIsDue, sentenceAlong, sentenceAt } from "./core/sentence";
 import { type Stop, stopLine, stopsAround, stopsFor } from "./core/stops";
 import { loadStripSize, saveStripSize } from "./core/strip-size";
 import { shadeLayer } from "./core/shade-layer";
@@ -40,7 +40,7 @@ import { createRideControls } from "./ride/ride-controls";
 import { loadPlan, loadUnits, rememberedCourseId, savePlan, saveUnits } from "./plan/plan-store";
 import { createSplitsTable } from "./plan/splits-table";
 import { showCourseLine } from "./scene/course-line";
-import { createGlobe, frameCourse, goTo, isFlying, isLookingStraightDown, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, watchCameraHeight } from "./scene/globe";
+import { createGlobe, frameCourse, goTo, isFlying, isLookingStraightDown, isStillFramed, leftOfMiddle, mapView, showMapTheme, showMoment, toggleStraightDown, useRoadAsGroundWhenHidden, verticalFovDeg, watchCameraHeight } from "./scene/globe";
 import { keepTheMapInTheVicinity } from "./scene/map-bounds";
 import { createMapDots, type MapDot, type MapDots } from "./scene/map-dots";
 import { createMapLabels, type MapLabel, type MapLabels } from "./scene/map-labels";
@@ -111,6 +111,8 @@ let rideSpeedChoice = 1;
 let wasRiding = false;
 /** Whether the Ride was playing then: a pause is not a jump, and the camera must not be told it is one. */
 let wasPlaying = false;
+/** When the sentence now up in a Ride that plays went up (performance.now); null when none is, and the next goes up at once (PLAN.md D68). */
+let beatStartedMs: number | null = null;
 /** How much of the map's left side the readout block covers; null until it is next measured (`coveredLeftPx`). */
 let coveredLeft: number | null = null;
 let rideCamera: CameraInTheScene | undefined;
@@ -421,6 +423,7 @@ function showPlan(): void {
  */
 function showLayers(): void {
   if (!showing || !viewer || !mapLabels) return;
+  beatStartedMs = null; // a layer on or off, or other units: the sentence says so now, not at the next beat
   const { bundle, layers } = showing;
   const screen = (showing.screen = onScreen(layerState, layers));
   layerBar.show(layerState, layers);
@@ -497,10 +500,32 @@ function showWhere(km: number, byHand = false): void {
   const spoken = `${unitName(units)} ${distanceNumber(readout.km, units, 1)}, ${readout.localClock}${carriedOver}, ${formatElapsed(readout.elapsedSeconds)} elapsed. ${sentenceInWords(sentence)}`;
   strip.setKm(readout.km, spoken, showing.ride.playing && !byHand);
   readoutView.show(planner, readout, units);
-  sentenceView.show(sentence);
+  showSentence(readout.km, sentence, byHand);
   mapDots?.show([...endDots(bundle), { id: "runner", look: "runner", place }], placement);
   showMoment(viewer, readout.instant);
   showRideControls();
+}
+
+/**
+ * The sentence on the screen. While a Ride plays it changes in beats (PLAN.md D68): a new one every
+ * BEAT_SECONDS, saying what is true of the whole stretch the Ride covers before the next, because
+ * one rewritten with every frame can't be read (the owner, 09-24: "It changes so fast that a user
+ * does not have the opportunity to actually even read it"). Paused, scrubbed by hand, or in
+ * Explore, it follows the runner as it always has, `live`.
+ */
+function showSentence(km: number, live: Clause[], byHand: boolean): void {
+  if (!showing) return;
+  const { ride } = showing;
+  if (!ride.playing || byHand) {
+    beatStartedMs = null;
+    sentenceView.show(live);
+    return;
+  }
+  const now = performance.now();
+  if (!beatIsDue(beatStartedMs, now)) return;
+  beatStartedMs = now;
+  const stretchKm = BEAT_SECONDS * ride.speed * cruiseKmPerS(ride.camera);
+  sentenceView.show(sentenceAlong({ bundle: showing.bundle, planner: showing.planner, fromKm: km, toKm: km + stretchKm, units, layerClauses: showing.screen.stretchClauses }));
 }
 
 /**
@@ -518,6 +543,7 @@ function startRide(scene: RideScene): Ride {
     frames: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
     reducedMotion: () => reducedMotion.matches,
     onMove: (km, how) => {
+      if (how === "jump") beatStartedMs = null; // somewhere else: what was up is about the road left behind
       showWhere(km);
       followTheRide(how);
     },
@@ -531,6 +557,7 @@ function startRide(scene: RideScene): Ride {
 /** The Ride was started, paused, left, or given the other camera. */
 function showRide(): void {
   if (!showing) return;
+  beatStartedMs = null; // played, paused, or another camera or speed: the stretch a beat covers is another
   showWhere(showing.km); // paused, the strip says where that is; and the controls follow
   // Started, resumed after the runner looked around, or given the other camera: the camera glides
   // to where the Ride is. A pause is none of those. The camera is a frame behind the Ride when it
@@ -583,7 +610,7 @@ function followTheRide(how: HowItMoved): void {
     return;
   }
   rideCamera.follow(() => {
-    const options = { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()) };
+    const options = { heightAt: roadHeight(), leftOfRunner: leftOfMiddle(map, coveredLeftPx()), verticalFovDeg: verticalFovDeg(map) };
     return riding.ride.straightDown ? straightDownView(riding.rideScene, riding.km, options) : rideView(riding.rideScene, riding.km, riding.ride.camera, options);
   }, how);
 }

@@ -17,7 +17,7 @@ const nyc = bundleFor("nyc");
 const berlin = bundleFor("berlin");
 
 /** A stand-in for a layer a later ticket will add, to show the system isn't built around Hills. */
-const wind: Layer = { id: "wind", name: "Wind", rows: () => [], lineMarks: () => [], lineLabels: () => [], clause: () => ({ text: "Crosswind from your left.", encoding: "measured" }) };
+const wind: Layer = { id: "wind", name: "Wind", rows: () => [], lineMarks: () => [], lineLabels: () => [], clause: () => ({ text: "Crosswind from your left.", encoding: "measured" }), stretchClause: () => ({ text: "Crosswind from your left.", encoding: "measured" }) };
 /** Shade, the second layer there really is: built from the course and from one runner's plan (#9). */
 const shade = shadeLayer(nyc, createPlanner(plannerCourse(nyc), defaultPlan(plannerCourse(nyc))))!;
 
