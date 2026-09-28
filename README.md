@@ -2,19 +2,13 @@
 
 # GeoPace
 
-### Run the course before race day.
-
-The Berlin and New York City marathons in 3D, on each city's own open data: every hill, every
-shadow and every water station, at the minute you'll reach it.
-
-_The rally driver's roadbook, for the marathon._
+### Run your marathon's course before race day.
 
 ![The last 4 km of the Berlin Marathon, ridden from above over Google's photographed city: from Potsdamer Platz past the Gendarmenmarkt and through the Brandenburg Gate to the finish, while the kilometre, the clock and the strip keep up](docs/media/hero-berlin-finish.gif)
 
-<sub>In photoreal, which uses your own Google or Cesium key. Without one, the city stands as its own buildings in plain
-white blocks, with race day's shadows.</sub>
+<sub>In photoreal mode, which uses a Google or Cesium key.</sub>
 
-**No account, no key, no Python.** Install it with [Pinokio](#one-click-no-terminal) in one click, or
+**Open-source, no Python** Install it with [Pinokio](#one-click-no-terminal) in one click, or
 [from the terminal](#terminal). **[→ Quick start](#quick-start)**
 
 </div>
@@ -27,41 +21,25 @@ white blocks, with race day's shadows.</sub>
 
 </div>
 
----
-
-## Why this exists
-
-> ✍️ **Owner:** two or three sentences here, in your own voice (issue #50).
 
 ---
 
-## What it does
+## What is GeoPace?
 
-- **Race morning's shadows, on the city's own buildings.** The real buildings along the course stand
-  as plain white blocks, from each city's own open data, and their shadows fall where the sun will put
-  them at the minute you get there. No key needed.
-- **Ride the course.** The runner is carried from the start to the finish: from above, in about a minute
-  and a half, or on the road, 250 ft up, in about six. Play it from ¼× to 4×, and drag the map to look
-  around while it plays.
-- **Hills.** Every climb and descent coloured on the course line by how steep it is, with its grade and
-  the effort it costs against flat ground.
-- **Shade.** Sun, a building's shade or a tree's, every 10 m of the course, at the minute you reach it.
-- **Aid and fueling.** Every station and what it serves, from the organizer's own list. Put your gels in
-  the plan and it tells you where the next water is too far away.
-- **Your race plan.** A goal time or a pace, your start time from your start card, and the time of day
-  at every kilometre or mile. It assumes an even pace, and it says so.
-- **Bridges at their real height.** The Verrazzano's upper deck and the Queensboro's lower one, measured
-  from New York's LiDAR. The usual terrain models would put the start at sea level.
+GeoPace is a marathon planning app that enables users to view detailed insights of their marathon course all in one dashboard. GeoPace includes:
+
+- **Race morning shade** Using NOAA's Solar Calculator and each city's open data, GeoPace maps out where you'll get building shade and partial tree shade. 
+- **Ride the course.** Ride the course from start to finish from above or through the streets, all in 3d.
+- **Hills.** Visualize each climb and descent coloured on how steep it is, with grade and effort cost against flat ground.
+- **Aid and fueling.** Plan your race-day fueling by seeing each station and what it serves, from the organizer's own list. 
+- **Your race plan.** Input your goal time or pace and GeoPace will calculate your estimated time/required pace. 
 - **Kilometres or miles, light or dark.**
-- **Photoreal, with your own key.** Google's photographed 3D city under the course, and the course drawn
-  at the road's own height over it.
-- **Every fact has a source.** A height that was filled in rather than measured is greyed out on the
-  map, the strip and the sentence, and a time that rests on last year's start is marked carried over.
+- **Block mode if you don't have a key.** GeoPace defaults to the modeled building and tree map if you do not have Photorealmode enabled (requires key).
 
 ![New York's start, on the road over the Verrazzano-Narrows Bridge: the course runs on the upper deck, at the height measured from the city's LiDAR, and where the scan missed the middle of the main span the sentence and the strip grey it out as not measured](docs/media/nyc-verrazzano.gif)
 
-_New York's start, on the Verrazzano's upper deck. The middle of the main span has no LiDAR returns,
-so its height is filled in, and the app says so._
+_New York's start, on the Verrazzano's upper deck. The middle of the brdige has no LiDAR returns,
+so its height is filled in. 
 
 ---
 
@@ -73,30 +51,27 @@ own buildings in white blocks, with race day's shadows.
 1. **Pick Berlin.** The app opens on the whole course from above, drawn in blue on plain paper, with the
    city's buildings standing along it. Beside the map: the distance as one giant numeral, the time of
    day, the time since the start, and one sentence about where you are.
-2. **Switch on a layer.** Each one marks the course line, adds its own chart to the strip and its own
-   clause to the sentence. Here each is on alone, the Ride playing at half speed.
+2. **Switch on a layer.** Each layer marks the course line, adds its own chart to the strip and its own
+   clause to the sentence.
 
-   **Hills.** Every climb and descent banded on the course line, yellow to red going up and aqua to teal
-   coming down, the darker the steeper, with the grade and the effort it costs against flat ground.
+   **Hills.** Every climb and descent is coloured on the course line, yellow to red going up and aqua to teal
+   coming down. The darker the steeper, with the grade and the effort it costs against flat ground.
    Berlin is flat, so here is New York, up and over the Queensboro Bridge into Manhattan:
 
    ![Hills alone, in New York: the Ride climbs the Queensboro Bridge and comes down onto First Avenue; the course line is banded by steepness with each hill's grade and length, the strip shows the grade and the effort, and the sentence says "Climbing 3.0% for 1.3 km"](docs/media/tour-hills.gif)
 
-   **Shade.** Sun, a building's shade or a tree's, every 10 m, at the minute you get there: a dark rim
-   beside the course line, dotted where the shade is a tree's, and its own row on the strip.
+   **Shade.** Calculated sun or shade at the minute you get there. A dark rim
+   beside the course line represents building shade while a dotted line represents tree shade.
 
    ![Shade alone, in Berlin on race morning: a dark rim runs beside the blue line where the road will be in shade, dotted where the shade is a tree's, and the strip's Shade row and the sentence say the same](docs/media/tour-shade.gif)
 
-   **Aid.** Every station and what it serves, as a chip on the course line with a mark for each thing,
-   and the stations as a row on the strip with its key.
+   **Aid.** Every station and what it serves, as a marker on the course line for each resource.
 
    ![Aid alone, in Berlin: the Ride passes the 9 km station, whose chip names what it serves, while the strip's Stations row and the sentence say what is next](docs/media/tour-aid.gif)
 
-   **All three at once**, and every chart on the strip reads the same course:
+   **All three at once**, Turn on as many layers as you'd like.
 
    ![Hills, Shade and Aid on together past Rathaus Schöneberg: the course line carries a hill's band, the shade's rim and a station's chip, the strip shows every row, and the sentence has a clause from each](docs/media/tour-all-layers.gif)
-
-   **What the marks mean** explains every mark.
 
 3. **Drag the strip.** The band along the bottom is the whole course. Drag it, click it or use the arrow
    keys, and the runner, the clock and the sentence move together. Without a key, the city's white
@@ -111,7 +86,7 @@ own buildings in white blocks, with race day's shadows.
 
    ![The Ride on the road, 250 ft up, down Unter den Linden and through the Brandenburg Gate to the finish in the Tiergarten](docs/media/tour-on-the-road.gif)
 
-   _While the Ride plays, the sentence holds for four seconds at a time and says what is true of the road ahead._
+   _While the Ride plays, a short summary of your current stretch is displayed on the left of the screen._
 
 5. **Type your goal time.** Open **Your race plan**, type a finish time or a pace, and every kilometre
    gets its time of day. Type in the start time on your start card, and add your gels to check them
@@ -166,7 +141,7 @@ ground.
 
 ## Quick start
 
-### One click, no terminal
+### Method 1: (Easiest, no terminal)
 
 [Pinokio](https://pinokio.co) installs and runs apps like this one, and brings its own Node.js and git.
 
@@ -177,13 +152,12 @@ ground.
 3. GeoPace's page runs **Install**, then **Start**, by itself. When the app is ready, **Open GeoPace**
    shows it.
 
-Next time, open GeoPace in Pinokio and it starts again. **Update** fetches the newest GeoPace and
-reinstalls; **Reset** clears the installed packages so **Install** starts clean. Tested with
-Pinokio 8.0.40 on a Mac.
+Open GeoPace in Pinokio and it starts. **Update** fetches the newest GeoPace and
+reinstalls; **Reset** clears the installed packages so **Install** starts clean. 
 
-### Terminal
+### Method 2: (Terminal)
 
-You need [Node.js](https://nodejs.org/) 22.12 or newer. No Python, no account and no key.
+You need [Node.js](https://nodejs.org/) 22.12 or newer.
 
 ```sh
 git clone https://github.com/Daniwave100/GeoPace.git
@@ -199,13 +173,12 @@ Open http://localhost:5173 and pick a course: **Berlin** or **New York City**.
 ## Keys and what they cost
 
 Everything above works without a key. **Make it photoreal** is the one thing that needs one, because
-Google's photographed city isn't free to show and GeoPace can't come with a key of its own. It uses
-yours:
+Google's photographed city isn't free to show. It uses
+your:
 
-- a **Cesium ion token** is free for personal, non-commercial use and takes about five minutes;
-- a **Google Maps key** needs a Google Cloud project with billing switched on. The first 1,000 loads a
-  month are free, then Google charges $6.00 per 1,000. (Checked 2026-09-18; the app links each
-  provider's own page.)
+- a **Google Maps key (Recommended for best visuals)** needs a Google Cloud project with billing switched on. The first 1,000 loads a
+  month are free, then Google charges $6.00 per 1,000. Get a key here: https://developers.google.com/maps/documentation/javascript/get-api-key
+- a **Cesium ion token** is free for personal, non-commercial use and takes about five minutes. Get a key here: https://cesium.com/platform/cesium-ion/
 
 Your key stays in your browser. It is never written to GeoPace's files and is sent only to the provider
 it belongs to; **Forget my key** removes it. If the imagery can't be had (a refused key, a used-up
@@ -218,8 +191,7 @@ GeoPace's numbers come from it, which is why the white model steps aside while i
 
 ## How it's built
 
-A Python pipeline turns each city's open data into one file per course, the **Course Bundle**, which
-is committed to the repo. The app reads it in the browser and needs no Python, no server and no key.
+A Python pipeline turns each city's open data into one file per course, the **Course Bundle**. The app reads it in the browser and needs no Python, no server and no key to do this.
 
 - **The route** is the organizer's own course file where there is one (Berlin). New York publishes
   none you can download, so the pipeline traces it along OpenStreetMap streets from the city's list of
@@ -237,8 +209,6 @@ is committed to the repo. The app reads it in the browser and needs no Python, n
 - **The sun** is worked out with NOAA's equations for every 10 m of the course, every five minutes of
   race day, against the city's own buildings and trees. The app looks up the minute your plan
   puts you there.
-- **Race dates and start times** are written down per edition from the organizer's own pages, in the
-  race's own time zone. New York's 2026 race falls on the morning the clocks go back.
 - **The effort a hill costs** is from [Minetti et al. 2002](https://doi.org/10.1152/japplphysiol.00103.2002),
   and isn't shown for grades outside that model's range.
 
@@ -336,5 +306,10 @@ geometry derived from OpenStreetMap is under the ODbL.
 
 **What's next.**
 
-> ✍️ **Owner:** in your own words (issue #50). The layers not built yet, wind (#11) and what runners
-> say about the course (#13), can be named here.
+- Wind - headwind/tailwind and conditions
+- Fan zones - Areas with lots of fan support and areas that are quiet
+- Congestion zones - Areas that runners tend to funnel and bunch together
+- Custom weather conditions
+- Custom/personal race routes
+-  Grade-adjusted pacing
+- More majors - Chicago, Tokyo, Boston, London
