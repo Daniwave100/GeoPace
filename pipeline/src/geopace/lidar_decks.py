@@ -113,17 +113,16 @@ def deck_heights(returns: list[np.ndarray], deck: str | None, where: str) -> np.
     passes over or under it there (a ramp, a walkway, the other level of a double-deck bridge).
     Layers with far fewer returns than the busiest are discarded, then:
 
-    - one layer left: that is the deck.
-    - several, and the course facts name a deck ("upper"/"lower"): take that one. A bridge that is
-      double-decked the whole way (NYC's Queensboro) can only be resolved this way.
-    - several, and no deck named: a deck runs on unbroken, so take the layer nearest the height of
-      the closest point that was not ambiguous. That is how a bridge passing under something else
-      for a few meters resolves itself.
+    - no deck named: one layer left is the deck. Several, and a deck runs on unbroken, so take the
+      layer nearest the height of the closest point that was not ambiguous. That is how a bridge
+      passing under something else for a few meters resolves itself.
+    - the course facts name a deck ("upper"/"lower"): a bridge that is double-decked the whole way
+      (NYC's Queensboro) can only be resolved this way, and `_named_deck` says how.
     """
     layers = [_layers(z) for z in returns]
-    heights = np.array([layer[0] if len(layer) == 1 else np.nan for layer in layers])
     if deck is not None:
-        return np.array([np.nan if not len(l) else (l[0] if deck == "lower" else l[-1]) for l in layers])
+        return _named_deck(layers, deck)
+    heights = np.array([layer[0] if len(layer) == 1 else np.nan for layer in layers])
     ambiguous = [i for i, layer in enumerate(layers) if len(layer) > 1]
     if ambiguous and not np.any(np.isfinite(heights)):
         found = ", ".join(f"{h:.1f} m" for h in layers[ambiguous[0]])
@@ -135,6 +134,37 @@ def deck_heights(returns: list[np.ndarray], deck: str | None, where: str) -> np.
     for i in ambiguous:
         nearest = known[np.argmin(np.abs(known - i))]
         heights[i] = min(layers[i], key=lambda h: abs(h - heights[nearest]))
+    return heights
+
+
+def _named_deck(layers: list[list[float]], deck: str) -> np.ndarray:
+    """The height of the deck the course facts name, at each point of a double-deck bridge, NaN
+    where the scan does not see that deck.
+
+    A point that sees two decks has the named one by position, the lowest or the highest layer. A
+    point that sees one layer could be seeing either: the scan sees top surfaces, so where the
+    upper deck covers the lower one the lower deck is not in the returns at all, and the one layer
+    left is the upper deck whichever deck the course uses (issue #56). Read as the lowest of one,
+    it put the Queensboro's road 6 m up on the upper deck for 50 m. A deck runs on unbroken, so a
+    lone layer is the named deck only if it is nearer that deck's line than the other deck's, each
+    line drawn between the nearest points either side that saw both decks. Two layers closer than
+    MIN_DECK_OVERHEAD_M are not two decks (a wall or a roadway beside the course), so such a point
+    is no measure of where either deck runs. Where no point on the bridge sees both decks (the
+    Verrazzano's upper deck hides its lower one the whole way) there is no other line to compare
+    with, and the one layer is the named deck.
+    """
+    named = (lambda layer: layer[0]) if deck == "lower" else (lambda layer: layer[-1])
+    other = (lambda layer: layer[-1]) if deck == "lower" else (lambda layer: layer[0])
+    heights = np.array([named(layer) if layer else np.nan for layer in layers])
+    saw_both = [i for i, layer in enumerate(layers) if len(layer) > 1 and layer[-1] - layer[0] >= MIN_DECK_OVERHEAD_M]
+    if not saw_both:
+        return heights
+    at = np.arange(len(layers))
+    named_line = np.interp(at, saw_both, [named(layers[i]) for i in saw_both])
+    other_line = np.interp(at, saw_both, [other(layers[i]) for i in saw_both])
+    for i, layer in enumerate(layers):
+        if len(layer) == 1 and abs(layer[0] - named_line[i]) > abs(layer[0] - other_line[i]):
+            heights[i] = np.nan
     return heights
 
 

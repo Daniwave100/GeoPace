@@ -466,6 +466,28 @@ def test_a_long_gap_in_the_scan_between_two_stretches_under_a_deck_is_carried_ac
     assert gap["km_end"] == pytest.approx(2.09, abs=0.02)
 
 
+def test_where_the_scan_sees_only_the_upper_deck_the_course_stays_on_the_lower_one_and_the_stretch_under_it_is_unbroken(synthetic_facts):
+    """Issue #56: the scan sees top surfaces, so where the upper deck covers the lower one for a few
+    samples the lower deck is not in the returns at all. The one layer left is the upper deck, and
+    it was read as the lower one: a 6 m spike in the road, and a break in the stretch under the
+    upper deck exactly where the deck overhead was all the scan saw."""
+    upper_alone = lambda d: [high_arched_deck(d) + 6.4] if 2000 <= d <= 2040 else [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+    bundle = build_with_decks(synthetic_facts, {"deck": "lower"}, upper_alone)
+
+    line = course_line(bundle)
+    km, elevation = np.array(line["km"]), np.array(line["elevation_m"])
+    around = (km >= 1.9) & (km <= 2.15)
+    assert np.max(np.abs(elevation[around] - high_arched_deck(km[around] * 1000))) < 0.5
+    [span] = under_a_deck(bundle)
+    assert span["km_start"] == pytest.approx(1.2, abs=0.02)
+    assert span["km_end"] == pytest.approx(3.8, abs=0.02)
+    # The lower deck was not measured there, and the bundle says so: its height is a straight line
+    # between the samples either side, which is what greys the stretch there on screen.
+    [gap] = not_measured(bundle)
+    assert gap["km_start"] == pytest.approx(1.99, abs=0.02)
+    assert gap["km_end"] == pytest.approx(2.05, abs=0.02)
+
+
 def test_a_long_stretch_of_open_sky_cuts_the_stretch_under_a_deck_in_two(synthetic_facts):
     """Eighty metres where the scan sees the runners' deck and nothing over it is a measurement
     of open sky, and two stretches are two stretches."""
