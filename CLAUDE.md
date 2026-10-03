@@ -52,6 +52,10 @@ ask before anything that changes scope or look.
 - **A tree is not a wall.** A crown starts above the ground, so at the 10° floor the sun comes in
   underneath it; a crown modelled from the ground up over-shades every tree-lined street. Where the
   crown starts is **worked out, never measured** — no survey says — and the bundle says so (D60).
+- **A bridge deck is not a building.** No building record has the Queensboro's upper level over the runners on its
+  lower one; the deck overhead comes from the same LiDAR returns as the deck underfoot, is listed in the bundle as
+  `under_a_deck`, and keeps the sun off the road at every step. The Verrazzano's upper deck has nothing over it and
+  must still read as never shaded (D70).
 - **A building's shade wins over a tree's**, everywhere both apply: shade you get whatever the trees
   do is the stronger claim, and the only one drawn solid. Nothing may be both.
 - A crown is as its city last recorded it — Berlin tree by tree in a register, New York from a 2017

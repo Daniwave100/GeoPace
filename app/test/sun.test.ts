@@ -296,12 +296,67 @@ describe("the Shade layer", () => {
  * checked against times worked out on paper: the first half of it is in the sun all morning, and
  * the second half falls into shade at 10:00. The steps run 09:00 to 11:00, five minutes apart.
  */
-function madeUpCourse(): CourseBundle {
+describe("the road under a bridge deck (issue #42)", () => {
+  // A bridge deck is not a building, so no building record puts the Queensboro's upper level over
+  // the runners on its lower one. The pipeline finds it in the LiDAR and lists the stretch; the
+  // table already has the sun off it at every step. What is left to the layer is the words, and
+  // what kind of claim they are: measured, from the survey, solid.
+  it("says so in the sentence, as a measured claim, with the survey's reason under it", () => {
+    const course = madeUpCourse({ underADeck: { fromKm: 0.6, toKm: 0.8 } });
+    const layer = shadeLayer(course, plannerFor(course, { courseId: "berlin", edition: 2026, waveId: "late", ownStartLocal: null, goal: { kind: "finish", seconds: 2 * 3600 }, fueling: [] }))!;
+
+    const under = layer.clause(0.7, "km")!;
+    expect(under.text).toBe("Under the upper deck for the next 100 m.");
+    expect(under.encoding).toBe("measured");
+    expect(under.note).toContain("Test bridge");
+    // The one number, in the runner's own units: the bundle's words carry none (core/units.ts).
+    expect(under.note).toContain("about 6 m up");
+    expect(layer.clause(0.7, "mi")!.note).toContain("about 21 ft up");
+    // Off the deck, the ordinary words.
+    expect(layer.clause(0.3, "km")!.text).toMatch(/^No shade for the next [\d.]+ m, at any hour\.$/);
+    expect(layer.clause(0.55, "km")!.text).toMatch(/^In (the sun|shade) (for the next|to the finish)/);
+    // In the Ride, a beat wholly under the deck says where it is and nothing counts down.
+    expect(layer.stretchClause!(0.62, 0.78, "km")).toMatchObject({ text: "Under the upper deck.", encoding: "measured" });
+    // And a beat that runs off the end of the deck is in and out, as before.
+    expect(layer.stretchClause!(0.7, 0.9, "km")!.text).not.toBe("Under the upper deck.");
+    // The key names a deck's shade beside a building's.
+    expect(layer.key!("km")).toMatch(/bridge deck/);
+  });
+
+  it("New York: the Queensboro's lower level runs under the upper one, and the Verrazzano stays open", () => {
+    const layer = shadeLayer(nyc, plannerFor(nyc, firstWavePlan(nyc)))!;
+    const spans = nyc.measured.under_a_deck ?? [];
+    expect(spans.some((span) => span.reason.includes("Queensboro"))).toBe(true);
+    const underTheDeck = layer.clause(24.5, "km")!;
+    expect(underTheDeck.text).toMatch(/^Under the upper deck for the next [\d.]+ (m|km)\.$/);
+    expect(underTheDeck.encoding).toBe("measured");
+    expect(underTheDeck.note).toContain("about 6 m up");
+    // The 80 m where the scan has no returns at all, mid-bridge: the deck overhead is carried
+    // across it, the height greys it, and the strongest claim cannot land there (the owner's ask).
+    const inTheGap = layer.clause(25.3, "km")!;
+    expect(inTheGap.encoding).toBe("not-measured");
+    expect(inTheGap.text).toMatch(/^Under the upper deck/);
+    expect(inTheGap.note).toContain("carried across");
+    // And every stretch listed is a deck a road could pass under, not a wall beside the ramp.
+    expect(spans.every((span) => span.deck_above_m >= 5)).toBe(true);
+    // The issue's own measure: no sample under the deck is sunlit at any step, so the strongest
+    // claim this layer makes — "No shade, at any hour." — can no longer land there.
+    const along = sunAlong(nyc, plannerFor(nyc, firstWavePlan(nyc)))!;
+    for (const span of spans) {
+      for (let km = span.km_start; km <= span.km_end; km += 0.01) expect(along.at(km).alwaysInSun, `at km ${km.toFixed(2)}`).toBe(false);
+    }
+    expect(layer.clause(0.5, "km")!.text).toMatch(/^No shade for the next [\d.]+ (m|km), at any hour\.$/);
+  });
+});
+
+function madeUpCourse(options: { underADeck?: { fromKm: number; toKm: number } } = {}): CourseBundle {
   const copy = structuredClone(berlin);
   const km = Array.from({ length: 101 }, (_, i) => i / 100);
   const steps = 25;
   const firstStep = "2026-09-27T09:00:00+02:00";
-  const rows = km.map((_, sample) => Array.from({ length: steps }, (_, step) => sample < 50 || step < 12));
+  const deck = options.underADeck;
+  const underADeck = (sample: number) => deck !== undefined && km[sample] >= deck.fromKm && km[sample] <= deck.toKm;
+  const rows = km.map((_, sample) => Array.from({ length: steps }, (_, step) => !underADeck(sample) && (sample < 50 || step < 12)));
   const sunAtStep = (step: number) => sunPosition(new Date(Date.parse(firstStep) + step * 5 * 60_000), 52.5, 13.4);
 
   copy.measured.course_line = {
@@ -317,6 +372,7 @@ function madeUpCourse(): CourseBundle {
     bearing_deg: km.map(() => 0),
   };
   copy.measured.elevation_not_measured = [];
+  copy.measured.under_a_deck = deck ? [{ km_start: deck.fromKm, km_end: deck.toKm, above: "the upper deck", deck_above_m: 6.4, reason: "Test bridge (lower level): the survey's bridge-deck returns stand over the road here, so the road runs under the upper deck and the sun never reaches it.", source: "https://example.org/lidar" }] : [];
   copy.measured.sun = {
     step_minutes: 5,
     first_step: firstStep,

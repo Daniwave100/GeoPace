@@ -32,6 +32,14 @@ export interface CourseBundle {
     /** Where the height is a straight line between measured heights, in course order. Often empty. */
     elevation_not_measured: NotMeasuredSpan[];
     /**
+     * Where the course runs under a bridge deck — the lower level of a double-deck bridge, or a
+     * bridge passing under another — in course order (issue #42). Measured, from the same survey
+     * returns as the road's own height, and never drawn: a deck is not a building. The sun table
+     * already keeps the sun off these samples; the Shade layer says why. Absent from a bundle built
+     * before it existed, which means the same as empty.
+     */
+    under_a_deck?: UnderADeckSpan[];
+    /**
      * The city's real buildings along this course, written beside the bundle as its own file
      * (app/src/bundle/white-model.ts). Absent for a course nobody has building data for. The
      * bundle carries the credits for it, so they can be shown before the geometry arrives.
@@ -99,6 +107,21 @@ export interface NotMeasuredSpan {
   km_end: number;
   /** In plain words, for the runner. */
   reason: string;
+}
+
+/** A stretch of the course under a bridge deck: shade at every hour, from the survey. */
+export interface UnderADeckSpan {
+  /** km from the start, same scale as course_line.km */
+  km_start: number;
+  km_end: number;
+  /** What is overhead, in the sentence's words: "the upper deck", or "another deck". */
+  above: string;
+  /** How far over the road it stands, in metres. */
+  deck_above_m: number;
+  /** In plain words, for the runner: which bridge, and how the survey knows. */
+  reason: string;
+  /** The survey the deck overhead was read from: the same one the deck underfoot comes from. */
+  source: string;
 }
 
 /** Parallel columns: index i of every array describes the same course sample. */

@@ -207,6 +207,13 @@ row of its own for a day and the owner had it taken out (09-21); it is said in t
 where it is true, and nowhere else.
 _Avoid_: always sunny, exposure score, all-day sun
 
+**Under a deck**:
+Said of a stretch of road with a bridge deck over it: the lower level of a double-deck bridge (the
+Queensboro's), or a bridge passing under another. Measured, from the same LiDAR returns the deck
+underfoot comes from, never drawn (a deck is not a building), and in shade at every hour the table
+covers; the sentence says *Under the upper deck*. Listed in the bundle as `under_a_deck` (D70).
+_Avoid_: covered, roofed, tunnel, enclosed
+
 **Sun table**:
 The Course Bundle's own answer for the Shade layer: one bit for every course sample and every
 five-minute step of race day whose sun stands above the floor. The app looks up the column the

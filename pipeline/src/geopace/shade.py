@@ -36,6 +36,11 @@ lower than atan(h / d). Everything else here is bookkeeping around it.
     the road — Berlin's course runs through the Brandenburg Gate, 21 m up — shades it at every
     hour, which is right.
 
+  - **A bridge deck is not a building.** The Queensboro's lower deck runs under its upper deck
+    the whole way, and no building record says so. The course line finds the deck overhead in the
+    same LiDAR returns the road's own height comes from (course_line.py, issue #42), and under it
+    the sun is off the road at every step, as under a roof.
+
   - **Trees are a third state, not a fourth kind of wall** (PLAN.md D58, D60). The same ray is
     traced past the city's crowns (trees.py), and where it gets past every building but not past
     the leaves the answer is *leafy shade* — shade the runner only gets while the leaves are on.
@@ -159,6 +164,7 @@ def shade_table(
     day: dt.date,
     timezone: str,
     crowns: list[Crown] | None = None,
+    under_a_deck: np.ndarray | None = None,
     step_minutes: int = DEFAULT_STEP_MINUTES,
     floor_deg: float = SUN_FLOOR_DEG,
 ) -> ShadeTable:
@@ -172,6 +178,11 @@ def shade_table(
     With `crowns`, the same ray is traced past the city's trees as well, and every sample the
     buildings leave in the sun is asked again: what gets past the walls but not past the leaves is
     leafy shade (PLAN.md D60).
+
+    `under_a_deck` is one flag per sample: True where the course line found a bridge deck over
+    the road (course_line.py, issue #42). A deck is not a building and is in no building record,
+    so it is taken from there, and under it the sun is off the road at every step: a wall's shade
+    and a deck's are the same claim, and a crown under a deck adds nothing.
     """
     lat, lon = np.asarray(lat, dtype=float), np.asarray(lon, dtype=float)
     reference = (float(lat[0]), float(lon[0]))  # the start line
@@ -182,6 +193,8 @@ def shade_table(
         raise ValueError(f"The sun never reaches {floor_deg:.0f} degrees over ({reference[0]:.4f}, {reference[1]:.4f}) on {day}: there is no shade to work out.")
     _check_evenly_spaced(steps, step_minutes)
     in_sun = sunlit(lat, lon, elevation_m, buildings, altitude, azimuth)
+    if under_a_deck is not None:
+        in_sun &= ~np.asarray(under_a_deck, dtype=bool)[:, None]
     return ShadeTable(
         steps=steps,
         step_minutes=step_minutes,

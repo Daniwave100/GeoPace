@@ -97,7 +97,7 @@ describe("what a layer puts on screen", () => {
     const screen = onScreen(pressLayer(NO_LAYERS, "shade"), layers);
     expect(screen.rows.map((row) => row.name)).toEqual(["Shade"]);
     // What it says is Shade's own business (sun.test.ts); that it says something here is this test's.
-    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual([expect.stringMatching(/^(In (the sun|shade)|No shade)/)]);
+    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual([expect.stringMatching(/^(In (the sun|shade)|No shade|Under the upper deck)/)]);
   });
 
   it("shows two layers at once, in the layers' own order whichever was pressed first: both on the map, both on the strip, both in the sentence", () => {
@@ -108,7 +108,7 @@ describe("what a layer puts on screen", () => {
     // Hills paint the band and Shade the rim, so the one line carries both (course-placement.test.ts draws it).
     expect(screen.lineMarks.some((mark) => (mark.slot ?? "band") === "band")).toBe(true);
     expect(screen.lineMarks.some((mark) => mark.slot === "rim")).toBe(true);
-    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual(["Climbing 4%.", expect.stringMatching(/^(In (the sun|shade)|No shade)/)]);
+    expect(screen.clauses(24.5, "km").map((clause) => clause.text)).toEqual(["Climbing 4%.", expect.stringMatching(/^(In (the sun|shade)|No shade|Under the upper deck)/)]);
   });
 
   it("puts every layer on with Show everything: all the rows, all the marks, and every clause", () => {

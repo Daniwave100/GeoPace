@@ -29,7 +29,7 @@ SOURCE = Source(
     url="https://www.fisheries.noaa.gov/inport/item/64728",
     licence="NYC Open Data: no restrictions on use (NYC Admin. Code § 23-504); NOAA redistribution, no access constraints",
     accessed="2026-09-17",
-    note="Collected May 2017, ~50% leaf-off. Class 17 (bridge deck) returns give deck heights; NAVD88 (GEOID18) meters.",
+    note="Collected May 2017, ~50% leaf-off. Class 17 (bridge deck) returns give deck heights, and where a second deck stands over the one the course uses; NAVD88 (GEOID18) meters.",
 )
 ATTRIBUTION = Attribution(
     text="Bridge decks: 2017 NYC Topobathymetric LiDAR (City of New York / NOAA Digital Coast)",

@@ -399,3 +399,108 @@ def test_flagged_stretches_lie_on_the_course_in_order_and_never_overlap(syntheti
     assert [span["reason"].count("bridge") > 0 for span in spans] == [True, True]
     assert all(0 <= span["km_start"] < span["km_end"] <= 5.0 for span in spans)
     assert spans[0]["km_end"] <= spans[1]["km_start"]
+
+
+def under_a_deck(bundle):
+    return bundle["measured"]["under_a_deck"]
+
+
+def test_the_lower_deck_of_a_double_deck_bridge_runs_under_the_upper_one_and_the_upper_deck_runs_in_the_open(synthetic_facts):
+    """Issue #42: the Queensboro's lower level runs under its upper level the whole way, which the
+    LiDAR sees as a second deck 6.4 m over the one the runners are on. The Verrazzano's upper deck
+    has nothing over it."""
+    two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+
+    [span] = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, two_decks))
+    assert span["km_start"] == pytest.approx(1.2, abs=0.02)
+    assert span["km_end"] == pytest.approx(3.8, abs=0.02)
+    assert span["deck_above_m"] == pytest.approx(6.4, abs=0.1)
+    assert span["above"] == "the upper deck"
+    assert "Test Narrows Bridge" in span["reason"]
+    assert span["source"] == "https://example.org/lidar"  # the deck overhead has the deck underfoot's survey as its source
+    assert not any(char.isdigit() for char in span["reason"])  # no height in the words: the app prints it in the runner's units
+
+    assert under_a_deck(build_with_decks(synthetic_facts, {"deck": "upper"}, two_decks)) == []
+
+
+def test_a_bridge_with_one_deck_runs_under_nothing(synthetic_facts):
+    assert under_a_deck(build_with_decks(synthetic_facts, {}, lambda d: [high_arched_deck(d)])) == []
+
+
+def test_the_stretch_under_a_deck_ends_where_the_scan_sees_the_runners_deck_in_the_open(synthetic_facts):
+    """Where the survey sees the deck under the runners and nothing over it, the sky is open:
+    that is a measurement, and the stretch ends there."""
+    deck_overhead_for_a_while = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4] if 1500 <= d <= 3000 else [high_arched_deck(d)]  # noqa: E731
+
+    [span] = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, deck_overhead_for_a_while))
+    assert span["km_start"] == pytest.approx(1.5, abs=0.02)
+    assert span["km_end"] == pytest.approx(3.0, abs=0.02)
+
+
+@pytest.mark.parametrize("seen_in_the_break", [[], ["the runners' deck alone"]])
+def test_a_short_break_does_not_cut_the_stretch_under_a_deck_in_two(synthetic_facts, seen_in_the_break):
+    """A scan with no returns at all for 30 m says nothing about either deck, and one that catches
+    the runners' deck alone for 30 m has met its own density, not a hole in the deck overhead. Like
+    a gap in the deck's own height, a break too short to act on is carried across."""
+    in_the_break = lambda d: [high_arched_deck(d)] if seen_in_the_break else []  # noqa: E731
+    scan = lambda d: in_the_break(d) if 2000 <= d <= 2030 else [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+
+    [span] = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, scan))
+    assert span["km_start"] == pytest.approx(1.2, abs=0.02)
+    assert span["km_end"] == pytest.approx(3.8, abs=0.02)
+
+
+def test_a_long_gap_in_the_scan_between_two_stretches_under_a_deck_is_carried_across_and_the_height_flags_it(synthetic_facts):
+    """Eighty metres with no returns at all, between two measured stretches of deck overhead: a
+    deck has no holes, so the stretch runs on across the gap — and the gap is flagged for the
+    height, which is what greys it on screen (the owner's ask on #42: the layer must not make its
+    strongest claim, no shade at any hour, on a known gap in the one stretch under a deck)."""
+    scan_gap = lambda d: [] if 2000 <= d <= 2080 else [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+    bundle = build_with_decks(synthetic_facts, {"deck": "lower"}, scan_gap)
+
+    [span] = under_a_deck(bundle)
+    assert span["km_start"] == pytest.approx(1.2, abs=0.02)
+    assert span["km_end"] == pytest.approx(3.8, abs=0.02)
+    [gap] = not_measured(bundle)
+    assert gap["km_start"] == pytest.approx(1.99, abs=0.02)
+    assert gap["km_end"] == pytest.approx(2.09, abs=0.02)
+
+
+def test_a_long_stretch_of_open_sky_cuts_the_stretch_under_a_deck_in_two(synthetic_facts):
+    """Eighty metres where the scan sees the runners' deck and nothing over it is a measurement
+    of open sky, and two stretches are two stretches."""
+    open_sky = lambda d: [high_arched_deck(d)] if 2000 <= d <= 2080 else [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+
+    first, second = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, open_sky))
+    assert first["km_end"] == pytest.approx(1.99, abs=0.02)
+    assert second["km_start"] == pytest.approx(2.09, abs=0.02)
+
+
+def test_a_deck_crossing_over_for_a_moment_is_too_short_to_act_on_and_is_not_listed(synthetic_facts):
+    """A single-deck bridge passing under a 30 m ramp: real, and shorter than the smoothing
+    window, the same bar a gap in the scan has to clear to be flagged."""
+    crossing = lambda d: [high_arched_deck(d), high_arched_deck(d) + 7] if 2000 <= d <= 2030 else [high_arched_deck(d)]  # noqa: E731
+
+    assert under_a_deck(build_with_decks(synthetic_facts, {}, crossing)) == []
+
+
+def test_a_bridge_passing_under_another_for_a_stretch_is_listed_as_under_another_deck(synthetic_facts):
+    crossing = lambda d: [high_arched_deck(d), high_arched_deck(d) + 7] if 2000 <= d <= 2100 else [high_arched_deck(d)]  # noqa: E731
+
+    [span] = under_a_deck(build_with_decks(synthetic_facts, {}, crossing))
+    assert span["above"] == "another deck"
+    assert span["km_start"] == pytest.approx(2.0, abs=0.02)
+    assert span["km_end"] == pytest.approx(2.1, abs=0.02)
+
+
+def test_a_course_with_no_surface_data_lists_no_deck_overhead(synthetic_facts):
+    source = {"source": "https://example.org/bridge", "accessed": "2026-09-16"}
+    synthetic_facts["bridges"] = [{"name": "Test bridge", "km_start": 2.0, "km_end": 2.08, **source}]
+    bundle = build_course_bundle(
+        parse_course_facts(synthetic_facts),
+        route=straight_north_route(5000),
+        elevation=synthetic_elevation(river_without_bridge_deck),
+        editions=parsed_synthetic_editions(),
+        geoid=synthetic_geoid(),
+    )
+    assert under_a_deck(bundle) == []

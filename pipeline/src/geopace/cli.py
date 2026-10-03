@@ -8,9 +8,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+
 from geopace import berlin_buildings, berlin_dgm1, berlin_dom1, berlin_trees, geoid_egm2008, nyc_buildings, nyc_dem, nyc_lidar, nyc_trees, shade, white_model
 from geopace.buildings import DEFAULT_CORRIDOR_M, BuildingsModel
-from geopace.bundle import build_course_bundle, validate_bundle, write_bundle
+from geopace.bundle import build_course_bundle, validate_bundle, within_spans, write_bundle
 from geopace.cache import cache_dir, download
 from geopace.course_facts import CourseFacts, load_course_facts
 from geopace.edition_facts import load_editions
@@ -146,7 +147,9 @@ def build_shade(bundle: dict, buildings: BuildingsModel, editions, *, trees: Tre
     lat, lon, elevation_m = line["lat"], line["lon"], line["elevation_m"]
     day = dt.date.fromisoformat(max(editions, key=lambda edition: edition.edition).date.day)
     for_shade = shade.shade_buildings(lat, lon, elevation_m, buildings)
-    table = shade.shade_table(lat, lon, elevation_m, for_shade, crowns=crowns or [], day=day, timezone=bundle["course"]["timezone"])
+    # Where the course line found a bridge deck over the road (issue #42): shade at every step.
+    under_a_deck = within_spans(line["km"], bundle["measured"].get("under_a_deck", []))
+    table = shade.shade_table(lat, lon, elevation_m, for_shade, crowns=crowns or [], under_a_deck=under_a_deck, day=day, timezone=bundle["course"]["timezone"])
     shade.note_in_bundle(
         bundle,
         table,
@@ -164,6 +167,8 @@ def build_shade(bundle: dict, buildings: BuildingsModel, editions, *, trees: Tre
         f"{table.steps[0]:%H:%M} to {table.steps[-1]:%H:%M}, from {len(for_shade)} buildings"
     )
     print(f"  shade: {in_sun.mean():.0%} of the course-by-moment table is past every building; {table.always_in_sun.sum()} samples have neither wall nor leaf over them at any hour")
+    if under_a_deck.any():
+        print(f"  shade: {under_a_deck.sum()} samples run under a bridge deck, in shade at every step")
     if crowns:
         print(f"  leafy shade: {table.in_leaf_shade.mean():.1%} of the table is shade that depends on the leaves")
 

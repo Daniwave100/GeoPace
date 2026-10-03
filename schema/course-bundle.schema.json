@@ -94,6 +94,23 @@
             }
           }
         },
+        "under_a_deck": {
+          "description": "Stretches where the survey finds a second bridge deck over the one the course runs on: the lower level of a double-deck bridge, or a bridge passing under another. Measured, from the same bridge-deck returns the road's own height comes from, and never drawn: a deck is not a building. The sun table keeps the sun off these samples at every step, and the app says why. In course order, never overlapping; empty when the course runs under no deck, and absent from a bundle built before it existed.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["km_start", "km_end", "above", "deck_above_m", "reason", "source"],
+            "additionalProperties": false,
+            "properties": {
+              "km_start": { "description": "km from the start, same scale as course_line.km.", "type": "number", "minimum": 0 },
+              "km_end": { "type": "number", "exclusiveMinimum": 0 },
+              "above": { "description": "What is overhead, in the sentence's words: 'the upper deck' of this bridge, or 'another deck'.", "type": "string", "minLength": 1 },
+              "deck_above_m": { "description": "How far over the road the deck overhead stands, median along the stretch.", "type": "number", "exclusiveMinimum": 0 },
+              "reason": { "description": "Shown to the runner: which bridge, and how the survey knows.", "type": "string", "minLength": 1 },
+              "source": { "description": "The survey the deck overhead was read from: the same one the deck underfoot comes from.", "$ref": "#/$defs/url" }
+            }
+          }
+        },
         "white_model": {
           "description": "The city's real buildings along this course, written beside this bundle as its own file (schema/white-model.schema.json). Absent for a course nobody has building data for; the app then draws the course on the plain map. The geometry is far larger than everything else about a course put together, so the bundle only names it and counts it — and carries its credits, which must be on screen whenever the buildings are.",
           "type": "object",

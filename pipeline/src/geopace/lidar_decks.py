@@ -32,6 +32,12 @@ MIN_DECK_RETURNS = 3
 # A layer with far fewer returns than the busiest one is something passing over or under the
 # course (a ramp, a walkway), not a deck the runners could be on.
 MIN_DECK_SHARE = 0.25
+# A deck over the runners has to stand at least this far above the deck under them, top to top,
+# because the scan sees top surfaces only: a lorry needs about four metres of headroom under a
+# roof (shade.py's UNDER_A_ROOF_M) and a deck is about a metre thick, so nothing drives under
+# anything closer. A second layer nearer than this is a parapet, a wall, or a roadway beside the
+# course that SEARCH_RADIUS_M caught, not a deck over the road.
+MIN_DECK_OVERHEAD_M = 5.0
 
 
 @dataclass(frozen=True)
@@ -131,6 +137,26 @@ def deck_heights(returns: list[np.ndarray], deck: str | None, where: str) -> np.
         heights[i] = min(layers[i], key=lambda h: abs(h - heights[nearest]))
     return heights
 
+
+def decks_over(returns: list[np.ndarray], deck_m: np.ndarray) -> np.ndarray:
+    """The height of the deck over the runners' heads at each point along a bridge, NaN where the
+    scan sees none: the lowest layer standing at least MIN_DECK_OVERHEAD_M above the deck the
+    course uses.
+
+    A bridge deck is not a building, so neither city's building records know that the Queensboro's
+    lower level runs under its upper one (issue #42). The scan does: the same returns that give the
+    deck under the runners' feet hold a second layer over their heads, and where it stands the sun
+    never reaches the road. A point whose own deck is unknown has nothing over it that we can say.
+    """
+    deck_m = np.asarray(deck_m, dtype=float)
+    over = np.full(len(returns), np.nan)
+    for i, z in enumerate(returns):
+        if not np.isfinite(deck_m[i]):
+            continue
+        above = [layer for layer in _layers(z) if layer >= deck_m[i] + MIN_DECK_OVERHEAD_M]
+        if above:
+            over[i] = above[0]
+    return over
 
 def _layers(returns: np.ndarray) -> list[float]:
     """The heights the returns near one point fall into, lowest first: a deck, plus anything
