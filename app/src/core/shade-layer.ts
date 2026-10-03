@@ -22,11 +22,17 @@
 // sentence say which, and what race day brings. Where the sun is under the floor the pipeline works
 // shade out above, nothing was measured and the layer says so rather than filling in silently.
 //
+// A bridge deck is not a building (issue #42, PLAN.md D70). The Queensboro's lower level runs
+// under its upper level the whole way, and no building record says so; the pipeline finds the deck
+// overhead in the same LiDAR the road's height comes from, lists the stretch, and the table has
+// the sun off it at every step. Here it is a wall's shade — solid, measured — with its own words:
+// "Under the upper deck for the next 1.2 km." and the survey's reason under them.
+//
 // The time-independent fact — stretches with no shade at any hour we model, which is the bridges
 // and the wide avenues — had a row of its own for a day. The owner had it taken out (09-21: "just
 // one sun chart is fine"): a row that is empty for 38 of Berlin's 42 km asks more of the screen
 // than it gives back. It keeps its place in the sentence, which says it where it is true.
-import type { CourseBundle, NotMeasuredSpan } from "../bundle/types";
+import type { CourseBundle, NotMeasuredSpan, UnderADeckSpan } from "../bundle/types";
 import type { Encoding } from "./encoding";
 import type { Clause, HowMuch, Layer, LineMark, RowBin, RowValue, StripRow } from "./layers";
 import type { Planner } from "./planner";
@@ -59,6 +65,8 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
   // at a 10-degree sun ten metres of height moves a block's reach by nearly sixty. Those
   // stretches are greyed here exactly as Hills greys them (PLAN.md D45, D47).
   const gaps = bundle.measured.elevation_not_measured;
+  // Where the road runs under a bridge deck: shade at every hour, and the sentence says why.
+  const decks = bundle.measured.under_a_deck ?? [];
   // What the trees are wearing on race day, and what the survey caught them in: the two halves of
   // the one honest thing this layer can say about a leaf (PLAN.md D60).
   const leaves = leafNote(bundle, along.table.hasTrees);
@@ -102,19 +110,19 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     name: "Shade",
     key: () =>
       along.table.hasTrees
-        ? ["A thin dark edge on the line is shade when you get there: solid for a building's, dotted for a tree's — that one you get while the leaves are on. No edge is sun; a coloured band beside the line is a hill, not shade.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
-        : "A thin dark edge on the line is a building's shade when you get there; no edge is sun, and a coloured band beside the line is a hill, not shade. A clear sky is assumed, and trees are not in yet.",
+        ? ["A thin dark edge on the line is shade when you get there: solid for a building's or a bridge deck's, dotted for a tree's — that one you get while the leaves are on. No edge is sun; a coloured band beside the line is a hill, not shade.", leaves.onRaceDay, "A clear sky is assumed."].filter(Boolean).join(" ")
+        : "A thin dark edge on the line is a building's or a bridge deck's shade when you get there; no edge is sun, and a coloured band beside the line is a hill, not shade. A clear sky is assumed, and trees are not in yet.",
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],
-    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km), leaves),
+    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km), leaves, underADeck(decks, km)),
     stretchClause: (fromKm, toKm, units) => {
       const hours = { firstStep, lastStep, timezone: bundle.course.timezone };
       const first = along.at(fromKm);
       // The sun down, too low, or outside the hours worked out: none of those counts down, and none
       // of them comes or goes within a beat of race morning, so the stretch's start says it.
-      if (first.state === "down" || first.state === "unknown") return clauseFor(first, fromKm, lengthKm, units, floorDeg, planner.carriedOver !== null, hours, filledIn(gaps, fromKm), leaves);
-      return stretchClauseFor(along, fromKm, toKm, planner.carriedOver !== null, gaps.filter((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves);
+      if (first.state === "down" || first.state === "unknown") return clauseFor(first, fromKm, lengthKm, units, floorDeg, planner.carriedOver !== null, hours, filledIn(gaps, fromKm), leaves, underADeck(decks, fromKm));
+      return stretchClauseFor(along, fromKm, toKm, planner.carriedOver !== null, gaps.filter((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves, decks.find((deck) => deck.km_start <= fromKm && deck.km_end >= toKm));
     },
   };
 }
@@ -124,15 +132,18 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
  * shade" where the sun and the shade take turns. Never how far, which counts down, and never a
  * share of the stretch (D58: binary, every 10 m).
  */
-function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carriedOver: boolean, gaps: NotMeasuredSpan[], leaves: LeafNote): Clause {
+function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carriedOver: boolean, gaps: NotMeasuredSpan[], leaves: LeafNote, deck: UnderADeckSpan | undefined): Clause {
   const first = along.at(fromKm);
   const states = new Set([first.state, ...along.runs.filter((run) => run.fromKm < toKm && run.toKm > fromKm).map((run) => run.state)]);
   const sunny = states.has("sun");
+  // A beat that lies wholly under a deck says where it is (`deck` is only given for one that does).
   const text =
     states.size === 1
       ? first.alwaysInSun && first.alwaysUntilKm >= toKm
         ? "No shade, at any hour."
-        : `In ${whereYouAre(first.state)}.`
+        : deck && first.state === "shade"
+          ? `Under ${deck.above}.`
+          : `In ${whereYouAre(first.state)}.`
       : sunny
         ? "In and out of the shade."
         : "In shade.";
@@ -144,7 +155,13 @@ function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carried
   if (filledInKm > (toKm - fromKm) / 2) return { text, encoding: "not-measured", note: filledIn, carriedOver };
   // Some of the shade is a tree's: the whole clause rests on the leaves, as a tree's rim does.
   if (states.has("leafy")) return { text, encoding: "depends-on-leaves", note: [leaves.why, filledIn].filter(Boolean).join(" ") || undefined, carriedOver };
+  if (deck && first.state === "shade" && states.size === 1) return { text, encoding: "measured", note: [deck.reason, filledIn].filter(Boolean).join(" "), carriedOver };
   return { text, encoding: "measured", note: filledIn, carriedOver };
+}
+
+/** The deck the runner is standing under, if they are standing under one. */
+function underADeck(decks: UnderADeckSpan[], km: number): UnderADeckSpan | undefined {
+  return decks.find((deck) => km >= deck.km_start && km <= deck.km_end);
 }
 
 /**
@@ -182,7 +199,7 @@ interface ModelledHours {
   timezone: string;
 }
 
-function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorDeg: number, carriedOver: boolean, hours: ModelledHours, gap: NotMeasuredSpan | undefined, leaves: LeafNote): Clause | null {
+function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorDeg: number, carriedOver: boolean, hours: ModelledHours, gap: NotMeasuredSpan | undefined, leaves: LeafNote, deck: UnderADeckSpan | undefined): Clause | null {
   // The sentence's own last clause already says the sun is down; twice is not clearer.
   if (at.state === "down") return null;
   if (at.state === "unknown") {
@@ -198,11 +215,16 @@ function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorD
   }
   // Where the road is never shaded at any hour, that is the more useful thing a planner can be
   // told, and it is the stretch of never-shaded road that is worth a distance, not this moment's.
+  // Under a bridge deck the shade is the deck's, at every hour, and the distance is the deck's.
+  const underTheDeck = deck !== undefined && at.state === "shade";
   const text = at.alwaysInSun
     ? `No shade${howFar(at.alwaysUntilKm, km, lengthKm, units)}, at any hour.`
-    : `In ${whereYouAre(at.state)}${howFar(at.untilKm, km, lengthKm, units)}.`;
+    : underTheDeck
+      ? `Under ${deck.above}${howFar(deck.km_end, km, lengthKm, units)}.`
+      : `In ${whereYouAre(at.state)}${howFar(at.untilKm, km, lengthKm, units)}.`;
   // The shade was worked out from the road's own height. Where that height is filled in, so is this.
   if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}`, carriedOver };
+  if (underTheDeck) return { text, encoding: "measured", note: deck.reason, carriedOver };
   // A tree's shade is a claim with a condition on it, and the condition is printed with it.
   if (at.state === "leafy") return { text, encoding: "depends-on-leaves", note: leaves.why, carriedOver };
   return { text, encoding: "measured", carriedOver };

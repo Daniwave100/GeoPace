@@ -82,3 +82,39 @@ def test_a_course_outside_every_tile_is_refused(tmp_path):
 
     with pytest.raises(ValueError, match=r"no LiDAR tiles"):
         decks.returns(lat, lon)
+
+
+class TestTheDeckOverTheRunnersDeck:
+    """A bridge deck is not a building (issue #42): the Queensboro's lower level runs under its
+    upper level the whole way, and only the LiDAR knows. The same returns that give the deck under
+    the runners' feet also hold the deck over their heads."""
+
+    LOWER, UPPER = 44.0, 50.4  # the Queensboro's two levels, about 6.4 m apart (PLAN.md D23)
+
+    def layer(self, height):
+        return height + np.array([-0.1, 0.0, 0.05, 0.1])
+
+    def test_on_the_lower_deck_the_upper_one_is_overhead_and_on_the_upper_deck_nothing_is(self):
+        from geopace.lidar_decks import deck_heights, decks_over
+
+        both = np.concatenate([self.layer(self.LOWER), self.layer(self.UPPER)])
+        returns = [both, both, self.layer(self.LOWER), np.empty(0)]
+
+        on_the_lower = deck_heights(returns, "lower", "test")
+        over_the_lower = decks_over(returns, on_the_lower)
+        assert over_the_lower[:2] == pytest.approx([self.UPPER, self.UPPER], abs=0.2)
+        assert np.isnan(over_the_lower[2])  # the scan sees the lower deck alone: open sky
+        assert np.isnan(over_the_lower[3])  # the scan sees nothing at all: nothing to say
+
+        on_the_upper = deck_heights(returns, "upper", "test")
+        assert np.isnan(decks_over(returns, on_the_upper)).all()
+
+    def test_a_few_stray_returns_overhead_are_not_a_deck(self):
+        """A sign, a light pole, a walkway: the same rule as for the deck itself (MIN_DECK_SHARE)."""
+        from geopace.lidar_decks import deck_heights, decks_over
+
+        deck = self.LOWER + np.linspace(-0.1, 0.1, 400)
+        stray = np.array([self.UPPER, self.UPPER + 0.1, self.UPPER - 0.1])
+        returns = [np.concatenate([deck, stray])]
+
+        assert np.isnan(decks_over(returns, deck_heights(returns, None, "test"))).all()

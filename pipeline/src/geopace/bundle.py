@@ -91,6 +91,10 @@ def build_course_bundle(
                 {"km_start": round(span.km_start, 2), "km_end": round(span.km_end, 2), "reason": span.reason}
                 for span in line.not_measured
             ],
+            "under_a_deck": [
+                {"km_start": round(span.km_start, 2), "km_end": round(span.km_end, 2), "above": span.above, "deck_above_m": span.deck_above_m, "reason": span.reason}
+                for span in line.under_a_deck
+            ],
             "difficulty_model": difficulty.model_json(),
         },
         "sources": [route_source.to_json(), elevation.source.to_json()],

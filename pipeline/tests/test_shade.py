@@ -166,6 +166,25 @@ class TestATableOfEveryFiveMinutes:
         assert not bits[:, len(table.steps) :].any()  # the spare bits at the end of a row are zero
 
 
+class TestTheRoadUnderADeck:
+    """Issue #42: a bridge deck is not a building, so neither city's records put the Queensboro's
+    upper level over the runners on its lower one. The course line finds it in the LiDAR
+    (course_line.py, `under_a_deck`), and the table takes it from there: under a deck the sun is
+    off the road at every step, whatever the buildings say."""
+
+    def test_a_sample_under_a_deck_is_never_in_the_sun_and_the_rest_of_the_road_is_untouched(self):
+        lat, lon, elevation, north = road_north()
+        under = north >= 0
+
+        table = shade_table(lat, lon, elevation, [], day=dt.date(2026, 9, 27), timezone="Europe/Berlin", under_a_deck=under)
+
+        assert not table.in_sun[under].any()
+        assert table.in_sun[~under].all()
+        assert not table.always_in_sun[under].any()
+        assert table.always_in_sun[~under].all()
+        assert not table.in_leaf_shade.any()
+
+
 def _from_base64(text: str) -> bytes:
     import base64
 
@@ -263,6 +282,39 @@ class TestTheCommittedTables:
         assert sun["buildings"]["furthest_m"] > white["corridor_m"]
         assert len(self.white_model(course)["buildings"]["ring"]) == white["buildings"]
 
+
+    def test_new_york_runs_under_the_queensboros_upper_deck_and_the_table_keeps_the_sun_off_it(self):
+        """Issue #42. The Verrazzano, which really is open to the sky, stays never shaded."""
+        bundle = self.bundle("nyc")
+        km = np.array(bundle["measured"]["course_line"]["km"])
+        lit = self.unpacked(bundle["measured"]["sun"])
+        spans = bundle["measured"]["under_a_deck"]
+
+        queensboro = [span for span in spans if "Queensboro" in span["reason"]]
+        assert queensboro, "the Queensboro's lower level is not listed as running under a deck"
+        assert 23.8 < queensboro[0]["km_start"] < 24.0
+        assert 25.6 < queensboro[-1]["km_end"] < 25.9
+        assert all(span["above"] == "the upper deck" and 3 < span["deck_above_m"] < 8 for span in queensboro)
+        for span in queensboro:
+            under = (km >= span["km_start"]) & (km <= span["km_end"])
+            assert under.sum() >= 5
+            assert not lit[under].any(), f"{span['km_start']}-{span['km_end']} km has sunlit samples under the upper deck"
+        # On the span the issue measured, 112 of 243 samples were sunlit at every step we model. What
+        # is still lit there is the 80 m where the scan has no returns at all, which the height
+        # already flags and the layer greys: nothing measured says what is over the road there.
+        gaps = bundle["measured"]["elevation_not_measured"]
+        in_a_gap = np.zeros(len(km), dtype=bool)
+        for gap in gaps:
+            in_a_gap |= (km >= gap["km_start"]) & (km <= gap["km_end"])
+        measured_span = (km >= 24.3) & (km <= 25.6) & ~in_a_gap
+        assert not lit[measured_span].any()
+        assert lit[(km >= 24.3) & (km <= 25.6)].mean() < 0.07
+        # The Verrazzano's upper deck is open to the sky, and says so.
+        assert lit[(km >= 0.2) & (km <= 0.7)].all()
+
+    def test_berlin_runs_under_no_deck(self):
+        assert self.bundle("berlin")["measured"].get("under_a_deck", []) == []
+
     @pytest.mark.parametrize("course", ["berlin", "nyc"])
     def test_the_blocks_on_screen_cast_the_shade_the_table_says_they_do(self, course):
         """The ticket's own acceptance, as a test: the White model's shadows and the numbers agree.
@@ -280,7 +332,13 @@ class TestTheCommittedTables:
             Building(id=str(i), ring=np.asarray(ring, dtype=float).reshape(-1, 2), ground_m=blocks["base_m"][i], roof_m=blocks["roof_m"][i])
             for i, ring in enumerate(blocks["ring"])
         ]
-        take = slice(None, None, self.EVERY)
+        # A bridge deck over the road is not a building: nothing draws it, and the table keeps the
+        # sun off the road under it (issue #42). Those samples are left out of the comparison.
+        km = np.array(line["km"])
+        open_sky = np.ones(len(km), dtype=bool)
+        for span in bundle["measured"].get("under_a_deck", []):
+            open_sky &= ~((km >= span["km_start"]) & (km <= span["km_end"]))
+        take = np.flatnonzero(open_sky)[:: self.EVERY]
         lat, lon = np.array(line["lat"])[take], np.array(line["lon"])[take]
         # The White model's heights count from the ellipsoid, so the road's matching column is used.
         road_m = np.array(line["ellipsoid_height_m"])[take]

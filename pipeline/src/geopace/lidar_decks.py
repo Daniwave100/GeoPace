@@ -132,6 +132,26 @@ def deck_heights(returns: list[np.ndarray], deck: str | None, where: str) -> np.
     return heights
 
 
+def decks_over(returns: list[np.ndarray], deck_m: np.ndarray) -> np.ndarray:
+    """The height of the deck over the runners' heads at each point along a bridge, NaN where the
+    scan sees none: the lowest layer that stands clear above the deck the course uses.
+
+    A bridge deck is not a building, so neither city's building records know that the Queensboro's
+    lower level runs under its upper one (issue #42). The scan does: the same returns that give the
+    deck under the runners' feet hold a second layer 6.4 m up, and where it stands the sun never
+    reaches the road. A point whose own deck is unknown has nothing over it that we can say.
+    """
+    deck_m = np.asarray(deck_m, dtype=float)
+    over = np.full(len(returns), np.nan)
+    for i, z in enumerate(returns):
+        if not np.isfinite(deck_m[i]):
+            continue
+        above = [layer for layer in _layers(z) if layer > deck_m[i] + DECK_GAP_M]
+        if above:
+            over[i] = above[0]
+    return over
+
+
 def _layers(returns: np.ndarray) -> list[float]:
     """The heights the returns near one point fall into, lowest first: a deck, plus anything
     passing over or under it. Empty when there aren't enough returns to call anything a deck."""
