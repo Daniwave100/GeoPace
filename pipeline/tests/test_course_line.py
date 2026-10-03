@@ -406,9 +406,9 @@ def under_a_deck(bundle):
 
 
 def test_the_lower_deck_of_a_double_deck_bridge_runs_under_the_upper_one_and_the_upper_deck_runs_in_the_open(synthetic_facts):
-    """Issue #42: the Queensboro's lower level is roofed by its upper level the whole way, which
-    the LiDAR sees as a second deck 6.4 m over the one the runners are on. The Verrazzano's upper
-    deck has nothing over it."""
+    """Issue #42: the Queensboro's lower level runs under its upper level the whole way, which the
+    LiDAR sees as a second deck 6.4 m over the one the runners are on. The Verrazzano's upper deck
+    has nothing over it."""
     two_decks = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
 
     [span] = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, two_decks))
@@ -417,7 +417,8 @@ def test_the_lower_deck_of_a_double_deck_bridge_runs_under_the_upper_one_and_the
     assert span["deck_above_m"] == pytest.approx(6.4, abs=0.1)
     assert span["above"] == "the upper deck"
     assert "Test Narrows Bridge" in span["reason"]
-    assert "6 m over the road" in span["reason"]
+    assert span["source"] == "https://example.org/lidar"  # the deck overhead has the deck underfoot's survey as its source
+    assert not any(char.isdigit() for char in span["reason"])  # no height in the words: the app prints it in the runner's units
 
     assert under_a_deck(build_with_decks(synthetic_facts, {"deck": "upper"}, two_decks)) == []
 
@@ -429,9 +430,9 @@ def test_a_bridge_with_one_deck_runs_under_nothing(synthetic_facts):
 def test_the_stretch_under_a_deck_ends_where_the_scan_sees_the_runners_deck_in_the_open(synthetic_facts):
     """Where the survey sees the deck under the runners and nothing over it, the sky is open:
     that is a measurement, and the stretch ends there."""
-    roofed = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4] if 1500 <= d <= 3000 else [high_arched_deck(d)]  # noqa: E731
+    deck_overhead_for_a_while = lambda d: [high_arched_deck(d), high_arched_deck(d) + 6.4] if 1500 <= d <= 3000 else [high_arched_deck(d)]  # noqa: E731
 
-    [span] = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, roofed))
+    [span] = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, deck_overhead_for_a_while))
     assert span["km_start"] == pytest.approx(1.5, abs=0.02)
     assert span["km_end"] == pytest.approx(3.0, abs=0.02)
 
@@ -449,14 +450,30 @@ def test_a_short_break_does_not_cut_the_stretch_under_a_deck_in_two(synthetic_fa
     assert span["km_end"] == pytest.approx(3.8, abs=0.02)
 
 
-def test_a_long_gap_in_the_scan_cuts_the_stretch_under_a_deck_in_two(synthetic_facts):
-    """Eighty metres with nothing to say is flagged for the height, and the deck overhead is not
-    carried across it either: two stretches, with the gap between them greyed by the height."""
+def test_a_long_gap_in_the_scan_between_two_stretches_under_a_deck_is_carried_across_and_the_height_flags_it(synthetic_facts):
+    """Eighty metres with no returns at all, between two measured stretches of deck overhead: a
+    deck has no holes, so the stretch runs on across the gap — and the gap is flagged for the
+    height, which is what greys it on screen (the owner's ask on #42: the layer must not make its
+    strongest claim, no shade at any hour, on a known gap in the one stretch under a deck)."""
     scan_gap = lambda d: [] if 2000 <= d <= 2080 else [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+    bundle = build_with_decks(synthetic_facts, {"deck": "lower"}, scan_gap)
 
-    first, second = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, scan_gap))
-    assert first["km_end"] == pytest.approx(2.0, abs=0.02)
-    assert second["km_start"] == pytest.approx(2.08, abs=0.02)
+    [span] = under_a_deck(bundle)
+    assert span["km_start"] == pytest.approx(1.2, abs=0.02)
+    assert span["km_end"] == pytest.approx(3.8, abs=0.02)
+    [gap] = not_measured(bundle)
+    assert gap["km_start"] == pytest.approx(1.99, abs=0.02)
+    assert gap["km_end"] == pytest.approx(2.09, abs=0.02)
+
+
+def test_a_long_stretch_of_open_sky_cuts_the_stretch_under_a_deck_in_two(synthetic_facts):
+    """Eighty metres where the scan sees the runners' deck and nothing over it is a measurement
+    of open sky, and two stretches are two stretches."""
+    open_sky = lambda d: [high_arched_deck(d)] if 2000 <= d <= 2080 else [high_arched_deck(d), high_arched_deck(d) + 6.4]  # noqa: E731
+
+    first, second = under_a_deck(build_with_decks(synthetic_facts, {"deck": "lower"}, open_sky))
+    assert first["km_end"] == pytest.approx(1.99, abs=0.02)
+    assert second["km_start"] == pytest.approx(2.09, abs=0.02)
 
 
 def test_a_deck_crossing_over_for_a_moment_is_too_short_to_act_on_and_is_not_listed(synthetic_facts):

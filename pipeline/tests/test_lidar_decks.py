@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from pyproj import Transformer
 
-from geopace.lidar_decks import BRIDGE_DECK, LidarTile, lidar_deck_model
+from geopace.lidar_decks import BRIDGE_DECK, MIN_DECK_OVERHEAD_M, LidarTile, deck_heights, decks_over, lidar_deck_model
 from geopace.provenance import Attribution, Source
 
 UTM18 = Transformer.from_crs("EPSG:6347", "EPSG:4326", always_xy=True)
@@ -95,8 +95,6 @@ class TestTheDeckOverTheRunnersDeck:
         return height + np.array([-0.1, 0.0, 0.05, 0.1])
 
     def test_on_the_lower_deck_the_upper_one_is_overhead_and_on_the_upper_deck_nothing_is(self):
-        from geopace.lidar_decks import deck_heights, decks_over
-
         both = np.concatenate([self.layer(self.LOWER), self.layer(self.UPPER)])
         returns = [both, both, self.layer(self.LOWER), np.empty(0)]
 
@@ -109,10 +107,23 @@ class TestTheDeckOverTheRunnersDeck:
         on_the_upper = deck_heights(returns, "upper", "test")
         assert np.isnan(decks_over(returns, on_the_upper)).all()
 
+    def test_a_layer_too_close_to_be_driven_under_is_not_a_deck_overhead(self):
+        """The scan sees top surfaces only: a second layer 3.5 m up has no road under it (a lorry
+        needs four metres under a deck a metre thick). It is a parapet, a wall, or the roadway
+        beside the course that the search radius caught — New York's exit ramp off the Queensboro
+        shows one 3–5 m up for 100 m — and it keeps the sun off nobody."""
+        close = np.concatenate([self.layer(self.LOWER), self.layer(self.LOWER + 3.5)])
+        returns = [close]
+
+        assert np.isnan(decks_over(returns, deck_heights(returns, "lower", "test"))).all()
+        # A real deck overhead clears the bar, and the bar is at least a roof's headroom.
+        from geopace.shade import UNDER_A_ROOF_M
+
+        assert MIN_DECK_OVERHEAD_M >= UNDER_A_ROOF_M
+        assert self.UPPER - self.LOWER > MIN_DECK_OVERHEAD_M
+
     def test_a_few_stray_returns_overhead_are_not_a_deck(self):
         """A sign, a light pole, a walkway: the same rule as for the deck itself (MIN_DECK_SHARE)."""
-        from geopace.lidar_decks import deck_heights, decks_over
-
         deck = self.LOWER + np.linspace(-0.1, 0.1, 400)
         stray = np.array([self.UPPER, self.UPPER + 0.1, self.UPPER - 0.1])
         returns = [np.concatenate([deck, stray])]

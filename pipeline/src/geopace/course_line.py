@@ -23,6 +23,7 @@ Steps, in order:
 """
 
 from dataclasses import dataclass, replace
+from typing import TypeVar
 
 import numpy as np
 from pyproj import Geod
@@ -67,6 +68,8 @@ class UnderADeck:
     # How far over the road the deck overhead stands, median along the stretch.
     deck_above_m: float
     reason: str
+    # The survey the deck overhead was read from: the same one as the deck underfoot.
+    source: str
 
 
 @dataclass(frozen=True)
@@ -219,9 +222,9 @@ def raise_bridge_decks(
         returns = decks.returns(lat[span], lon[span])
         heights = deck_heights(returns, bridge.deck, where)
         measured = np.isfinite(heights)
-        under_a_deck.extend(_under_a_deck(distance_m[span], heights, decks_over(returns, heights), bridge))
         if not measured.any():
             raise ValueError(f"{where}: the surface data has no bridge deck there. Is the km range right?")
+        under_a_deck.extend(_under_a_deck(distance_m[span], heights, decks_over(returns, heights), bridge, decks.source.url))
         along = distance_m[span]
         known_m, known_h = along[measured], heights[measured]
         if not measured[0]:
@@ -241,46 +244,49 @@ def raise_bridge_decks(
     return patched, not_measured, under_a_deck
 
 
-def _under_a_deck(along_m: np.ndarray, deck_m: np.ndarray, over_m: np.ndarray, bridge: Bridge) -> list[UnderADeck]:
+def _under_a_deck(along_m: np.ndarray, deck_m: np.ndarray, over_m: np.ndarray, bridge: Bridge, source: str) -> list[UnderADeck]:
     """The stretches of one bridge that run under a deck, from the returns at each of its points.
 
     Where the scan sees the runners' deck and nothing over it, the sky is open, and a stretch ends
-    there. But a break shorter than MIN_FLAGGED_GAP_M between two roofed stretches is carried
-    across, whatever the scan saw in it: at 10 m samples read from returns within 5 m, one sample
-    that happens to catch the runners' deck alone is the scan's density, not a hole in the deck
-    overhead, and 50 m is the bar a gap in the deck's own height has to clear to be flagged. A
-    stretch shorter than the same bar — a ramp crossing over for a moment — is left out too.
+    there. Two kinds of break are carried across instead. A break shorter than MIN_FLAGGED_GAP_M,
+    whatever the scan saw in it: at 10 m samples read from returns within 5 m, one sample that
+    happens to catch the runners' deck alone is the scan's density, not a hole in the deck
+    overhead, and 50 m is the bar a gap in the deck's own height has to clear to be flagged. And a
+    gap where the scan has no deck at all, however long, between two stretches under a deck: it
+    has nothing to say there, a deck has no holes, and the height is already filled in and flagged
+    across the same gap, which greys this too. A stretch shorter than MIN_FLAGGED_GAP_M — a ramp
+    crossing over for a moment — is left out, for the same reason a gap that short isn't flagged.
     """
-    roofed = np.isfinite(over_m)
+    under = np.isfinite(over_m)
+    nothing_seen = ~np.isfinite(deck_m)
     spans = []
     i = 0
-    while i < len(roofed):
-        if not roofed[i]:
+    while i < len(under):
+        if not under[i]:
             i += 1
             continue
         end = i
         j = i + 1
-        while j < len(roofed) and along_m[j] - along_m[end] < MIN_FLAGGED_GAP_M:
-            if roofed[j]:
+        # Carry on past a break while it is short, or while the scan has seen nothing since `end`.
+        while j < len(under) and (along_m[j] - along_m[end] < MIN_FLAGGED_GAP_M or nothing_seen[end + 1 : j].all()):
+            if under[j]:
                 end = j
             j += 1
         if along_m[end] - along_m[i] >= MIN_FLAGGED_GAP_M:
             inside = slice(i, end + 1)
-            deck_above_m = float(np.nanmedian(over_m[inside] - deck_m[inside]))
             above = "the upper deck" if bridge.deck == "lower" else "another deck"
             spans.append(
                 UnderADeck(
                     km_start=float(along_m[i]) / 1000,
                     km_end=float(along_m[end]) / 1000,
                     above=above,
-                    deck_above_m=round(deck_above_m, 1),
-                    reason=f"{bridge.name}: the survey's bridge-deck returns stand {deck_above_m:.0f} m over the road here, "
-                    f"so the road runs under {above} and the sun never reaches it.",
+                    deck_above_m=round(float(np.nanmedian(over_m[inside] - deck_m[inside])), 1),
+                    reason=f"{bridge.name}: the survey's bridge-deck returns stand over the road here, so the road runs under {above} and the sun never reaches it.",
+                    source=source,
                 )
             )
         i = end + 1
     return spans
-
 
 def _gaps(along_m: np.ndarray, measured: np.ndarray) -> list[tuple[float, float]]:
     """Stretches of a bridge with no measured deck height, each from the measured point before
@@ -302,7 +308,10 @@ def _gaps(along_m: np.ndarray, measured: np.ndarray) -> list[tuple[float, float]
     return gaps
 
 
-def _in_course_order(spans):
+Span = TypeVar("Span", NotMeasured, UnderADeck)
+
+
+def _in_course_order(spans: list[Span]) -> list[Span]:
     """Sorted by where they start, and never overlapping: two bridges listed back to back share
     the sample where one ends and the next begins."""
     ordered = []

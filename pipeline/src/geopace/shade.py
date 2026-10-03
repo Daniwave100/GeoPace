@@ -164,7 +164,7 @@ def shade_table(
     day: dt.date,
     timezone: str,
     crowns: list[Crown] | None = None,
-    under_a_deck=None,
+    under_a_deck: np.ndarray | None = None,
     step_minutes: int = DEFAULT_STEP_MINUTES,
     floor_deg: float = SUN_FLOOR_DEG,
 ) -> ShadeTable:

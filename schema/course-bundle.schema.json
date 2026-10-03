@@ -99,14 +99,15 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["km_start", "km_end", "above", "deck_above_m", "reason"],
+            "required": ["km_start", "km_end", "above", "deck_above_m", "reason", "source"],
             "additionalProperties": false,
             "properties": {
               "km_start": { "description": "km from the start, same scale as course_line.km.", "type": "number", "minimum": 0 },
               "km_end": { "type": "number", "exclusiveMinimum": 0 },
               "above": { "description": "What is overhead, in the sentence's words: 'the upper deck' of this bridge, or 'another deck'.", "type": "string", "minLength": 1 },
               "deck_above_m": { "description": "How far over the road the deck overhead stands, median along the stretch.", "type": "number", "exclusiveMinimum": 0 },
-              "reason": { "description": "Shown to the runner: which bridge, and how the survey knows.", "type": "string", "minLength": 1 }
+              "reason": { "description": "Shown to the runner: which bridge, and how the survey knows.", "type": "string", "minLength": 1 },
+              "source": { "description": "The survey the deck overhead was read from: the same one the deck underfoot comes from.", "$ref": "#/$defs/url" }
             }
           }
         },

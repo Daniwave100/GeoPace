@@ -18,9 +18,11 @@ import numpy as np
 import pytest
 
 from geopace.buildings import Building, BuildingsModel, buildings_along, meters_per_degree
+from geopace.bundle import within_spans
 from geopace.provenance import Attribution, Source
 from geopace.shade import REACH_PER_METER, SUN_FLOOR_DEG, UNDER_A_ROOF_M, shade_buildings, shade_table, sunlit
 from geopace.sun import sun_position
+from geopace.trees import Crown
 
 SOURCE = Source(id="made-up-city", title="A made-up city's buildings", url="https://example.org/buildings", licence="test data", accessed="2026-09-20")
 ATTRIBUTION = Attribution(text="Buildings: a made-up city", url="https://example.org/buildings")
@@ -184,6 +186,19 @@ class TestTheRoadUnderADeck:
         assert table.always_in_sun[~under].all()
         assert not table.in_leaf_shade.any()
 
+    def test_a_deck_wins_over_the_leaves_under_it_as_a_wall_does(self):
+        """A crown over the whole road: leafy shade in the open, and nothing under the deck, where
+        the shade is the deck's at every hour and a leaf can add nothing (PLAN.md D60's rule)."""
+        lat, lon, elevation, north = road_north()
+        under = north >= 0
+        canopy = [Crown(id="street trees", ring=block(east_m=0, north_m=0, width_m=60, depth_m=300, height_m=12).ring, underside_m=4.0, top_m=12.0)]
+
+        table = shade_table(lat, lon, elevation, [], crowns=canopy, day=dt.date(2026, 9, 27), timezone="Europe/Berlin", under_a_deck=under)
+
+        assert table.in_leaf_shade[~under].any()
+        assert not table.in_leaf_shade[under].any()
+        assert not table.in_sun[under].any()
+
 
 def _from_base64(text: str) -> bytes:
     import base64
@@ -296,16 +311,13 @@ class TestTheCommittedTables:
         assert 25.6 < queensboro[-1]["km_end"] < 25.9
         assert all(span["above"] == "the upper deck" and 3 < span["deck_above_m"] < 8 for span in queensboro)
         for span in queensboro:
-            under = (km >= span["km_start"]) & (km <= span["km_end"])
+            under = within_spans(km, [span])
             assert under.sum() >= 5
             assert not lit[under].any(), f"{span['km_start']}-{span['km_end']} km has sunlit samples under the upper deck"
         # On the span the issue measured, 112 of 243 samples were sunlit at every step we model. What
         # is still lit there is the 80 m where the scan has no returns at all, which the height
         # already flags and the layer greys: nothing measured says what is over the road there.
-        gaps = bundle["measured"]["elevation_not_measured"]
-        in_a_gap = np.zeros(len(km), dtype=bool)
-        for gap in gaps:
-            in_a_gap |= (km >= gap["km_start"]) & (km <= gap["km_end"])
+        in_a_gap = within_spans(km, bundle["measured"]["elevation_not_measured"])
         measured_span = (km >= 24.3) & (km <= 25.6) & ~in_a_gap
         assert not lit[measured_span].any()
         assert lit[(km >= 24.3) & (km <= 25.6)].mean() < 0.07
@@ -334,10 +346,7 @@ class TestTheCommittedTables:
         ]
         # A bridge deck over the road is not a building: nothing draws it, and the table keeps the
         # sun off the road under it (issue #42). Those samples are left out of the comparison.
-        km = np.array(line["km"])
-        open_sky = np.ones(len(km), dtype=bool)
-        for span in bundle["measured"].get("under_a_deck", []):
-            open_sky &= ~((km >= span["km_start"]) & (km <= span["km_end"]))
+        open_sky = ~within_spans(line["km"], bundle["measured"].get("under_a_deck", []))
         take = np.flatnonzero(open_sky)[:: self.EVERY]
         lat, lon = np.array(line["lat"])[take], np.array(line["lon"])[take]
         # The White model's heights count from the ellipsoid, so the road's matching column is used.

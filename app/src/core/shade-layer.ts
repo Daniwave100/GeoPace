@@ -37,7 +37,7 @@ import type { Encoding } from "./encoding";
 import type { Clause, HowMuch, Layer, LineMark, RowBin, RowValue, StripRow } from "./layers";
 import type { Planner } from "./planner";
 import { sunAlong, type SunAlong, type SunAt, type SunRun, type SunState } from "./sun";
-import { formatNearby, type Units } from "./units";
+import { formatHeight, formatNearby, type Units } from "./units";
 
 /** How deep the warm and the teal are on a binary layer: one step, not a scale. */
 const MARK: HowMuch = 0.8;
@@ -86,7 +86,7 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     // The middle of this row is not a value: there is no zero between sun and shade.
     baseline: "middle",
     stepped: true,
-    valueAt: (km) => valueAt(along.at(km), floorDeg, filledIn(gaps, km)),
+    valueAt: (km) => valueAt(along.at(km), floorDeg, spanAt(gaps, km)),
     // The fill follows the slice's own value, never a second count of its own: with three states
     // to share out, "the commonest state" and "sun or shade" can disagree — 40 sun, 35 shade, 25
     // leafy is a shaded slice whose commonest single state is sun — and the row would then be
@@ -115,14 +115,14 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
     rows: () => [row],
     lineMarks: () => marks,
     lineLabels: () => [],
-    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, filledIn(gaps, km), leaves, underADeck(decks, km)),
+    clause: (km, units) => clauseFor(along.at(km), km, lengthKm, units, floorDeg, planner.carriedOver !== null, { firstStep, lastStep, timezone: bundle.course.timezone }, spanAt(gaps, km), leaves, spanAt(decks, km)),
     stretchClause: (fromKm, toKm, units) => {
       const hours = { firstStep, lastStep, timezone: bundle.course.timezone };
       const first = along.at(fromKm);
       // The sun down, too low, or outside the hours worked out: none of those counts down, and none
       // of them comes or goes within a beat of race morning, so the stretch's start says it.
-      if (first.state === "down" || first.state === "unknown") return clauseFor(first, fromKm, lengthKm, units, floorDeg, planner.carriedOver !== null, hours, filledIn(gaps, fromKm), leaves, underADeck(decks, fromKm));
-      return stretchClauseFor(along, fromKm, toKm, planner.carriedOver !== null, gaps.filter((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves, decks.find((deck) => deck.km_start <= fromKm && deck.km_end >= toKm));
+      if (first.state === "down" || first.state === "unknown") return clauseFor(first, fromKm, lengthKm, units, floorDeg, planner.carriedOver !== null, hours, spanAt(gaps, fromKm), leaves, spanAt(decks, fromKm));
+      return stretchClauseFor(along, fromKm, toKm, units, planner.carriedOver !== null, gaps.filter((gap) => gap.km_start < toKm && gap.km_end > fromKm), leaves, decks.find((deck) => deck.km_start <= fromKm && deck.km_end >= toKm));
     },
   };
 }
@@ -132,17 +132,19 @@ export function shadeLayer(bundle: CourseBundle, planner: Planner): Layer | null
  * shade" where the sun and the shade take turns. Never how far, which counts down, and never a
  * share of the stretch (D58: binary, every 10 m).
  */
-function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carriedOver: boolean, gaps: NotMeasuredSpan[], leaves: LeafNote, deck: UnderADeckSpan | undefined): Clause {
+function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, units: Units, carriedOver: boolean, gaps: NotMeasuredSpan[], leaves: LeafNote, deck: UnderADeckSpan | undefined): Clause {
   const first = along.at(fromKm);
   const states = new Set([first.state, ...along.runs.filter((run) => run.fromKm < toKm && run.toKm > fromKm).map((run) => run.state)]);
   const sunny = states.has("sun");
-  // A beat that lies wholly under a deck says where it is (`deck` is only given for one that does).
+  // A beat that lies wholly under a deck, and in its shade the whole way, says where it is
+  // (`deck` is only given for a beat the deck covers end to end).
+  const underTheDeck = deck !== undefined && first.state === "shade" && states.size === 1 ? deck : undefined;
   const text =
     states.size === 1
       ? first.alwaysInSun && first.alwaysUntilKm >= toKm
         ? "No shade, at any hour."
-        : deck && first.state === "shade"
-          ? `Under ${deck.above}.`
+        : underTheDeck
+          ? `Under ${underTheDeck.above}.`
           : `In ${whereYouAre(first.state)}.`
       : sunny
         ? "In and out of the shade."
@@ -155,13 +157,17 @@ function stretchClauseFor(along: SunAlong, fromKm: number, toKm: number, carried
   if (filledInKm > (toKm - fromKm) / 2) return { text, encoding: "not-measured", note: filledIn, carriedOver };
   // Some of the shade is a tree's: the whole clause rests on the leaves, as a tree's rim does.
   if (states.has("leafy")) return { text, encoding: "depends-on-leaves", note: [leaves.why, filledIn].filter(Boolean).join(" ") || undefined, carriedOver };
-  if (deck && first.state === "shade" && states.size === 1) return { text, encoding: "measured", note: [deck.reason, filledIn].filter(Boolean).join(" "), carriedOver };
+  if (underTheDeck) return { text, encoding: "measured", note: [deckNote(underTheDeck, units), filledIn].filter(Boolean).join(" "), carriedOver };
   return { text, encoding: "measured", note: filledIn, carriedOver };
 }
 
-/** The deck the runner is standing under, if they are standing under one. */
-function underADeck(decks: UnderADeckSpan[], km: number): UnderADeckSpan | undefined {
-  return decks.find((deck) => km >= deck.km_start && km <= deck.km_end);
+/**
+ * What a deck overhead rests on, for whoever asks: which bridge, how the survey knows, and how far
+ * up it is — the one number here, printed in the runner's own units (CLAUDE.md: every height
+ * shown goes through core/units.ts), which is why the bundle's words carry none.
+ */
+function deckNote(deck: UnderADeckSpan, units: Units): string {
+  return `${deck.reason} The deck overhead is about ${formatHeight(deck.deck_above_m, units)} up.`;
 }
 
 /**
@@ -222,9 +228,10 @@ function clauseFor(at: SunAt, km: number, lengthKm: number, units: Units, floorD
     : underTheDeck
       ? `Under ${deck.above}${howFar(deck.km_end, km, lengthKm, units)}.`
       : `In ${whereYouAre(at.state)}${howFar(at.untilKm, km, lengthKm, units)}.`;
-  // The shade was worked out from the road's own height. Where that height is filled in, so is this.
-  if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}`, carriedOver };
-  if (underTheDeck) return { text, encoding: "measured", note: deck.reason, carriedOver };
+  // The shade was worked out from the road's own height. Where that height is filled in, so is
+  // this — and so is a deck overhead, carried across the same gap in the scan (course_line.py).
+  if (gap) return { text, encoding: "not-measured", note: `The shade here is worked out from a height that is filled in, not measured. ${gap.reason}${underTheDeck ? " The deck overhead is carried across this gap from the stretches measured either side of it." : ""}`, carriedOver };
+  if (underTheDeck) return { text, encoding: "measured", note: deckNote(deck, units), carriedOver };
   // A tree's shade is a claim with a condition on it, and the condition is printed with it.
   if (at.state === "leafy") return { text, encoding: "depends-on-leaves", note: leaves.why, carriedOver };
   return { text, encoding: "measured", carriedOver };
@@ -240,9 +247,9 @@ function howFar(untilKm: number, km: number, lengthKm: number, units: Units): st
   return ahead.startsWith("0 ") ? "" : ` for the next ${ahead}`;
 }
 
-/** The stretch of filled-in height the runner is standing on, if they are standing on one. */
-function filledIn(gaps: NotMeasuredSpan[], km: number): NotMeasuredSpan | undefined {
-  return gaps.find((gap) => km >= gap.km_start && km <= gap.km_end);
+/** The span the runner is standing on, if they are standing on one: a filled-in height, a deck overhead. */
+function spanAt<Span extends { km_start: number; km_end: number }>(spans: Span[], km: number): Span | undefined {
+  return spans.find((span) => km >= span.km_start && km <= span.km_end);
 }
 
 /** The parts of a run whose height is measured: the run, with every filled-in stretch cut out. */

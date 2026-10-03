@@ -7,6 +7,8 @@ by schema/course-bundle.schema.json at the repo root, which the app validates ag
 import base64
 import json
 import math
+
+import numpy as np
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -92,7 +94,7 @@ def build_course_bundle(
                 for span in line.not_measured
             ],
             "under_a_deck": [
-                {"km_start": round(span.km_start, 2), "km_end": round(span.km_end, 2), "above": span.above, "deck_above_m": span.deck_above_m, "reason": span.reason}
+                {"km_start": round(span.km_start, 2), "km_end": round(span.km_end, 2), "above": span.above, "deck_above_m": span.deck_above_m, "reason": span.reason, "source": span.source}
                 for span in line.under_a_deck
             ],
             "difficulty_model": difficulty.model_json(),
@@ -127,6 +129,16 @@ def build_course_bundle(
         bundle["attributions"].append(Attribution(text=f"{uses.capitalize()}: © OpenStreetMap contributors", url=OSM_COPYRIGHT).to_json())
     validate_bundle(bundle)
     return bundle
+
+
+def within_spans(km, spans: list[dict]) -> np.ndarray:
+    """One flag per course sample: True where the sample lies on one of these spans of the bundle
+    (`elevation_not_measured`, `under_a_deck`), whose ends are km rounded to the centimetre."""
+    km = np.asarray(km, dtype=float)
+    inside = np.zeros(len(km), dtype=bool)
+    for span in spans:
+        inside |= (km >= span["km_start"] - 1e-6) & (km <= span["km_end"] + 1e-6)
+    return inside
 
 
 def credit(bundle: dict, source: Source, attribution: Attribution | None = None) -> None:

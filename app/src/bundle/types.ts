@@ -120,6 +120,8 @@ export interface UnderADeckSpan {
   deck_above_m: number;
   /** In plain words, for the runner: which bridge, and how the survey knows. */
   reason: string;
+  /** The survey the deck overhead was read from: the same one the deck underfoot comes from. */
+  source: string;
 }
 
 /** Parallel columns: index i of every array describes the same course sample. */

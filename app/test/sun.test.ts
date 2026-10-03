@@ -309,6 +309,9 @@ describe("the road under a bridge deck (issue #42)", () => {
     expect(under.text).toBe("Under the upper deck for the next 100 m.");
     expect(under.encoding).toBe("measured");
     expect(under.note).toContain("Test bridge");
+    // The one number, in the runner's own units: the bundle's words carry none (core/units.ts).
+    expect(under.note).toContain("about 6 m up");
+    expect(layer.clause(0.7, "mi")!.note).toContain("about 21 ft up");
     // Off the deck, the ordinary words.
     expect(layer.clause(0.3, "km")!.text).toMatch(/^No shade for the next [\d.]+ m, at any hour\.$/);
     expect(layer.clause(0.55, "km")!.text).toMatch(/^In (the sun|shade) (for the next|to the finish)/);
@@ -327,6 +330,15 @@ describe("the road under a bridge deck (issue #42)", () => {
     const underTheDeck = layer.clause(24.5, "km")!;
     expect(underTheDeck.text).toMatch(/^Under the upper deck for the next [\d.]+ (m|km)\.$/);
     expect(underTheDeck.encoding).toBe("measured");
+    expect(underTheDeck.note).toContain("about 6 m up");
+    // The 80 m where the scan has no returns at all, mid-bridge: the deck overhead is carried
+    // across it, the height greys it, and the strongest claim cannot land there (the owner's ask).
+    const inTheGap = layer.clause(25.3, "km")!;
+    expect(inTheGap.encoding).toBe("not-measured");
+    expect(inTheGap.text).toMatch(/^Under the upper deck/);
+    expect(inTheGap.note).toContain("carried across");
+    // And every stretch listed is a deck a road could pass under, not a wall beside the ramp.
+    expect(spans.every((span) => span.deck_above_m >= 5)).toBe(true);
     // The issue's own measure: no sample under the deck is sunlit at any step, so the strongest
     // claim this layer makes — "No shade, at any hour." — can no longer land there.
     const along = sunAlong(nyc, plannerFor(nyc, firstWavePlan(nyc)))!;
@@ -360,7 +372,7 @@ function madeUpCourse(options: { underADeck?: { fromKm: number; toKm: number } }
     bearing_deg: km.map(() => 0),
   };
   copy.measured.elevation_not_measured = [];
-  copy.measured.under_a_deck = deck ? [{ km_start: deck.fromKm, km_end: deck.toKm, above: "the upper deck", deck_above_m: 6.4, reason: "Test bridge (lower level): the survey's bridge-deck returns stand 6 m over the road here, so the road runs under the upper deck and the sun never reaches it." }] : [];
+  copy.measured.under_a_deck = deck ? [{ km_start: deck.fromKm, km_end: deck.toKm, above: "the upper deck", deck_above_m: 6.4, reason: "Test bridge (lower level): the survey's bridge-deck returns stand over the road here, so the road runs under the upper deck and the sun never reaches it.", source: "https://example.org/lidar" }] : [];
   copy.measured.sun = {
     step_minutes: 5,
     first_step: firstStep,
