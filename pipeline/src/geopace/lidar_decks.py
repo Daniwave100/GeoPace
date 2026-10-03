@@ -139,31 +139,31 @@ def deck_heights(returns: list[np.ndarray], deck: str | None, where: str) -> np.
 
 def _named_deck(layers: list[list[float]], deck: str) -> np.ndarray:
     """The height of the deck the course facts name, at each point of a double-deck bridge, NaN
-    where the scan does not see that deck.
+    where, as far as can be told, the scan does not see that deck.
 
-    A point that sees two decks has the named one by position, the lowest or the highest layer. A
-    point that sees one layer could be seeing either: the scan sees top surfaces, so where the
-    upper deck covers the lower one the lower deck is not in the returns at all, and the one layer
-    left is the upper deck whichever deck the course uses (issue #56). Read as the lowest of one,
-    it put the Queensboro's road 6 m up on the upper deck for 50 m. A deck runs on unbroken, so a
-    lone layer is the named deck only if it is nearer that deck's line than the other deck's, each
-    line drawn between the nearest points either side that saw both decks. Two layers closer than
-    MIN_DECK_OVERHEAD_M are not two decks (a wall or a roadway beside the course), so such a point
-    is no measure of where either deck runs. Where no point on the bridge sees both decks (the
-    Verrazzano's upper deck hides its lower one the whole way) there is no other line to compare
-    with, and the one layer is the named deck.
+    A point that sees both decks — two layers at least MIN_DECK_OVERHEAD_M apart — has the named
+    one by position, the lowest or the highest layer. Every other point that sees anything could
+    be seeing either deck: the scan sees top surfaces, so where the upper deck covers the lower one
+    the lower deck is not in the returns at all, and what is left is the upper deck whichever deck
+    the course uses (issue #56), alone or with a parapet or a roadway beside it (layers closer than
+    MIN_DECK_OVERHEAD_M are not two decks). Read as the lowest of one, it put the Queensboro's
+    road 6 m up on the upper deck for 50 m. A deck runs on unbroken, so such a point is read by
+    position too, and kept only if that height is nearer the named deck's line than the other
+    deck's, each line drawn between the nearest points either side that saw both decks and held
+    level beyond the last of them; a tie keeps the named deck. Where no point on the bridge sees
+    both decks (the Verrazzano's upper deck hides its lower one the whole way) there is no other
+    line to compare with, and what the scan sees is the named deck.
     """
-    named = (lambda layer: layer[0]) if deck == "lower" else (lambda layer: layer[-1])
-    other = (lambda layer: layer[-1]) if deck == "lower" else (lambda layer: layer[0])
-    heights = np.array([named(layer) if layer else np.nan for layer in layers])
+    named_at, other_at = (0, -1) if deck == "lower" else (-1, 0)
+    heights = np.array([layer[named_at] if layer else np.nan for layer in layers])
     saw_both = [i for i, layer in enumerate(layers) if len(layer) > 1 and layer[-1] - layer[0] >= MIN_DECK_OVERHEAD_M]
     if not saw_both:
         return heights
     at = np.arange(len(layers))
-    named_line = np.interp(at, saw_both, [named(layers[i]) for i in saw_both])
-    other_line = np.interp(at, saw_both, [other(layers[i]) for i in saw_both])
-    for i, layer in enumerate(layers):
-        if len(layer) == 1 and abs(layer[0] - named_line[i]) > abs(layer[0] - other_line[i]):
+    named_line = np.interp(at, saw_both, [layers[i][named_at] for i in saw_both])
+    other_line = np.interp(at, saw_both, [layers[i][other_at] for i in saw_both])
+    for i, height in enumerate(heights):
+        if i not in saw_both and abs(height - named_line[i]) > abs(height - other_line[i]):
             heights[i] = np.nan
     return heights
 

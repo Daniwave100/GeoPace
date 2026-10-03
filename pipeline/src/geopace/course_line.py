@@ -238,8 +238,8 @@ def raise_bridge_decks(
                 NotMeasured(
                     km_start=gap_start_m / 1000,
                     km_end=gap_end_m / 1000,
-                    reason=f"{bridge.name}: the survey has no returns from the bridge deck here, so the "
-                    "height is a straight line between the measured heights either side.",
+                    reason=f"{bridge.name}: the survey has no returns from the deck the course runs on here, "
+                    "so the height is a straight line between the measured heights either side.",
                 )
             )
     return patched, not_measured, under_a_deck

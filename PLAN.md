@@ -741,8 +741,9 @@ arrival times are approximate — state that in the UI.
 - 🟡 **Two blocks stand over the course, and only one of them should.** In Berlin the course runs *through* the
   **Brandenburg Gate** (km 41.93, its roof 21 m over the road), which is right. In New York nine samples at
   **km 25.65–25.73** have a roof one to four metres over them (3.7 m at most, under the 4 m headroom bar; it read as
-  2 m over three samples until #56 put the road on the lower deck there): the course is on the Queensboro's lower deck
-  and a building beside the bridge holds the road's plan position without standing over the road at all. Harmless to look at; **#9 must not read it as the runner being indoors**, and the surface it measures shade
+  2 m over three samples until #56 put the road on the lower deck there): the course is on the Queensboro's lower
+  deck and a building beside the bridge holds the road's plan position without standing over the road at all.
+  Harmless to look at; **#9 must not read it as the runner being indoors**, and the surface it measures shade
   against has to know the road can be above a roof.
 - ✅ **The Shade layer, looked at by the owner 09-21 (#9, D59):** one chart, not two, and the layer is called Shade. The
   square wave itself they liked as it is. 🟡 *Still unseen:* the layer **over photoreal**, where the map's own shadows are
@@ -1177,5 +1178,9 @@ arrival times are approximate — state that in the UI.
   `deck_heights` had read it as the lower one for five samples (km 25.69–25.73): the road 6 m up, which the smoothing
   spread down the ramp as an error of up to 2.4 m, and the stretch under the upper deck broken exactly where the deck
   overhead was all the scan saw. Now a lone layer is read against the two decks' lines, the lower deck is unmeasured
-  there (a flagged straight line, 25.68–25.74), and the stretch runs on. New York rebuilt: one stretch, 23.90–25.75 km,
-  186 samples; the Verrazzano, whose upper deck hides its lower one from the scan the whole way, is unchanged.
+  there (a flagged straight line, 25.68–25.74), and the stretch runs on. The same reading moved two single samples the
+  old one had also put on the upper deck, km 23.79 (now tied to the ground at the span's start) and 25.46 (a straight
+  line between its neighbours), both under the 50 m bar and so unflagged; the gap's words now say the survey has no
+  returns from *the deck the course runs on*, which is true whether it saw nothing or saw the upper deck. New York
+  rebuilt: one stretch, 23.90–25.75 km, 186 samples; the Verrazzano, whose upper deck hides its lower one from the scan
+  the whole way, is unchanged.

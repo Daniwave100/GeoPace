@@ -88,10 +88,11 @@ def check_nyc_not_measured(spans: list[dict]) -> None:
 def check_nyc_under_a_deck(spans: list[dict], line: dict) -> None:
     """The Queensboro's lower level runs under its upper one from the Queens approach to the
     Manhattan exit ramp, in one stretch (D70). Where the upper deck covers the lower one the scan
-    sees the upper deck alone (km 25.69-25.73): the stretch runs on through it, and the road stays
+    sees the upper deck alone (km 25.69–25.73): the stretch runs on through it, and the road stays
     on the lower deck's line instead of jumping 6 m up onto the upper one (#56)."""
     [queensboro] = spans
     assert "Queensboro" in queensboro["reason"]
+    # The ends are km rounded to the centimetre, so a centimetre is the tolerance.
     assert queensboro["km_start"] == pytest.approx(23.90, abs=0.011)
     assert queensboro["km_end"] == pytest.approx(25.75, abs=0.011)
     assert queensboro["deck_above_m"] == pytest.approx(6.4, abs=0.3)

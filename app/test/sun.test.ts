@@ -91,9 +91,10 @@ describe("what the table says about the real courses", () => {
     // At km 25.69-25.73 the upper deck covers the lower one, so the scan sees the upper deck alone.
     // Read as the runners' deck it put the road 6 m up and the stretch under the upper deck broke
     // there (issue #56); now the lower deck is simply unmeasured there, the stretch runs on, and
-    // the table has the sun off these samples at every step like the rest of the lower deck. The
-    // building beside the bridge whose footprint holds the road's plan position here (PLAN.md §10)
-    // has its roof under a lorry's headroom over the road, so it never made the runner indoors.
+    // the table has the sun off these samples at every step like the rest of the lower deck. (The
+    // building beside the bridge whose outline holds the road's plan position here, PLAN.md §10, has
+    // its roof one to four metres over the road, under a lorry's headroom; that it does not make the
+    // runner indoors is the pipeline's test to keep, since this table cannot tell a roof from a deck.)
     const table = readSunTable(nyc)!;
     const lit = [...Array(table.block.steps).keys()].filter((step) => table.inSun(sampleAt(nyc, 25.72), step)).length;
 
