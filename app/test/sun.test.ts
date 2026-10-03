@@ -87,14 +87,18 @@ describe("what the table says about the real courses", () => {
     expect(lit(underTheGate + 3)).toBeGreaterThan(table.block.steps / 2);
   });
 
-  it("does not take the Queensboro's lower deck for indoors", () => {
-    // Three samples at km 25.71-25.73 have a roof 2 m over them: the course is on the lower deck
-    // and a building beside the bridge is under it (PLAN.md §10). A roof that low is a footprint
-    // overlapping a road it doesn't stand over, not a runner inside a building.
+  it("keeps the sun off the Queensboro's lower deck where the scan sees only the upper one", () => {
+    // At km 25.69-25.73 the upper deck covers the lower one, so the scan sees the upper deck alone.
+    // Read as the runners' deck it put the road 6 m up and the stretch under the upper deck broke
+    // there (issue #56); now the lower deck is simply unmeasured there, the stretch runs on, and
+    // the table has the sun off these samples at every step like the rest of the lower deck. The
+    // building beside the bridge whose footprint holds the road's plan position here (PLAN.md §10)
+    // has its roof under a lorry's headroom over the road, so it never made the runner indoors.
     const table = readSunTable(nyc)!;
     const lit = [...Array(table.block.steps).keys()].filter((step) => table.inSun(sampleAt(nyc, 25.72), step)).length;
 
-    expect(lit).toBeGreaterThan(table.block.steps / 2);
+    expect(lit).toBe(0);
+    expect((nyc.measured.under_a_deck ?? []).some((span) => span.km_start < 25.72 && 25.72 < span.km_end)).toBe(true);
   });
 
   it("was worked out from more buildings than the White model draws", () => {

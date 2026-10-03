@@ -154,8 +154,10 @@ describe("the Hills layer", () => {
       const greyed = hillsLayer(bundle).lineMarks().filter((mark) => mark.encoding === "not-measured");
       expect(greyed.map((mark) => [mark.fromKm, mark.toKm])).toEqual(bundle.measured.elevation_not_measured.map((gap) => [gap.km_start, gap.km_end]));
     }
-    // New York has five such stretches, only one of them on a hill. Berlin's decks are all measured.
-    expect(hillsLayer(nyc).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(5);
+    // New York has six such stretches: the Verrazzano's crest, three short ones, the 80 m with no returns
+    // mid-Queensboro and the 60 m down its Manhattan ramp where the scan sees only the upper deck (#56).
+    // Berlin's decks are all measured.
+    expect(hillsLayer(nyc).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(6);
     expect(hillsLayer(berlin).lineMarks().filter((mark) => mark.encoding === "not-measured")).toHaveLength(0);
   });
 
