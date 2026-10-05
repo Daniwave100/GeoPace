@@ -85,6 +85,24 @@ def check_nyc_not_measured(spans: list[dict]) -> None:
     assert sum(span["km_end"] - span["km_start"] for span in spans) < 2.0
 
 
+def check_nyc_under_a_deck(spans: list[dict], line: dict) -> None:
+    """The Queensboro's lower level runs under its upper one from the Queens approach to the
+    Manhattan exit ramp, in one stretch (D70). Where the upper deck covers the lower one the scan
+    sees the upper deck alone (km 25.69–25.73): the stretch runs on through it, and the road stays
+    on the lower deck's line instead of jumping 6 m up onto the upper one (#56)."""
+    [queensboro] = spans
+    assert "Queensboro" in queensboro["reason"]
+    # The ends are km rounded to the centimetre, so a centimetre is the tolerance.
+    assert queensboro["km_start"] == pytest.approx(23.90, abs=0.011)
+    assert queensboro["km_end"] == pytest.approx(25.75, abs=0.011)
+    assert queensboro["deck_above_m"] == pytest.approx(6.4, abs=0.3)
+    km = np.array(line["km"])
+    elevation = np.array(line["elevation_m"])
+    # In the scan the lower deck is 30.1 m at km 25.68 and 28.7 m at 25.74; between them it is not
+    # seen, so the road is a straight line between the two, about 29 m, not the upper deck's 35 m.
+    assert elevation[np.argmin(np.abs(km - 25.72))] == pytest.approx(29.2, abs=1.0)
+
+
 def test_committed_nyc_bundle_matches_the_schema_and_the_real_course():
     bundle = json.loads(BUNDLE.read_text())
 
@@ -93,6 +111,7 @@ def test_committed_nyc_bundle_matches_the_schema_and_the_real_course():
     check_nyc_course_line(bundle["measured"]["course_line"])
     check_nyc_ellipsoid_heights(bundle["measured"]["course_line"])
     check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])
+    check_nyc_under_a_deck(bundle["measured"]["under_a_deck"], bundle["measured"]["course_line"])
     # The data it was built from is named, with a licence and the date it was fetched — the
     # buildings once, though both the White model and the shade table are worked out from them.
     assert {"route", "nyc-dem-2017", "nyc-lidar-2017", "geoid-egm2008", "openstreetmap", "nyc-building-footprints", "nyc-land-cover-2017", "noaa-solar"} == {s["id"] for s in bundle["sources"]}
@@ -117,3 +136,4 @@ def test_real_nyc_course_rebuilds_from_the_cached_inputs():
     check_nyc_course_line(bundle["measured"]["course_line"])
     check_nyc_ellipsoid_heights(bundle["measured"]["course_line"])
     check_nyc_not_measured(bundle["measured"]["elevation_not_measured"])
+    check_nyc_under_a_deck(bundle["measured"]["under_a_deck"], bundle["measured"]["course_line"])

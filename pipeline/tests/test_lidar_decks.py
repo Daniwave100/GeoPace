@@ -84,23 +84,29 @@ def test_a_course_outside_every_tile_is_refused(tmp_path):
         decks.returns(lat, lon)
 
 
+# The Queensboro's two levels, about 6.4 m apart (PLAN.md D23), as a scan sees them: a few returns each.
+LOWER, UPPER = 44.0, 50.4
+
+
+def layer(height):
+    return height + np.array([-0.1, 0.0, 0.05, 0.1])
+
+
+def both_decks(lower=LOWER, upper=UPPER):
+    return np.concatenate([layer(lower), layer(upper)])
+
+
 class TestTheDeckOverTheRunnersDeck:
     """A bridge deck is not a building (issue #42): the Queensboro's lower level runs under its
     upper level the whole way, and only the LiDAR knows. The same returns that give the deck under
     the runners' feet also hold the deck over their heads."""
 
-    LOWER, UPPER = 44.0, 50.4  # the Queensboro's two levels, about 6.4 m apart (PLAN.md D23)
-
-    def layer(self, height):
-        return height + np.array([-0.1, 0.0, 0.05, 0.1])
-
     def test_on_the_lower_deck_the_upper_one_is_overhead_and_on_the_upper_deck_nothing_is(self):
-        both = np.concatenate([self.layer(self.LOWER), self.layer(self.UPPER)])
-        returns = [both, both, self.layer(self.LOWER), np.empty(0)]
+        returns = [both_decks(), both_decks(), layer(LOWER), np.empty(0)]
 
         on_the_lower = deck_heights(returns, "lower", "test")
         over_the_lower = decks_over(returns, on_the_lower)
-        assert over_the_lower[:2] == pytest.approx([self.UPPER, self.UPPER], abs=0.2)
+        assert over_the_lower[:2] == pytest.approx([UPPER, UPPER], abs=0.2)
         assert np.isnan(over_the_lower[2])  # the scan sees the lower deck alone: open sky
         assert np.isnan(over_the_lower[3])  # the scan sees nothing at all: nothing to say
 
@@ -112,7 +118,7 @@ class TestTheDeckOverTheRunnersDeck:
         needs four metres under a deck a metre thick). It is a parapet, a wall, or the roadway
         beside the course that the search radius caught — New York's exit ramp off the Queensboro
         shows one 3–5 m up for 100 m — and it keeps the sun off nobody."""
-        close = np.concatenate([self.layer(self.LOWER), self.layer(self.LOWER + 3.5)])
+        close = np.concatenate([layer(LOWER), layer(LOWER + 3.5)])
         returns = [close]
 
         assert np.isnan(decks_over(returns, deck_heights(returns, "lower", "test"))).all()
@@ -120,12 +126,88 @@ class TestTheDeckOverTheRunnersDeck:
         from geopace.shade import UNDER_A_ROOF_M
 
         assert MIN_DECK_OVERHEAD_M >= UNDER_A_ROOF_M
-        assert self.UPPER - self.LOWER > MIN_DECK_OVERHEAD_M
+        assert UPPER - LOWER > MIN_DECK_OVERHEAD_M
 
     def test_a_few_stray_returns_overhead_are_not_a_deck(self):
         """A sign, a light pole, a walkway: the same rule as for the deck itself (MIN_DECK_SHARE)."""
-        deck = self.LOWER + np.linspace(-0.1, 0.1, 400)
-        stray = np.array([self.UPPER, self.UPPER + 0.1, self.UPPER - 0.1])
+        deck = LOWER + np.linspace(-0.1, 0.1, 400)
+        stray = np.array([UPPER, UPPER + 0.1, UPPER - 0.1])
         returns = [np.concatenate([deck, stray])]
 
         assert np.isnan(decks_over(returns, deck_heights(returns, None, "test"))).all()
+
+
+class TestOneLayerSeenOnADoubleDeckBridge:
+    """Issue #56. The scan sees top surfaces, so where the upper deck covers the lower one the lower
+    deck is not seen at all, and the one layer left is the upper deck — whichever deck the course
+    facts name. Which deck a lone layer is comes from the line it continues, drawn between the
+    nearest points either side that saw both decks."""
+
+    def test_the_upper_deck_seen_alone_is_not_the_lower_deck(self):
+        """Read as the lowest of one, the lone layer was the lower deck: a 6 m spike in the road,
+        and no deck overhead where the deck overhead was all the scan saw."""
+        returns = [both_decks(), both_decks(), layer(UPPER), layer(UPPER), both_decks()]
+
+        heights = deck_heights(returns, "lower", "test")
+
+        assert heights[[0, 1, 4]] == pytest.approx([LOWER] * 3, abs=0.2)
+        assert np.isnan(heights[2:4]).all()  # the lower deck was not seen: nothing to measure
+        assert np.isnan(decks_over(returns, heights)[2:4]).all()  # and nothing to say over it either
+
+    def test_the_lower_deck_seen_alone_is_the_lower_deck(self):
+        returns = [both_decks(), layer(LOWER), layer(LOWER), both_decks()]
+
+        assert deck_heights(returns, "lower", "test") == pytest.approx([LOWER] * 4, abs=0.2)
+
+    def test_on_the_upper_deck_the_mirror_image(self):
+        upper_alone = [both_decks(), layer(UPPER), both_decks()]
+        lower_alone = [both_decks(), layer(LOWER), both_decks()]
+
+        assert deck_heights(upper_alone, "upper", "test") == pytest.approx([UPPER] * 3, abs=0.2)
+        assert np.isnan(deck_heights(lower_alone, "upper", "test")[1])
+
+    def test_the_upper_deck_with_a_parapet_beside_it_is_not_the_lower_deck_either(self):
+        """Two layers under MIN_DECK_OVERHEAD_M apart are not two decks: the upper deck and a
+        parapet or a roadway beside it, with the lower deck hidden under both. Read by position
+        alone, the lowest of the two would be the upper deck again, the same spike one layer wider."""
+        upper_and_parapet = np.concatenate([layer(UPPER), layer(UPPER + 3.0)])
+        returns = [both_decks(), both_decks(), upper_and_parapet, both_decks()]
+
+        heights = deck_heights(returns, "lower", "test")
+
+        assert heights[[0, 1, 3]] == pytest.approx([LOWER] * 3, abs=0.2)
+        assert np.isnan(heights[2])
+
+    def test_a_lone_layer_is_read_against_the_decks_lines_down_a_ramp(self):
+        """Down the Queensboro's Manhattan ramp both decks fall about 0.6 m a sample, so a layer
+        compared with one deck's height some samples away could be nearer the wrong deck. The
+        lines are drawn between the points that saw both, on either side."""
+        lower = 30.0 - 0.6 * np.arange(13)
+        upper = lower + 7.3
+        returns = [both_decks(lower[i], upper[i]) if i < 5 or i > 9 else layer(upper[i]) for i in range(13)]
+
+        heights = deck_heights(returns, "lower", "test")
+
+        assert heights[:5] == pytest.approx(lower[:5], abs=0.2)
+        assert heights[10:] == pytest.approx(lower[10:], abs=0.2)
+        assert np.isnan(heights[5:10]).all()
+
+    def test_where_the_scan_never_sees_both_decks_the_one_layer_is_the_named_deck(self):
+        """The Verrazzano: the course is on the upper deck, which hides the lower one from the scan
+        the whole way. There is no other deck's line to compare with, and the one layer seen is the
+        deck the course facts name, as it has always been read."""
+        returns = [layer(UPPER + 0.4 * i) for i in range(6)]
+
+        assert deck_heights(returns, "upper", "test") == pytest.approx(UPPER + 0.4 * np.arange(6), abs=0.2)
+
+    def test_two_layers_too_close_to_be_two_decks_are_no_reference_for_where_the_decks_run(self):
+        """Off the Queensboro's exit ramp the scan sees a second layer 3–5 m up for 100 m: a wall or a
+        roadway beside the course (MIN_DECK_OVERHEAD_M), not the upper deck. Such a point is read by
+        position and kept, since it continues the lower deck's line, but it draws no line itself: a
+        lone layer past it is compared with the last point that saw two decks, not with the wall."""
+        wall = np.concatenate([layer(26.0), layer(29.2)])  # 3.2 m apart
+        returns = [both_decks(28.3, 33.4), wall, layer(27.0)]
+
+        heights = deck_heights(returns, "lower", "test")
+
+        assert heights == pytest.approx([28.3, 26.0, 27.0], abs=0.2)

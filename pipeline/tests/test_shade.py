@@ -108,8 +108,9 @@ class TestTheReachOfATallBuildingFurtherOut:
 
 
 class TestTheRoadCanBeAboveARoof:
-    """PLAN.md §10: in New York three samples sit over a roof 2 m below them, because the course
-    is on the Queensboro's lower deck and a building beside the bridge is under it. In Berlin the
+    """PLAN.md §10: in New York the Queensboro's lower deck runs over the roofs of buildings beside
+    it, and for nine samples a roof stands one to four metres over the road, because a building
+    beside the bridge holds the road's plan position without standing over it. In Berlin the
     course really does run through the Brandenburg Gate, 21 m over its head."""
 
     def test_a_roof_that_clears_the_road_by_two_metres_does_not_make_the_runner_indoors(self):

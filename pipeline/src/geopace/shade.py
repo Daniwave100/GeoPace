@@ -29,12 +29,13 @@ lower than atan(h / d). Everything else here is bookkeeping around it.
     at a low sun the light comes in sideways, under the leaves — so the runner standing under a
     street tree is traced like anybody else, from a ray that starts inside the outline.
 
-  - **The road can be above a roof.** In New York three samples on the Queensboro's lower deck
-    sit over a building beside the bridge, whose outline holds the road's plan position without
-    standing over the road at all (PLAN.md §10). A roof that clears the road by less than a
-    lorry's headroom is that, not a runner indoors, and is ignored. A roof that really is over
-    the road — Berlin's course runs through the Brandenburg Gate, 21 m up — shades it at every
-    hour, which is right.
+  - **The road can be above a roof.** In New York the Queensboro's lower deck runs over the roofs
+    of buildings beside it, on Roosevelt Island and on the Manhattan approach, whose outlines hold
+    the road's plan position; and for nine samples at km 25.65–25.73 one such roof stands one to
+    four metres over the road (PLAN.md §10). A roof that clears the road by less than a lorry's
+    headroom is an outline overlapping a road it doesn't stand over, not a runner indoors, and is
+    ignored. A roof that really is over the road — Berlin's course runs through the Brandenburg
+    Gate, 21 m up — shades it at every hour, which is right.
 
   - **A bridge deck is not a building.** The Queensboro's lower deck runs under its upper deck
     the whole way, and no building record says so. The course line finds the deck overhead in the

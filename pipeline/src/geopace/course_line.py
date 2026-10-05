@@ -205,9 +205,10 @@ def raise_bridge_decks(
 ) -> tuple[np.ndarray, list[NotMeasured], list[UnderADeck]]:
     """Replace heights on each bridge with the measured height of the deck the course uses.
 
-    Where a point on the bridge has no deck returns (a gap in the scan, or the ramp where the
-    bridge meets the ground), the height is filled in along a straight line between the
-    nearest measured points, and tied to the ground at the bridge's two ends. Those stretches
+    Where a point on the bridge has no returns from the deck the course uses (a gap in the scan,
+    the ramp where the bridge meets the ground, or the upper deck of a double-deck bridge hiding
+    the lower one from the scan, issue #56), the height is filled in along a straight line between
+    the nearest measured points, and tied to the ground at the bridge's two ends. Those stretches
     are flagged as not measured, unless they are too short to survive the smoothing.
 
     The same returns say where a second deck stands over the one the course uses (the Queensboro's
@@ -237,8 +238,8 @@ def raise_bridge_decks(
                 NotMeasured(
                     km_start=gap_start_m / 1000,
                     km_end=gap_end_m / 1000,
-                    reason=f"{bridge.name}: the survey has no returns from the bridge deck here, so the "
-                    "height is a straight line between the measured heights either side.",
+                    reason=f"{bridge.name}: the survey has no returns from the deck the course runs on here, "
+                    "so the height is a straight line between the measured heights either side.",
                 )
             )
     return patched, not_measured, under_a_deck
