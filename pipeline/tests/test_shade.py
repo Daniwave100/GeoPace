@@ -43,7 +43,7 @@ def block(east_m: float, north_m: float, width_m: float, depth_m: float, height_
     return Building(id=name, ring=ring, ground_m=ground_m, roof_m=ground_m + height_m)
 
 
-def block_at_its_own_latitude(north_m: float, east_m: float, width_m: float, depth_m: float, height_m: float, name: str = "block") -> Building:
+def block_at_its_own_latitude(east_m: float, north_m: float, width_m: float, depth_m: float, height_m: float, name: str = "block") -> Building:
     """A block like `block`, but placed in true metres at its own latitude rather than the origin's.
 
     Metres per degree of longitude shrink towards the pole: on a course 20 km long the two differ
@@ -139,13 +139,12 @@ class TestEachBuildingIsMeasuredAtItsOwnLatitude:
 
         shaded = {}
         for end_m in (-9_000, 9_000):
-            tower = block_at_its_own_latitude(north_m=end_m, east_m=near_wall_m + 20, width_m=40, depth_m=410, height_m=100)
+            tower = block_at_its_own_latitude(east_m=near_wall_m + 20, north_m=end_m, width_m=40, depth_m=410, height_m=100)
             lit = sunlit(lat, lon, elevation, [tower], *sun)[:, 0]
             shaded[end_m] = [float(offset) for offset in north[~lit] - end_m]
 
         assert shaded[-9_000] == shaded[9_000]
-        assert shaded[9_000], "the tower at the north end shades nothing"
-        assert min(shaded[9_000]) == -200.0 and max(shaded[9_000]) == 200.0  # the road beside the tower, and no more
+        assert shaded[9_000] == [float(offset) for offset in range(-200, 201, 10)]  # the road beside the tower, every sample of it, and no more
 
 
 class TestTheRoadCanBeAboveARoof:

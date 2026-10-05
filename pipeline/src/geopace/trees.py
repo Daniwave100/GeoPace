@@ -122,6 +122,11 @@ def crowns_along(lat, lon, elevation_m, model: TreesModel, *, corridor_m: float 
     """
     lat, lon = np.asarray(lat, dtype=float), np.asarray(lon, dtype=float)
     road_m = np.asarray(elevation_m, dtype=float)
+    # One frame for the whole course, kept on purpose (issue #44 took the others away): it is only
+    # the pre-filter, 0.3 m out at the ends of a 150 m corridor, and `distance_to_the_road` then
+    # measures what passes it at the crown's own latitude. It can misjudge a crown standing within
+    # 0.3 m of the corridor's edge, which could shade the road for minutes at most at the floor
+    # sun; and the crowns kept here are the crowns drawn, whose look is settled.
     per_lat, per_lon = meters_per_degree(float(lat.mean()))
     road_x, road_y = lon * per_lon, lat * per_lat
     kept: dict[str, Crown] = {}

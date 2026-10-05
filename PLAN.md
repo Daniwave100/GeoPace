@@ -452,8 +452,9 @@ arrival times are approximate — state that in the UI.
   **One frame for a whole course is the same trap in another coat (#44):** New York's course spans a fifth of a
   degree of latitude, and a metres frame taken at its middle is 0.18% out at the ends — 5 m at the 2.7 km the
   tallest building reaches, on the edge of a shadow where a sample flips. Shade measures every building and every
-  crown in a frame at its own latitude, and so does the keep test of the wide set; two tests hold a tower to the
-  same answer at either end of a 20 km course (`shade.py`, `buildings.py`).
+  crown in a frame at its own latitude, and so does the keep test of the wide set; one test holds a tower to the
+  same answer at either end of a 20 km course (`shade.py`), another a building at the end of a 10.8 km stretch of
+  road to its true distance (`buildings.py`). The crowns' corridor pre-filter keeps one course-wide frame, and says why.
 - **New York's `HEIGHT_ROOF` is above the ground at the building, not above sea level**, and in US survey feet;
   zero or missing means the city never worked it out. Berlin publishes a height above the ground too, but no
   ground: that comes from the city's own bare-earth model, so a block and the road beside it agree (D56).
@@ -1197,6 +1198,13 @@ arrival times are approximate — state that in the UI.
   2 m out at the far end of a tall building's reach. Two tests hold it, each red on the old code. Both bundles rebuilt
   from the cache, no downloads: the same buildings and crowns kept, the same never-shaded samples (48 in Berlin, 407 in
   New York), and the tables moved only on shadows' edges — Berlin 52 of 482,220 bits (24 to shade, 28 to sun) and 62
-  leafy bits (35 and 27), New York 119 of 427,000 (57 to shade, 62 to sun) and 88 leafy (42 and 46), every one a single
-  sample at a single five-minute step. Berlin's bundle also gains the empty `under_a_deck` list the pipeline has written
-  for every course since #42; neither White model changed.
+  leafy bits (35 and 27), New York 119 of 427,000 (57 to shade, 62 to sun) and 88 leafy (42 and 46), each one bit on a
+  shadow's edge: in Berlin no sample moved at more than one step and no two neighbours at the same step; in New York a
+  sample moved at up to two steps and up to three neighbours at one step. Berlin's bundle also gains the empty
+  `under_a_deck` list the pipeline has written for every course since #42; neither White model changed.
+- **2026-10-05** — **One review of the #44 commits (D59):** the line above had said every flip was a single sample at a
+  single step, which New York's tables don't bear out; §8 had said two tests hold the tower where one does and the other
+  holds a building at the end of a 10.8 km road to its true distance; `_meters_from`'s docstring still counted the whole
+  course where a chunk hands it a hundred samples; the tower test now holds the whole list of shaded samples, not its
+  ends; and the one course-wide frame left, the crowns' corridor pre-filter in `trees.py`, is kept on purpose and says
+  why: 0.3 m at the ends of a 150 m corridor, before the crown's own frame measures what passes it.
