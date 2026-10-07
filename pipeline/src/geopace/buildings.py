@@ -141,9 +141,12 @@ def distance_to_the_road(ring: np.ndarray, road_lat: np.ndarray, road_lon: np.nd
     """
     if inside_ring(ring, road_lat, road_lon).any():
         return 0.0
-    middle_lat = float(road_lat.mean())
-    road_x, road_y = _meters_from(middle_lat, road_lat, road_lon)
-    ring_x, ring_y = _meters_from(middle_lat, ring[:, 1], ring[:, 0])
+    # The frame is the building's own, not the road's. The road comes in chunks — up to 10.8 km of
+    # it for the wide set shade is worked out from — and a frame at a chunk's middle is 2 m out at
+    # the 2.7 km a tall building reaches from its end (issue #44).
+    own_lat = float(ring[:, 1].mean())
+    road_x, road_y = _meters_from(own_lat, road_lat, road_lon)
+    ring_x, ring_y = _meters_from(own_lat, ring[:, 1], ring[:, 0])
     closest = np.inf
     for i in range(len(ring_x)):
         closest = min(closest, float(_distance_squared_to_segment(road_x, road_y, ring_x[i - 1], ring_y[i - 1], ring_x[i], ring_y[i]).min()))
@@ -161,9 +164,12 @@ def _distance_squared_to_segment(x, y, x1: float, y1: float, x2: float, y2: floa
 def _meters_from(middle_lat: float, lat, lon) -> tuple[np.ndarray, np.ndarray]:
     """Degrees to meters east and north of nothing in particular: only differences are used.
 
-    A flat frame, good to centimeters over the few hundred meters this is ever asked about, and
-    far quicker than measuring every distance on the ellipsoid itself: the corridor is one
-    building's width, but it is measured against four thousand course samples per building.
+    A flat frame at `middle_lat`, and far quicker than measuring every distance on the ellipsoid
+    itself: the corridor is one building's width, but it is measured against every course sample
+    a chunk hands over, a hundred or a thousand of them, for each building. Good to centimeters
+    over the corridor's few hundred meters, and to about half a meter at the 2.7 km the wide set
+    reaches (shade.py) — as long as `middle_lat` is the latitude of what is being measured, since
+    meters per degree change with it.
     """
     per_lat, per_lon = meters_per_degree(middle_lat)
     return np.asarray(lon, dtype=float) * per_lon, np.asarray(lat, dtype=float) * per_lat
