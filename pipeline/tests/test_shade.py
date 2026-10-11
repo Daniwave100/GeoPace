@@ -43,6 +43,20 @@ def block(east_m: float, north_m: float, width_m: float, depth_m: float, height_
     return Building(id=name, ring=ring, ground_m=ground_m, roof_m=ground_m + height_m)
 
 
+def block_at_its_own_latitude(east_m: float, north_m: float, width_m: float, depth_m: float, height_m: float, name: str = "block") -> Building:
+    """A block like `block`, but placed in true metres at its own latitude rather than the origin's.
+
+    Metres per degree of longitude shrink towards the pole: on a course 20 km long the two differ
+    by a fifth of a percent, and `block` would stand a 100 m tower at the far end of such a course
+    a metre from where it says. Only a test about that difference needs this.
+    """
+    lat_here = at(0, north_m)[0]
+    per_lat, per_lon = meters_per_degree(lat_here)
+    corners = [(-width_m / 2, -depth_m / 2), (width_m / 2, -depth_m / 2), (width_m / 2, depth_m / 2), (-width_m / 2, depth_m / 2)]
+    ring = np.array([(ORIGIN[1] + (east_m + dx) / per_lon, lat_here + dy / per_lat) for dx, dy in corners])  # (lon, lat)
+    return Building(id=name, ring=ring, ground_m=0.0, roof_m=height_m)
+
+
 def road_north(length_m: float = 200.0, spacing_m: float = 10.0, east_m: float = 0.0, height_m: float = 0.0):
     """A straight course running north past the origin, as (lat, lon, elevation) columns."""
     north = np.arange(-length_m / 2, length_m / 2 + spacing_m, spacing_m)
@@ -105,6 +119,32 @@ class TestTheReachOfATallBuildingFurtherOut:
         assert not sunlit(lat, lon, elevation, inside_its_reach, *sun).all()
         assert sunlit(lat, lon, elevation, beyond_its_reach, *sun).all()
         assert reach_m == pytest.approx(567, abs=1)
+
+
+class TestEachBuildingIsMeasuredAtItsOwnLatitude:
+    """Issue #44. Metres per degree of longitude change with latitude, and New York's course spans
+    a fifth of a degree of it: one flat frame for the whole course, taken at its middle, is 0.18%
+    out at the ends — about 5 m at the 2.7 km the tallest building reaches, enough to flip a sample
+    on a shadow's edge. So each building is measured in a frame of its own, at its own latitude."""
+
+    def test_the_same_tower_at_either_end_of_a_long_course_shades_the_same_samples(self):
+        """A straight course 20 km long running north, the lowest sun we model due east, and a
+        100 m tower beside each end whose near wall stands half a metre inside the 567 m it reaches.
+        On paper both shade the road beside them, and the road beside one is the road beside the
+        other: the answers have to be the same list. (The tower is 410 m deep so that no corner of
+        it is level with a sample: a sample on a corner is a toss-up of millimetres either way.)"""
+        lat, lon, elevation, north = road_north(length_m=20_000)
+        sun = one_sun(SUN_FLOOR_DEG, 90, len(lat))
+        near_wall_m = 100 * REACH_PER_METER - 0.5
+
+        shaded = {}
+        for end_m in (-9_000, 9_000):
+            tower = block_at_its_own_latitude(east_m=near_wall_m + 20, north_m=end_m, width_m=40, depth_m=410, height_m=100)
+            lit = sunlit(lat, lon, elevation, [tower], *sun)[:, 0]
+            shaded[end_m] = [float(offset) for offset in north[~lit] - end_m]
+
+        assert shaded[-9_000] == shaded[9_000]
+        assert shaded[9_000] == [float(offset) for offset in range(-200, 201, 10)]  # the road beside the tower, every sample of it, and no more
 
 
 class TestTheRoadCanBeAboveARoof:

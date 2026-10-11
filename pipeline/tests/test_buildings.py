@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from geopace.buildings import Building, BuildingsModel, buildings_along, corridor_boxes, distance_to_the_road, simplify_ring
+from geopace.buildings import Building, BuildingsModel, buildings_along, corridor_boxes, distance_to_the_road, meters_per_degree, simplify_ring
 from geopace.provenance import Attribution, Source
 
 EARTH_RADIUS_M = 6_371_008.8
@@ -84,6 +84,22 @@ class TestCorridor:
         lon = 13.4 + np.arange(21) * 0.0001
         kept = buildings_along(lat, lon, model, corridor_m=150, chunk_m=30)
         assert [building.id for building in kept] == ["near"]
+
+    def test_a_building_is_as_far_from_a_long_stretch_of_road_as_it_is_from_the_road_beside_it(self):
+        """Issue #44. The wide set shade is worked out from asks about the road in chunks of up to
+        10.8 km, and a building at the end of one is a twentieth of a degree from its middle:
+        measured in a frame at the chunk's middle, 2,000 m due east of the road came out 2 m long.
+        The frame is the building's own."""
+        samples = np.arange(0, 10_800, 10)
+        lat = 52.5 + np.degrees(samples / EARTH_RADIUS_M)  # a straight road running north
+        lon = np.full(len(lat), 13.4)
+        at_the_end = float(lat[-1])
+        # Placed with the same ellipsoid the distance is measured on (`square` uses a sphere, a
+        # third of a percent out, which is fine for the corridor and not for this).
+        _, a_degree_east_m = meters_per_degree(at_the_end)
+        tower = square("tower", at_the_end, 13.4 + (2_000 + 10) / a_degree_east_m, side_m=20, ground_m=0.0, height_m=100.0)
+
+        assert distance_to_the_road(tower.ring, lat, lon) == pytest.approx(2_000, abs=0.1)
 
     def test_the_corridor_is_measured_to_the_footprint_not_to_its_middle(self):
         """A long building whose middle is far from the course but whose near wall is on it."""

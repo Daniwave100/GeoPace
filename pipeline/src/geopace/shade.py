@@ -255,19 +255,21 @@ def _blocked(lat, lon, elevation_m, blockers, altitude_deg, azimuth_deg, *, clea
     blocked = np.zeros(altitude.shape, dtype=bool)
     worth_asking = np.ones(altitude.shape, dtype=bool) if only_where is None else np.asarray(only_where, dtype=bool)
 
-    # A flat frame in metres east and north of the middle of the course: good to centimetres over
-    # a city, and every distance and bearing below is a subtraction in it.
-    lat0, lon0 = float(lat.mean()), float(lon.mean())
-    per_lat, per_lon = meters_per_degree(lat0)
-    x, y = (lon - lon0) * per_lon, (lat - lat0) * per_lat
     # How far the sun ray climbs for every metre it travels, and which way it goes.
     rise = np.tan(np.radians(altitude))
     east, north = np.sin(np.radians(azimuth)), np.cos(np.radians(azimuth))
     lowest_rise = max(float(rise.min()), 1e-6)
 
     for ring, top_m, underside_m in blockers:
-        ring_x = (ring[:, 0] - lon0) * per_lon
-        ring_y = (ring[:, 1] - lat0) * per_lat
+        # A flat frame in metres east and north of this shape, at its own latitude, and every
+        # distance and bearing below is a subtraction in it. Its own, not the course's: metres per
+        # degree of longitude change with latitude, and one frame for the 20 km of New York is
+        # 0.18% out at the ends — 5 m at the 2.7 km the tallest building reaches (issue #44).
+        # Within the reach of one shape the frame is good to a metre.
+        lat0, lon0 = float(ring[:, 1].mean()), float(ring[:, 0].mean())
+        per_lat, per_lon = meters_per_degree(lat0)
+        x, y = (lon - lon0) * per_lon, (lat - lat0) * per_lat
+        ring_x, ring_y = (ring[:, 0] - lon0) * per_lon, (ring[:, 1] - lat0) * per_lat
         over_the_road = top_m - road_m  # how far its top stands over each sample
         open_still = worth_asking & ~blocked
         # Furthest this shape could reach any sample, with the lowest sun we are asked about.

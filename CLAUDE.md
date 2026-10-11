@@ -48,7 +48,8 @@ ask before anything that changes scope or look.
   (D56). Every quality's distance is tested against the Ride's camera. A block stands on its city's own ground —
   Berlin's from our bare-earth model, New York's from the building record — and goes through the same geoid step
   as the road, so the two can never drift apart.
-- Metres per degree change with latitude; one rounded constant made a "150 m" corridor 151 m (D56).
+- Metres per degree change with latitude; one rounded constant made a "150 m" corridor 151 m (D56), and one
+  metres frame for a 20 km course put a shadow 5 m out at the ends (#44): every building gets a frame at its own latitude.
 - **A tree is not a wall.** A crown starts above the ground, so at the 10° floor the sun comes in
   underneath it; a crown modelled from the ground up over-shades every tree-lined street. Where the
   crown starts is **worked out, never measured** — no survey says — and the bundle says so (D60).
