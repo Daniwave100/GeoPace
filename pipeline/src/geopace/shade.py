@@ -97,8 +97,23 @@ UNDER_THE_LEAVES_M = 2.5
 CHUNK = 2_000_000
 # Where the wide set's bands are cut, beyond the corridor. Each band is one query per chunk of
 # course, and the city keeps back everything too short to reach the course from the band's near
-# edge: over 26 m past 150 m, 53 m past 300, 88 m past 500, 176 m past 1 km, 353 m past 2 km.
+# edge: 26 m of roof over the road past 150 m, 53 m past 300, 88 m past 500, 176 m past 1 km,
+# 353 m past 2 km — each asked for 20 m lower, for the ground the building stands on (below).
 BAND_EDGES_M = (300.0, 500.0, 1000.0, 2000.0)
+# How far above the road a building's own ground is allowed to stand when a band asks the city for
+# it. A city publishes a height above the building's own ground (Berlin's `hoehe`, New York's
+# `height_roof`), and that is the only height a wide band can ask it for; the keep test below
+# measures from the road. On ground above the road a roof stands higher over the road than the
+# city's number says, so each band asks for a bar this much lower and lets the keep test, and then
+# the ray itself, throw away what doesn't reach (issue #43). Measured on the committed courses on
+# 2026-10-11, the ground at a corridor building above the road beside it: Berlin p99 +5.5 m, never
+# over 15.1 m; New York p99 +20.7 m, up to 32.5 m. Twenty metres covers Berlin whole and 99% of
+# New York — and of the 4,160 buildings the strict bar had kept back in New York, every one falls
+# short of the road beside it at the 10° floor, the nearest by 24 m, bar one Fort Greene record
+# whose ground is 98 m over the street beside it and which shades no step of race day. What it costs is download and
+# cache, never anything a runner gets: the bands grow from 13k to 99k rows in Berlin, 8k to 73k in
+# New York, about one more corridor's worth each.
+GROUND_ABOVE_ROAD_M = 20.0
 # The furthest anything on either course can reach: New York's tallest on the course is 472 m,
 # which is 2.7 km at the floor. Past this nothing is asked for.
 FURTHEST_M = 2700.0
@@ -381,6 +396,10 @@ def shade_buildings(lat, lon, elevation_m, model: BuildingsModel, *, corridor_m:
     is tall enough to reach the course from there — at the 10-degree floor, one metre of height
     for every 5.7 m of distance (PLAN.md D58).
 
+    The height that counts is the roof's over the road, and the city can only be asked for the
+    roof's over the building's own ground, so each band asks for GROUND_ABOVE_ROAD_M less than it
+    needs and the test here, from the lowest road of the chunk, decides (issue #43).
+
     This set is never drawn and never shipped. It costs build time and cache, and what reaches
     the app is the same table of bits whatever the corridor.
     """
@@ -388,7 +407,7 @@ def shade_buildings(lat, lon, elevation_m, model: BuildingsModel, *, corridor_m:
     road_m = np.asarray(elevation_m, dtype=float)
     kept: dict[str, Building] = {}
     for inner, outer in _bands(corridor_m, furthest_m):
-        least_height_m = inner / REACH_PER_METER if inner > 0 else 0.0
+        least_height_m = max(inner / REACH_PER_METER - GROUND_ABOVE_ROAD_M, 0.0) if inner > 0 else 0.0
         found = 0
         # A wide band's boxes are mostly padding, so they are asked about in longer chunks of
         # course: the same city comes back either way, in a few requests instead of dozens.
@@ -402,7 +421,7 @@ def shade_buildings(lat, lon, elevation_m, model: BuildingsModel, *, corridor_m:
                 if away_m <= max(corridor_m, (building.roof_m - lowest_road_m) * REACH_PER_METER):
                     kept[building.id] = building
                     found += 1
-        print(f"  shade: {found} buildings {inner:.0f}-{outer:.0f} m from the course" + (f", over {least_height_m:.0f} m tall" if least_height_m else ""))
+        print(f"  shade: {found} buildings {inner:.0f}-{outer:.0f} m from the course" + (f", asked over {least_height_m:.0f} m above their own ground" if least_height_m else ""))
     return list(kept.values())
 
 

@@ -458,6 +458,13 @@ arrival times are approximate — state that in the UI.
 - **New York's `HEIGHT_ROOF` is above the ground at the building, not above sea level**, and in US survey feet;
   zero or missing means the city never worked it out. Berlin publishes a height above the ground too, but no
   ground: that comes from the city's own bare-earth model, so a block and the road beside it agree (D56).
+  **And that height, over the building's own ground, is all a wide band can ask either city for (#43):** what
+  shades the road is the roof's height over the *road*, which on rising ground is more than the city's number, so
+  a building on higher ground was kept back by the service before the keep test, measured from the road, ever saw
+  it. Each band now asks for a bar 20 m lower (`shade.GROUND_ABOVE_ROAD_M`) and lets the keep test and then the
+  ray decide. The 20 m is measured: the ground at a corridor building stands above the road beside it by at most
+  15.1 m in Berlin (p99 5.5 m) and 32.5 m in New York (p99 20.7 m). One test holds a 25 m building on a 15 m hill,
+  200 m out, to the shade it casts, and a 10 m house on the same hill to none (`test_shade.py`).
 - **A city's own free service times out.** Berlin's building service dropped a read an hour into a build and threw
   the whole thing away. Every download is tried again, waiting a little longer each time, and never leaves half a
   file where a whole one goes (`cache.py`).

@@ -63,7 +63,10 @@ class BuildingsModel:
     # (south, west, north, east) degrees, and the least height above its own ground a building
     # must have -> every building whose outline meets that box. Shade asks for a wide band of
     # city and only the buildings in it tall enough to reach the course (shade.py); both cities'
-    # services do that filtering themselves, so what isn't wanted is never downloaded.
+    # services do that filtering themselves, so what isn't wanted is never downloaded. The height
+    # is above the building's *own* ground, which is all a city publishes, where what shades the
+    # road is the roof's height over the road: shade asks for a little less than it needs and
+    # measures the rest itself (shade.GROUND_ABOVE_ROAD_M, issue #43).
     within: Callable[..., list[Building]]
     source: Source
     attribution: Attribution
