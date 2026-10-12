@@ -139,6 +139,12 @@ class TestTheQuery:
     def test_a_later_page_asks_the_service_to_start_further_in(self):
         assert "STARTINDEX=5000" in berlin_buildings.box_url(52.515, 13.360, 52.517, 13.365, start=5000)
 
+    def test_only_the_outline_and_the_height_are_asked_for(self):
+        """A record's twenty other fields are three quarters of its bytes, and the wide bands shade
+        is worked out from are 99,000 rows from a service that streams a big answer slowly (#43)."""
+        for min_height_m in (0.0, 6.4):
+            assert "PROPERTYNAME=geom,hoehe" in berlin_buildings.box_url(52.515, 13.360, 52.517, 13.365, min_height_m=min_height_m)
+
 
 def test_the_source_says_which_height_the_city_publishes_and_what_is_left_out():
     """Every fact about the world carries where it came from, and a block as tall as a roof's

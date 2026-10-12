@@ -96,6 +96,11 @@ def box_url(south: float, west: float, north: float, east: float, start: int = 0
     With a `min_height_m`, the box goes inside a filter instead of in the BBOX parameter — the
     two are alternatives in WFS, not companions — and the service does the height test itself, so
     a wide band only sends back the buildings tall enough to reach the course (shade.py).
+
+    Only the outline and the height are asked for. A record carries twenty other fields the
+    pipeline never reads — roof form, storeys, the survey each number came from — which are
+    three quarters of its bytes, and the city's service streams a big answer slowly: the wide
+    bands shade is worked out from are 99,000 rows (issue #43).
     """
     (min_x, max_x), (min_y, max_y) = to_utm33([west, east], [south, north])
     query = [
@@ -103,6 +108,7 @@ def box_url(south: float, west: float, north: float, east: float, start: int = 0
         ("VERSION", "2.0.0"),
         ("REQUEST", "GetFeature"),
         ("TYPENAMES", TYPE_NAME),
+        ("PROPERTYNAME", f"{GEOMETRY_FIELD},{HEIGHT_FIELD}"),
         ("COUNT", str(PAGE)),
         ("STARTINDEX", str(start)),
         ("SRSNAME", "urn:ogc:def:crs:EPSG::25833"),
