@@ -20,6 +20,8 @@ PAUSE_S = 3.0
 # the socket's timeout to fire (#43). So the answer is read a piece at a time, and a window this
 # long that brings in less than STALL_BYTES is a stall: the connection is dropped and the page
 # asked for again, afresh. A slow link is not a drip: half a kilobyte a second clears the bar.
+# A stream that goes silent altogether is the socket's to catch: STALL_S is its timeout too, for
+# each read. The window is checked as a piece lands, so a drip is given up on within two windows.
 STALL_S = 120.0
 STALL_BYTES = 64 * 1024
 PIECE = 64 * 1024
