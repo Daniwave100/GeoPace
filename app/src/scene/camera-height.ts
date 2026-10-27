@@ -12,7 +12,8 @@ interface Watched {
 
 /**
  * Tells `onHeight` how high the camera is above the open terrain (never the photoreal surface,
- * PLAN.md D5), or null when the terrain can't say. Returns a function that stops watching.
+ * PLAN.md D5), or null when the terrain can't say. That terrain is good to a few metres, so near the
+ * ground the answer is rough. Returns a function that stops watching.
  *
  * It was measured when CesiumJS said the camera had come to rest, and the Ride moves the camera
  * every frame, so it never rests: a Ride kept the height from before it all the way along (#52).

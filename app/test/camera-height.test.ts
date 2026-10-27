@@ -15,6 +15,7 @@ const GROUND_M = 10;
 
 function fakeScene() {
   const camera = { positionCartographic: Cartographic.fromDegrees(-74, 40.6, 15_000) };
+  const preRender = new Event();
   const postRender = new Event();
   let nowMs = 0;
   const asked: number[] = [];
@@ -26,18 +27,24 @@ function fakeScene() {
     });
   };
   const heights: (number | null)[] = [];
-  const viewer = { camera, scene: { postRender }, terrainProvider: {} as TerrainProvider };
+  const viewer = { camera, scene: { preRender, postRender }, terrainProvider: {} as TerrainProvider };
   const stop = watchCameraHeight(viewer, (m) => heights.push(m), { sample, now: () => nowMs });
   /** Every answer on its way arrives; promise callbacks run before this resolves. */
   const answer = async () => {
     for (const give of pending.splice(0)) give();
     await new Promise((r) => setTimeout(r, 0));
   };
-  /** One frame drawn from a camera at `heightM`, `ms` after the last. */
+  /**
+   * One frame drawn from a camera at `heightM`, `ms` after the last. Between frames the camera is
+   * one CesiumJS nudged; the Ride puts it at `heightM` before the frame is drawn, as it does.
+   */
   const frame = (heightM: number, ms = 16) => {
     nowMs += ms;
+    camera.positionCartographic = Cartographic.fromDegrees(-74, 40.6, 99_999);
+    preRender.raiseEvent();
     camera.positionCartographic = Cartographic.fromDegrees(-74, 40.6, heightM);
     postRender.raiseEvent();
+    camera.positionCartographic = Cartographic.fromDegrees(-74, 40.6, 99_999);
   };
   return { asked, heights, frame, answer, stop };
 }
@@ -81,7 +88,7 @@ describe("the camera's height above the ground", () => {
     s.stop();
   });
 
-  it("is asked about the camera the frame was drawn from", async () => {
+  it("is asked about the camera the frame was drawn from, not the one CesiumJS nudged", () => {
     const s = fakeScene();
     s.frame(777);
     expect(s.asked).toEqual([777]);
