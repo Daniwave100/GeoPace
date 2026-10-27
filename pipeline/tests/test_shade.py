@@ -285,9 +285,31 @@ class TestTheWiderSetShadeIsWorkedOutFrom:
 
         assert kept == {"in the corridor", "tall enough", "a tower miles away"}
         # The city is never asked for what it would only send to be thrown away: past the corridor
-        # every band asks for a height, and the furthest asks for the tallest.
+        # every band asks for a height, and the furthest asks for the tallest — each 20 m under
+        # what the road needs, for the ground a building may stand on (the test below).
         assert min(asked) == 0.0
-        assert sorted({round(height) for height in asked if height}) == [26, 53, 88, 176, 353]
+        assert sorted({round(height) for height in asked if height}) == [6, 33, 68, 156, 333]
+
+    def test_a_building_on_higher_ground_beyond_the_corridor_is_asked_for_and_shades_the_road(self):
+        """Issue #43. A city can only be asked for a building's height above its own ground, and the
+        150–300 m band needs 26 m of roof over the road. A 25 m building on ground 15 m above the
+        road, 200 m out, has its roof 40 m over the road and reaches 227 m at the floor — it shades
+        the road beside it — but asked strictly, the city would never send it. The bar is lowered
+        by GROUND_ABOVE_ROAD_M and the keep test, measured from the road, decides: the 10 m house on
+        the same hill comes through the lower bar and is thrown away, since its roof reaches 142 m."""
+        lat, lon, elevation, _ = road_north(length_m=400)
+        hill = [
+            block(east_m=210, north_m=0, width_m=20, depth_m=420, height_m=25, ground_m=15, name="on the hill"),
+            block(east_m=250, north_m=0, width_m=20, depth_m=420, height_m=10, ground_m=15, name="on the hill, too short"),
+        ]
+        model, asked = self.fake_city(hill)
+
+        kept = shade_buildings(lat, lon, elevation, model)
+
+        assert [b.id for b in kept] == ["on the hill"]
+        assert 0 < min(height for height in asked if height) < 25
+        lit = sunlit(lat, lon, elevation, kept, *one_sun(SUN_FLOOR_DEG, 90, len(lat)))[:, 0]
+        assert not lit.any()  # the block runs the whole road's length, and every sample is in its shadow
 
     def test_the_white_model_still_draws_the_corridor_alone(self):
         """The wide set is for shade only: what is drawn is what a runner can see from the road."""
