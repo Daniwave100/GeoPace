@@ -37,7 +37,7 @@ def openers(*answers):
         answer = answers[min(len(asked), len(answers)) - 1]
         if isinstance(answer, Exception):
             raise answer
-        return FakeAnswer(answer)
+        return answer if isinstance(answer, FakeAnswer) else FakeAnswer(answer)
 
     return urlopen, asked
 
@@ -60,6 +60,34 @@ def test_a_read_that_times_out_is_tried_again(tmp_path, monkeypatch):
 
     assert cache.download("https://example.org/box", dest).read_bytes() == b"at last"
     assert len(asked) == 3
+
+
+class Trickle(FakeAnswer):
+    """An answer that drips: a few bytes at a time, each piece a long while apart on a clock the
+    test holds. Too lively for a socket's timeout to fire, too slow to ever finish."""
+
+    def __init__(self, clock: dict, piece: bytes = b"drip", seconds_apart: float = 100.0):
+        super().__init__(piece * 1000)
+        self.clock, self.seconds_apart, self.piece = clock, seconds_apart, len(piece)
+
+    def read1(self, size=-1):
+        self.clock["now"] += self.seconds_apart
+        return super().read1(self.piece)
+
+
+def test_a_read_that_only_drips_is_a_stall_and_is_asked_for_again_afresh(tmp_path, monkeypatch):
+    """Berlin's building service was seen to deliver a 4 MB page in four seconds to a fresh
+    connection while the build's own stream of the same page had been dripping for forty minutes,
+    a few bytes at a time (#43). The socket's timeout never fires on a drip; the throughput does."""
+    clock = {"now": 0.0}
+    monkeypatch.setattr(cache.time, "monotonic", lambda: clock["now"])
+    urlopen, asked = openers(Trickle(clock), b"the whole page at once")
+    monkeypatch.setattr(cache.urllib.request, "urlopen", urlopen)
+    dest = tmp_path / "box.xml"
+
+    assert cache.download("https://example.org/box", dest).read_bytes() == b"the whole page at once"
+    assert len(asked) == 2
+    assert clock["now"] < 10 * cache.STALL_S  # given up on within a few windows, not left to drip for an hour
 
 
 def test_half_a_file_is_never_left_where_a_whole_one_goes(tmp_path, monkeypatch):
