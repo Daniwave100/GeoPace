@@ -8,7 +8,6 @@ import {
   BoundingSphere,
   Cartesian3,
   Cartesian4,
-  Cartographic,
   CesiumTerrainProvider,
   Color,
   HeadingPitchRange,
@@ -17,7 +16,6 @@ import {
   Math as CesiumMath,
   Matrix4,
   PerspectiveFrustum,
-  sampleTerrainMostDetailed,
   Terrain,
   Transforms,
   Viewer,
@@ -289,43 +287,4 @@ export function zoomMap(viewer: Viewer, towards: number): void {
   if (stepM <= 0) return;
   if (towards > 0) viewer.camera.zoomIn(stepM);
   else viewer.camera.zoomOut(stepM);
-}
-
-/**
- * Tell `onHeight` how far the camera is above the ground, now and each time the camera comes to
- * rest, until the function this returns is called. The ground is the keyless open terrain, never
- * the photoreal imagery, which is for looking at only (PLAN.md D5). That terrain is good to a few
- * metres, so near the ground the answer is rough. Null when the terrain can't say.
- */
-export function watchCameraHeight(viewer: Viewer, onHeight: (meters: number | null) => void): () => void {
-  let asked = 0;
-  const measure = async (): Promise<void> => {
-    const mine = ++asked;
-    const eye = Cartographic.clone(viewer.camera.positionCartographic);
-    let meters: number | null = null;
-    try {
-      const [ground] = await sampleTerrainMostDetailed(viewer.terrainProvider, [Cartographic.clone(eye)]);
-      if (Number.isFinite(ground.height)) meters = eye.height - ground.height;
-    } catch {
-      // The terrain is best-effort (PLAN.md D16). No height is better than a wrong one.
-    }
-    if (mine === asked) onHeight(meters);
-  };
-  // CesiumJS says the camera has come to rest before the frame is drawn, and before the Ride, if it
-  // is holding the camera, has put it where that frame is drawn from (scene/ride-camera.ts): read
-  // then, it is the camera CesiumJS nudged, a view nobody sees. It is read once that frame is drawn.
-  let waitingForTheFrame: (() => void) | undefined;
-  const stopListening = viewer.camera.moveEnd.addEventListener(() => {
-    waitingForTheFrame ??= viewer.scene.postRender.addEventListener(() => {
-      waitingForTheFrame?.();
-      waitingForTheFrame = undefined;
-      void measure();
-    });
-  });
-  void measure();
-  return () => {
-    asked += 1; // an answer still on its way is no longer wanted
-    stopListening();
-    waitingForTheFrame?.();
-  };
 }

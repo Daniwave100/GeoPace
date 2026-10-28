@@ -285,8 +285,8 @@ photoreal imagery (D32) · two cameras and a time-lapse (D33). Words used here a
   - **#6 (Explore) can keep the draped line from above**, where it is correct and reads well, and keeps opaque blocks
     for everything laid over the imagery. Nothing else got lost.
 - **The owner's second look, 09-18, at Explore over photoreal (#6):** the line is "better than last time" but still wrong on the Queensboro (it rides the right side of the structure, not the road) and on the Verrazzano ("not on the actual road itself"). Same cause as above: the line is draped over whatever is highest. The owner's own diagnosis, later the same day, is exactly right: from one angle the line is perfect, and it distorts as the camera moves, over trees and bridges but never on a plain street with buildings beside it. That is what draping does: the paint lands on whatever stands over the road, which is metres above it and so slides against it as the view changes. "Not a huge deal, but something we would ideally want to fix… let's create this into a new issue." **It is #22**, ahead of #8, which it blocks. *Built 09-18 (D51, D52): in photoreal the line stands at the road's own height, from the pipeline's heights and a geoid model. What is left is the owner's look, below.* The same look also showed that the *not measured here* dashes read as white squares over dark imagery (the grey vanishes, the paper gaps stand out); #22 takes that with it.
-- **How the look was done.** With photoreal on, the map shows "Camera: about N m above the ground" each time the
-  camera comes to rest. It is read from the open terrain, never from Google's mesh (D5): good to a few metres, and on
+- **How the look was done.** With photoreal on, the map shows "Camera: about N m above the ground", read
+  after a frame is drawn, at most twice a second (#52: it waited for the camera to come to rest, which in a Ride it never does). It is read from the open terrain, never from Google's mesh (D5): good to a few metres, and on
   a bridge it counts from the water. The page says under the map how to tilt down. The owner's answers, word for
   word, are in `docs/photoreal-look-notes.md`.
 - **Speed.** 42 km in 3 minutes is ~230 m/s: fine from the air, unwatchable on the ground. So: bird's-eye between
@@ -618,7 +618,8 @@ arrival times are approximate — state that in the UI.
   the ellipsoid?" from inside with the far side of it: "Straight down" from On the road sent the map to the Atlantic. The
   middle of the map is found on the ground under the camera (`scene/map-middle.ts`, tested with a real CesiumJS camera).
 - **CesiumJS says the camera has come to rest before the frame is drawn.** Anything that reads the camera then, while the
-  Ride holds it, reads the one CesiumJS nudged, not the one the frame is drawn from. It is read after the frame.
+  Ride holds it, reads the one CesiumJS nudged, not the one the frame is drawn from. It is read after the frame. And a
+  Ride never lets it come to rest: a height asked for only then kept the one from before the Ride all the way along (#52).
 - **A hidden globe stops loading, but still answers.** While photoreal has the plain ground's place CesiumJS's globe is
   hidden and loads nothing more; asked how high the ground is, it answers from whatever it has. Over a course it never
   drew (the runner switches course in photoreal) that is its top tile, whose flat triangles sag 2 km under the curved
@@ -1225,3 +1226,7 @@ arrival times are approximate — state that in the UI.
   measured from the road, decides. Both bundles rebuilt: Berlin counts 27,526 buildings (was 27,429), New York 18,195
   (was 18,073), and both shade tables are bit for bit the same; the White model is unchanged. Berlin's reader asks
   the city for the outline and the height alone, and a download that only drips is now dropped and asked for again.
+- **2026-10-27** — **Photoreal's camera height keeps up with a Ride (#52):** "Camera: about N m above the ground" was
+  measured when the camera came to rest, which a Ride never lets it do, so it showed the height from before the Ride.
+  It is now measured after a frame is drawn, when the camera has moved, at most twice a second and one question to
+  the terrain at a time (`scene/camera-height.ts`).
